@@ -8,13 +8,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
 // Muestra solo el nombre de la sección (RF-06).
 @Composable
 fun TabPlaceholder(destination: MainDestination, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("tab_placeholder_${destination.name}"),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(
             text = stringResource(destination.labelRes),
             style = MaterialTheme.typography.titleLarge,

@@ -1,5 +1,6 @@
 package com.rocioplata.familyfinaiapp.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -21,9 +22,14 @@ import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
     var selected by remember { mutableStateOf(MainDestination.Home) }
+    BackHandler(enabled = selected != MainDestination.Home) {
+        selected = MainDestination.Home
+    }
     MainScreenContent(
         selected = selected,
-        onSelect = { selected = it },
+        onSelect = { destination ->
+            if (destination != selected) selected = destination
+        },
         modifier = modifier,
     )
 }
