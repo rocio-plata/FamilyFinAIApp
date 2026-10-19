@@ -9,26 +9,26 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Configuración
 
-- [ ] **T-01 · Dependencia de iconos**
+- [x] **T-01 · Dependencia de iconos**
   - **Cubre:** RF-01, RF-05 · **Depende de:** —
   - **Alcance:** añadir `material-icons-extended` al catálogo y a `app/build.gradle.kts`.
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** la compilación de debug termina sin errores con la dependencia añadida.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-18: `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL (3m 34s) con `material-icons-extended` añadido al catálogo y a `app/build.gradle.kts`, versión fijada por el Compose BOM.
 
-- [ ] **T-02 · Cadenas de texto**
+- [x] **T-02 · Cadenas de texto**
   - **Cubre:** RF-12 (apoya RF-10) · **Depende de:** —
   - **Alcance:** en `strings.xml`, textos de las 5 pestañas, cabecera de ejemplo, FAB y descripciones accesibles, en español.
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y todos los textos del scaffold existen como recursos, sin cadenas literales previstas en código.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-18: `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL con las cadenas nuevas en `strings.xml` (5 pestañas, cabecera de ejemplo, descripciones accesibles, FAB). El uso en código se comprueba en T-04 a T-08.
 
-- [ ] **T-03 · Orientación vertical**
+- [x] **T-03 · Orientación vertical**
   - **Cubre:** RF-09 (CA-06) · **Depende de:** —
   - **Alcance:** fijar orientación vertical en `MainActivity` dentro del manifest.
   - **Validación:** `./gradlew :app:assembleDebug` y revisión del manifest.
   - **Hecho cuando:** el manifest declara `portrait` para `MainActivity` y compila.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-18: manifest con `android:screenOrientation="portrait"` en `MainActivity` (línea 18); `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. CA-06 (comportamiento en dispositivo) sigue pendiente de T-15.
 
 ## Interfaz
 
