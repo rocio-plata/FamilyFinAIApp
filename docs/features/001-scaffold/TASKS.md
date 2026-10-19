@@ -32,54 +32,54 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Interfaz
 
-- [ ] **T-04 · Destinos y orden de pestañas**
+- [x] **T-04 · Destinos y orden de pestañas**
   - **Cubre:** RF-05 · **Depende de:** T-01, T-02
   - **Alcance:** definir los 5 destinos (nombre, icono y etiqueta) en el orden Inicio, Movimientos, Reportes, Presupuestos, Asistente.
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y los 5 destinos existen en el orden de la SPEC con texto e icono.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-18: `ui/main/MainDestination.kt` define las 5 entradas en el orden Inicio, Movimientos, Reportes, Presupuestos, Asistente, cada una con etiqueta (`strings.xml`) e icono; `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL.
 
-- [ ] **T-05 · Cabecera estática**
+- [x] **T-05 · Cabecera estática**
   - **Cubre:** RF-01, RF-10, RF-12 · **Depende de:** T-02
   - **Alcance:** selector de familia (nombre y rol de ejemplo), icono de notificaciones y avatar; visibles, sin acción, con descripción accesible y área táctil mínima; usa colores del tema, sin hexadecimales.
   - **Validación:** vista previa y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** la vista previa muestra los tres elementos y cada uno tiene descripción accesible.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-18: `ui/main/MainHeader.kt` (con `@Preview`) implementado; `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. Vista previa `MainHeaderPreview` revisada por la persona el 2026-10-19: se ven los tres elementos.
 
-- [ ] **T-06 · Barra inferior**
+- [x] **T-06 · Barra inferior**
   - **Cubre:** RF-05, RF-10 · **Depende de:** T-04
   - **Alcance:** barra de navegación Material 3 con las 5 pestañas, la seleccionada resaltada, y un callback de selección.
   - **Validación:** vista previa y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** la vista previa muestra las 5 pestañas con Inicio seleccionada y etiquetas legibles.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-19: `ui/main/MainBottomBar.kt` implementado. La persona detectó que las etiquetas "Movimientos" y "Presupuestos" no se ven bien; se reduce el estilo a `labelSmall` sin ajuste de línea. Vista previa `MainBottomBarPreview` revisada por la persona el 2026-10-19 tras el ajuste: 5 pestañas, Inicio seleccionada, etiquetas legibles.
 
-- [ ] **T-07 · Placeholders de pestañas**
+- [x] **T-07 · Placeholders de pestañas**
   - **Cubre:** RF-06 · **Depende de:** T-04
   - **Alcance:** contenido que muestra solo el nombre de la sección, para las 4 pestañas distintas de Inicio.
   - **Validación:** vista previa y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** la vista previa de cada una de las 4 muestra únicamente su nombre.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-19: `ui/main/TabPlaceholder.kt` con una vista previa por pestaña (Movimientos, Reportes, Presupuestos, Asistente); `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. Las 4 vistas previas fueron revisadas por la persona el 2026-10-19: cada una muestra solo su nombre.
 
-- [ ] **T-08 · Cuerpo de Inicio y FAB**
+- [x] **T-08 · Cuerpo de Inicio y FAB**
   - **Cubre:** RF-03, RF-04, RF-10 · **Depende de:** T-02
   - **Alcance:** cuerpo placeholder sin datos ni secciones; FAB "+" sin acción y con descripción accesible.
   - **Validación:** vista previa y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** la vista previa muestra el cuerpo vacío y el FAB, y este no tiene acción asociada.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-19: `ui/main/HomeContent.kt` con cuerpo vacío (`HomeContent`) y `HomeFab` (`onClick` vacío, descripción accesible) con `@Preview`; `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. `HomeFabPreview` revisada por la persona el 2026-10-19. El cuerpo vacío se verá junto al resto en T-09.
 
-- [ ] **T-09 · Contenedor raíz y estado de pestaña**
+- [x] **T-09 · Contenedor raíz y estado de pestaña**
   - **Cubre:** RF-02, RF-05, RF-08, RF-11 · **Depende de:** T-05, T-06, T-07, T-08
   - **Alcance:** `Scaffold` que une cabecera (en las 5 pestañas), barra, FAB solo en Inicio y contenido de la pestaña activa; estado en memoria con Inicio por defecto, sin persistirlo; respeta insets del sistema.
   - **Validación:** vista previa y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** al cambiar de pestaña en la vista previa interactiva se ve su contenido, la cabecera permanece y el FAB solo aparece en Inicio.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-19: `ui/main/MainScreen.kt` (estado `remember` en memoria, Inicio por defecto; `Scaffold` con cabecera con insets, barra, FAB solo en Inicio y contenido por pestaña) con `@Preview` interactivo; `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. `MainScreenPreview` en modo interactivo revisada por la persona el 2026-10-19: el contenido cambia por pestaña, la cabecera permanece y el FAB solo aparece en Inicio.
 
-- [ ] **T-10 · Conectar en MainActivity**
+- [x] **T-10 · Conectar en MainActivity**
   - **Cubre:** RF-01, RF-08 · **Depende de:** T-09
   - **Alcance:** mostrar el contenedor raíz en `MainActivity`; retirar `Greeting` y su vista previa.
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y no queda código del saludo de ejemplo.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-10-19: `MainActivity` muestra `MainScreen`; `Greeting` y su vista previa eliminados (`grep` sin resultados); `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL.
 
 ## Comportamiento
 
