@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">FamilyFinAIApp</string>
+
+    <string name="tab_home">Inicio</string>
+    <string name="tab_movements">Movimientos</string>
+    <string name="tab_reports">Reportes</string>
+    <string name="tab_budgets">Presupuestos</string>
+    <string name="tab_assistant">Asistente</string>
+
+    <string name="header_family_name">Familia Plata</string>
+    <string name="header_family_role">Propietario</string>
+    <string name="header_family_selector_description">Selector de familia: %1$s, %2$s</string>
+    <string name="header_notifications_description">Notificaciones</string>
+    <string name="header_avatar_description">Perfil de usuario</string>
+
+    <string name="fab_add_description">Agregar</string>
 </resources>
