@@ -1,4 +1,4 @@
-# Instrucciones para agentes
+# AGENTS.md - FamilyFinAIApp
 
 ## Alcance y prioridad
 
