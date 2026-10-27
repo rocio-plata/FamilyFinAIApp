@@ -139,6 +139,7 @@ Todas nuevas; versiones a fijar en `gradle/libs.versions.toml` durante la implem
 - **DataStore Preferences**: *confirmado*; caché local sin esquema relacional.
 - **lifecycle-viewmodel-compose** y **lifecycle-runtime-compose** (`collectAsStateWithLifecycle`), alineadas con lifecycle 2.6.1 o superior: AGENTS.md pide `StateFlow` + `collectAsStateWithLifecycle`.
 - Tests: **kotlinx-coroutines-test**, **ktor-client-mock**.
+- Versiones fijadas por compatibilidad con Kotlin 2.2.10 y `compileSdk` 36: Ktor 3.3.3, kotlinx-serialization 1.9.0, kotlinx-coroutines 1.10.2 (ver evidencia de T-01).
 - Permisos: `INTERNET` y `ACCESS_NETWORK_STATE` (normales, sin diálogo).
 - `buildFeatures { buildConfig = true }` y lectura de `local.properties` (no versionado) hacia `BuildConfig` solo en `debug`: `BACKEND_BASE_URL=http://10.0.2.2:3000` (emulador), `DEV_EMAIL` y `DEV_PASSWORD`; en `release` quedan vacías. Si faltan en debug, el build falla con un mensaje claro. Sin secretos en el repositorio.
 - Tráfico HTTP en claro **solo en debug** y solo hacia `10.0.2.2`, mediante `src/debug/res/xml/network_security_config.xml` y manifest de debug (confirmado); release no permite cleartext.

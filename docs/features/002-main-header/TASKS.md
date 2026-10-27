@@ -9,33 +9,33 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Configuración
 
-- [ ] **T-01 · Dependencias y plugin de serialización**
+- [x] **T-01 · Dependencias y plugin de serialización**
   - **Cubre:** soporte (RF-01, RF-04, RF-05, RF-07) · **Depende de:** —
   - **Alcance:** en `gradle/libs.versions.toml` y `app/build.gradle.kts`: Ktor Client (core, okhttp, content-negotiation, serialization-kotlinx-json), plugin y `kotlinx-serialization-json`, DataStore Preferences, lifecycle-viewmodel-compose y lifecycle-runtime-compose, y para tests `kotlinx-coroutines-test` y `ktor-client-mock`. Versiones compatibles con Kotlin 2.2.10 y AGP 9.3.3.
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila sin errores con todas las dependencias.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug` y `:app:compileDebugUnitTestKotlin` → BUILD SUCCESSFUL. Versiones fijadas en `gradle/libs.versions.toml`: Ktor 3.3.3, kotlinx-serialization-json 1.9.0, kotlinx-coroutines-test 1.10.2, DataStore 1.3.0, lifecycle 2.10.0 (sustituye a `lifecycleRuntimeKtx` 2.6.1 para alinear runtime-ktx, runtime-compose y viewmodel-compose). Descartadas: serialization 1.12.0 (exige metadata de Kotlin 2.4, el proyecto usa 2.2.10) y Ktor 3.6.0 (arrastra OkHttp 5.5.0, que exige `compileSdk` 37; con 3.3.3 resuelve OkHttp 5.2.1). Plugin `kotlin-serialization` aplicado en `app/build.gradle.kts`.
 
-- [ ] **T-02 · Permisos, Application y configuración de entorno**
+- [x] **T-02 · Permisos, Application y configuración de entorno**
   - **Cubre:** soporte (RF-07) · **Depende de:** T-01
   - **Alcance:** permisos `INTERNET` y `ACCESS_NETWORK_STATE`; `FamilyFinApp` y `AppContainer` (HttpClient, DataStore, repositorio) y `android:name` en el manifest; `buildConfig` con `BACKEND_BASE_URL`, `DEV_EMAIL`, `DEV_PASSWORD` leídos de `local.properties` (no versionado) solo en debug (vacíos en release; el build de debug falla con mensaje claro si faltan); `network_security_config` en `src/debug` que permite HTTP solo a `10.0.2.2`.
   - **Validación:** `./gradlew :app:assembleDebug`, `./gradlew :app:assembleRelease` o revisión de que release no admite cleartext, y revisión de que `local.properties` no se versiona.
   - **Hecho cuando:** compila, el manifest declara permisos y `Application`, el cleartext existe solo en debug y no hay secretos en el repositorio.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:assembleRelease` → BUILD SUCCESSFUL. Manifest de release con permisos y `FamilyFinApp` y sin `networkSecurityConfig`; solo el manifest de debug lo declara (`src/debug`, HTTP solo a `10.0.2.2`). `BuildConfig` de release con las 3 constantes vacías. Sin `DEV_EMAIL` en `local.properties`, `assembleDebug` falla con «Faltan propiedades en local.properties… DEV_EMAIL» (la tarea `checkDevProperties` solo engancha `preDebugBuild`). `git check-ignore local.properties` → ignorado. `AppContainer` incluye por ahora `HttpClient` (OkHttp, JSON, timeouts 10 s/15 s) y el DataStore `header_cache`; el repositorio se añade en T-12.
 
-- [ ] **T-03 · Exclusión de la caché de las copias de seguridad**
+- [x] **T-03 · Exclusión de la caché de las copias de seguridad**
   - **Cubre:** privacidad (RF-07) · **Depende de:** T-01
   - **Alcance:** excluir el DataStore `header_cache` en `backup_rules.xml` y `data_extraction_rules.xml` (cloud-backup y device-transfer).
   - **Validación:** `./gradlew :app:assembleDebug` y revisión de los XML.
   - **Hecho cuando:** ambos archivos excluyen la caché y compila.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. `backup_rules.xml` (full-backup-content) y `data_extraction_rules.xml` (cloud-backup y device-transfer) excluyen `domain="file" path="datastore/header_cache.preferences_pb"`, el archivo que crea el DataStore `header_cache` (`AppContainer`). Revisión de XML; no se probó un backup real.
 
-- [ ] **T-04 · Cadenas y plurales**
+- [x] **T-04 · Cadenas y plurales**
   - **Cubre:** RF-04, RF-06, RF-07, RF-08, RF-09 · **Depende de:** —
   - **Alcance:** en `strings.xml`: roles ("Propietario", "Integrante"), plural del contador ("N invitaciones pendientes"), estados de carga/error/reintento/sin datos, aviso de datos desactualizados, "Cambios solo en este dispositivo", formato "Título · Familia"; retirar `header_family_name` y `header_family_role`.
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y no quedan textos de ejemplo ni literales previstos en código.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:lintDebug` → BUILD SUCCESSFUL. Añadidos en `strings.xml`: roles (`role_owner`, `role_member`), plural `header_notifications_count_description`, estados (`header_family_loading`, `header_family_error`, `header_retry`, `header_no_data`), aviso `header_stale_data_banner`, `header_local_changes_description`, etiquetas del avatar y del selector, y `tab_content_title_with_family` («%1$s · %2$s»). Desviación: `header_family_name`/`header_family_role` siguen en el archivo, marcadas con comentario, porque `MainHeader` estático y los androidTest de la 001 aún las usan; se retiran en T-13.
 
 ## Dominio y sesión
 
@@ -103,7 +103,7 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 - [ ] **T-13 · Cabecera con datos reales**
   - **Cubre:** RF-01, RF-02, RF-04, RF-05, RF-06, RF-07, RF-09 (CA-06, CA-08, CA-13, CA-19, CA-20) · **Depende de:** T-04, T-12
-  - **Alcance:** modificar `MainHeader`: nombre y rol de la activa; estados carga, error con reintento y sin datos; una sola familia sin indicador ni clic; contador solo si N>0 con semántica plural; avatar con inicial o icono genérico, sin acción; icono de cambios locales a la izquierda de notificaciones, oculto si `hasLocalChanges` es false; áreas ≥48 dp, truncado de nombres largos, colores del tema; `@Preview` de los estados.
+  - **Alcance:** retirar `header_family_name` y `header_family_role` de `strings.xml` (pendiente de T-04); modificar `MainHeader`: nombre y rol de la activa; estados carga, error con reintento y sin datos; una sola familia sin indicador ni clic; contador solo si N>0 con semántica plural; avatar con inicial o icono genérico, sin acción; icono de cambios locales a la izquierda de notificaciones, oculto si `hasLocalChanges` es false; áreas ≥48 dp, truncado de nombres largos, colores del tema; `@Preview` de los estados.
   - **Validación:** vistas previas y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** las vistas previas muestran los estados y cada elemento tiene etiqueta accesible.
   - **Evidencia:**
