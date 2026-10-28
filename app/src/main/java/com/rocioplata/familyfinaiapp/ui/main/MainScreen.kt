@@ -27,8 +27,6 @@ import com.rocioplata.familyfinaiapp.FamilyFinApp
 import androidx.compose.ui.tooling.preview.Preview
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
-// La pestaña seleccionada vive solo en memoria: se conserva al pasar a segundo
-// plano y se reinicia a Inicio al recrear la Activity (RF-08).
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
     val container = (LocalContext.current.applicationContext as FamilyFinApp).container
@@ -40,6 +38,27 @@ fun MainScreen(modifier: Modifier = Modifier) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.onStart() }
 
+    MainScreen(
+        uiState = uiState,
+        onFamilyClick = viewModel::openSelector,
+        onRetry = viewModel::retry,
+        onSelectFamily = viewModel::selectFamily,
+        onDismissSelector = viewModel::dismissSelector,
+        modifier = modifier,
+    )
+}
+
+// La pestaña seleccionada vive solo en memoria: se conserva al pasar a segundo
+// plano y se reinicia a Inicio al recrear la Activity (RF-08).
+@Composable
+fun MainScreen(
+    uiState: MainUiState,
+    onFamilyClick: () -> Unit,
+    onRetry: () -> Unit,
+    onSelectFamily: (String) -> Unit,
+    onDismissSelector: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var selected by remember { mutableStateOf(MainDestination.Home) }
     BackHandler(enabled = selected != MainDestination.Home) {
         selected = MainDestination.Home
@@ -50,10 +69,10 @@ fun MainScreen(modifier: Modifier = Modifier) {
             if (destination != selected) selected = destination
         },
         uiState = uiState,
-        onFamilyClick = viewModel::openSelector,
-        onRetry = viewModel::retry,
-        onSelectFamily = viewModel::selectFamily,
-        onDismissSelector = viewModel::dismissSelector,
+        onFamilyClick = onFamilyClick,
+        onRetry = onRetry,
+        onSelectFamily = onSelectFamily,
+        onDismissSelector = onDismissSelector,
         modifier = modifier,
     )
 }

@@ -138,30 +138,57 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Validación
 
-- [ ] **T-18 · Tests de interfaz**
+- [x] **T-18 · Tests de interfaz**
   - **Cubre:** CA-02, CA-03, CA-04, CA-06, CA-08, CA-12, CA-13, CA-14, CA-15, CA-19, CA-20 y regresión de la 001 · **Depende de:** T-17
   - **Alcance:** adaptar `MainScreenTest` y `MainScreenBehaviorTest` a la nueva firma y datos de prueba; añadir tests de selector, contador, una familia, icono de cambios locales y pestañas.
   - **Validación:** `./gradlew :app:connectedDebugAndroidTest` (requiere emulador o dispositivo).
   - **Hecho cuando:** los tests pasan o queda registrado el bloqueo del entorno.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:connectedDebugAndroidTest -Pandroid.injected.device.serial=emulator-5554` ejecutó en `Pixel_9` los 16 tests instrumentados (JUnit XML: 0 fallos, 0 errores, 0 omitidos), incluidos 12 de `MainScreenTest`, 3 de `MainScreenBehaviorTest` y `ExampleInstrumentedTest`. La tarea Gradle terminó en fallo después al intentar instalar también en el POCO: `INSTALL_FAILED_USER_RESTRICTED`; Xiaomi bloqueó esa instalación, pero no afectó los resultados del AVD. `:app:compileDebugAndroidTestKotlin` → BUILD SUCCESSFUL. Los tests usan `TestMainHost` con estado falso, sin red ni backend. Adaptadas las pruebas de navegación/Atrás y accesibilidad; añadidos selector, cierre sin cambios con Atrás, una familia, contador plural y ausente, cambios locales, banner stale, reintento y familia activa en todas las pestañas. Se detuvo `familyfin-db` sin borrar sus datos para liberar recursos; el emulador se cerró tras las pruebas.
 
-- [ ] **T-19 · Compilación, tests unitarios y lint**
+- [x] **T-19 · Compilación, tests unitarios y lint**
   - **Cubre:** todos los RF · **Depende de:** T-18
   - **Alcance:** ejecutar el conjunto completo.
   - **Validación:** `./gradlew :app:assembleDebug`, `./gradlew :app:testDebugUnitTest`, `./gradlew :app:lintDebug`.
   - **Hecho cuando:** las tres terminan sin errores, o se registran los fallos.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` → BUILD SUCCESSFUL, sin errores. Tests unitarios (XML de `testDebugUnitTest`): 51 tests, 0 fallos, 0 errores, 0 omitidos. Los instrumentados (16, 0 fallos en `Pixel_9`) están en T-18.
 
-- [ ] **T-20 · Pruebas manuales en emulador**
+- [x] **T-20 · Pruebas manuales en emulador**
   - **Cubre:** CA-05, CA-09, CA-10, CA-13, CA-15 · **Depende de:** T-19
   - **Alcance:** matar el proceso y reabrir (vuelve la favorita); instalación limpia sin red, error y reintento; datos previos sin red; TalkBack y fuente máxima; recorrer las 5 pestañas. Requiere el backend en `localhost:3000` (emulador: `http://10.0.2.2:3000`) y un usuario de prueba con varias familias en `DEV_EMAIL`/`DEV_PASSWORD` de `local.properties`. Para CA-19 y CA-06 se usa `DEV_GUEST_EMAIL`/`DEV_GUEST_PASSWORD` (una sola familia y 1 invitación pendiente): no aceptar su invitación mientras tanto. El rol «Integrante» se probará más adelante, al aceptarla.
   - **Validación:** ejecución manual con resultados anotados.
   - **Hecho cuando:** cada escenario tiene resultado registrado, o motivo de bloqueo (sin AVD o backend).
-  - **Evidencia:**
+  - **Evidencia (parcial, POCO X6 Pro con `DEV_TARGET=device`):**
+    - Limitación conocida, **CA-09, CA-10 y CA-16 no verificables**: `StaticSessionProvider` hace un login por red para obtener el `userId` antes de leer la caché; sin red `refresh()` termina antes de `loadCache`. Probado con datos previos, fecha del móvil +2 días y sin el túnel `adb reverse` (el modo avión solo no basta: el túnel USB seguía dando acceso al backend): la app muestra «no se pueden cargar las familias» en lugar de los datos guardados. Se resolverá en la spec de sesión; las reglas de caché (24 h / 7 h / usuario) están cubiertas por los tests unitarios de `HeaderRepositoryImpl`.
+    - Verificado por la usuaria en el POCO: recorrido de las 5 pestañas con «Título · Familia» y cambio de familia (CA-15); al cerrar la app y reabrirla vuelve la familia favorita (CA-05).
+    - Verificado por la usuaria en el POCO con `DEV_GUEST_*`: una sola familia sin flecha ni selector (CA-19), contador con 1 invitación (CA-06) y rol mostrado correctamente.
+    - CA-13: la usuaria confirmó que la cabecera con fuente grande se ve bien. TalkBack no se probó a mano; las etiquetas y la semántica están cubiertas por los androidTest de T-18.
+    - Resumen: T-20 completada salvo CA-09, CA-10 y CA-16 (limitación documentada) y TalkBack manual (no verificado).
 
-- [ ] **T-21 · Revisión final**
+- [x] **T-21 · Revisión final**
   - **Cubre:** CA-01 a CA-20 · **Depende de:** T-20
   - **Alcance:** contrastar cada criterio con su evidencia, confirmar que no se implementó nada fuera de alcance y que SPEC, PLAN y TASKS son coherentes.
   - **Validación:** revisión documental.
   - **Hecho cuando:** cada criterio tiene evidencia o está marcado como no verificado.
-  - **Evidencia:**
+  - **Evidencia:** revisión documental contra T-12..T-20. `assembleDebug`, `testDebugUnitTest` (51, 0 fallos) y `lintDebug` OK (T-19); 16 androidTest OK en `Pixel_9` (T-18); pruebas manuales en el POCO (T-20).
+
+    | CA | Estado | Evidencia |
+    | --- | --- | --- |
+    | CA-01 | Verificado | `MainViewModelTest` (favorita = primera); POCO (T-20) |
+    | CA-02, 03, 04 | Verificado | androidTest de selector (T-18); `MainViewModelTest`; POCO |
+    | CA-05 | Verificado | `MainViewModelTest` (ViewModel nuevo = favorita); POCO: reabrir tras cerrar |
+    | CA-06 | Verificado | androidTest de contador; POCO con `DEV_GUEST_*` (1 invitación) |
+    | CA-07 | Verificado | tests unitarios de avatar (5) |
+    | CA-08 | Verificado | androidTest (sin acción en el perfil); sin `onClick` en el avatar |
+    | CA-09 | No verificado | Limitación de sesión (T-20); cubierto en parte por `sinRedYSinCache_devuelveErrorYNoHayDatos` y el reintento del ViewModel |
+    | CA-10 | No verificado | Limitación de sesión; la regla está cubierta en `HeaderRepositoryImplTest` |
+    | CA-11 | Verificado | `HeaderRepositoryImplTest` y `MainViewModelTest` (falla solo invitaciones) |
+    | CA-12 | Verificado | `MainViewModelTest`; androidTest de selector |
+    | CA-13 | Parcial | Fuente grande vista en el POCO; etiquetas por androidTest; TalkBack no probado a mano |
+    | CA-14, 15 | Verificado | androidTest de pestañas (T-18); POCO: 5 pestañas y cambio de familia |
+    | CA-16 | No verificado de extremo a extremo | Limitación de sesión; la regla de 24 h en `HeaderRepositoryImplTest`; banner en androidTest |
+    | CA-17 | Parcial | `cacheDe8Dias_sinRed_seEliminaYNoSeMuestra` (unitario); no probado en dispositivo |
+    | CA-18 | Parcial | `cacheDeOtroUsuario_*` (unitarios); no probado con dos usuarios en el dispositivo |
+    | CA-19 | Verificado | androidTest de una familia; POCO con el invitado |
+    | CA-20 | Verificado | androidTest de icono de cambios locales; en producción es siempre `false` (sin origen de cambios locales aún) |
+
+    Alcance: sin navegación, perfil ni invitaciones accionables, como indica la SPEC; sin dependencias fuera del plan. SPEC, PLAN y TASKS coherentes. Pendientes para una spec de sesión: validar la caché sin red (CA-09, CA-10, CA-16), TalkBack manual (CA-13) y las pruebas en dispositivo de CA-17 y CA-18.
