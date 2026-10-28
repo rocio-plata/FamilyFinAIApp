@@ -142,7 +142,8 @@ Todas nuevas; versiones a fijar en `gradle/libs.versions.toml` durante la implem
 - Versiones fijadas por compatibilidad con Kotlin 2.2.10 y `compileSdk` 36: Ktor 3.3.3, kotlinx-serialization 1.9.0, kotlinx-coroutines 1.10.2 (ver evidencia de T-01).
 - Permisos: `INTERNET` y `ACCESS_NETWORK_STATE` (normales, sin diálogo).
 - `buildFeatures { buildConfig = true }` y lectura de `local.properties` (no versionado) hacia `BuildConfig` solo en `debug`: `BACKEND_BASE_URL=http://10.0.2.2:3000` (emulador), `DEV_EMAIL` y `DEV_PASSWORD`; en `release` quedan vacías. Si faltan en debug, el build falla con un mensaje claro. Sin secretos en el repositorio.
-- Tráfico HTTP en claro **solo en debug** y solo hacia `10.0.2.2`, mediante `src/debug/res/xml/network_security_config.xml` y manifest de debug (confirmado); release no permite cleartext.
+- `DEV_TARGET` (`emulator` por defecto, o `device`) en `local.properties` elige la URL: `emulator` → `http://10.0.2.2:3000`; `device` (móvil físico) → `http://localhost:3000` con `adb reverse tcp:3000 tcp:3000`. `BACKEND_BASE_URL` explícito, si existe, lo anula.
+- Tráfico HTTP en claro **solo en debug** y solo hacia `10.0.2.2` y `localhost`, mediante `src/debug/res/xml/network_security_config.xml` y manifest de debug (confirmado); release no permite cleartext.
 
 ## Estrategia de validación
 

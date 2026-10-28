@@ -10,7 +10,20 @@ val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use(::load)
 }
-val devPropertyNames = listOf("BACKEND_BASE_URL", "DEV_EMAIL", "DEV_PASSWORD")
+val devCredentialNames = listOf("DEV_EMAIL", "DEV_PASSWORD")
+val devTargetUrls = mapOf(
+    "emulator" to "http://10.0.2.2:3000",
+    // Requiere `adb reverse tcp:3000 tcp:3000` con el dispositivo conectado por USB.
+    "device" to "http://localhost:3000",
+)
+val devTarget = localProperties.getProperty("DEV_TARGET", "emulator").trim()
+val devBackendUrl = localProperties.getProperty("BACKEND_BASE_URL")?.takeIf { it.isNotBlank() }
+    ?: devTargetUrls[devTarget].orEmpty()
+val devBuildConfig = mapOf(
+    "BACKEND_BASE_URL" to devBackendUrl,
+    "DEV_EMAIL" to localProperties.getProperty("DEV_EMAIL", ""),
+    "DEV_PASSWORD" to localProperties.getProperty("DEV_PASSWORD", ""),
+)
 
 fun buildConfigString(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
@@ -34,12 +47,12 @@ android {
 
     buildTypes {
         debug {
-            devPropertyNames.forEach { name ->
-                buildConfigField("String", name, buildConfigString(localProperties.getProperty(name, "")))
+            devBuildConfig.forEach { (name, value) ->
+                buildConfigField("String", name, buildConfigString(value))
             }
         }
         release {
-            devPropertyNames.forEach { name ->
+            devBuildConfig.keys.forEach { name ->
                 buildConfigField("String", name, "\"\"")
             }
             optimization {
@@ -86,15 +99,21 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 
-val missingDevProperties = devPropertyNames.filter { localProperties.getProperty(it).isNullOrBlank() }
+val missingDevProperties = devCredentialNames.filter { localProperties.getProperty(it).isNullOrBlank() }
+val invalidDevTarget = devTarget !in devTargetUrls && localProperties.getProperty("BACKEND_BASE_URL").isNullOrBlank()
 
 val checkDevProperties by tasks.registering {
     val missing = missingDevProperties
+    val invalidTarget = invalidDevTarget
+    val target = devTarget
     doLast {
+        if (invalidTarget) {
+            throw GradleException("DEV_TARGET=\"$target\" no es válido en local.properties; usa emulator o device.")
+        }
         if (missing.isNotEmpty()) {
             throw GradleException(
                 "Faltan propiedades en local.properties (no versionado): ${missing.joinToString()}. " +
-                    "Ejemplo: BACKEND_BASE_URL=http://10.0.2.2:3000, DEV_EMAIL=..., DEV_PASSWORD=...",
+                    "Ejemplo: DEV_TARGET=emulator, DEV_EMAIL=..., DEV_PASSWORD=...",
             )
         }
     }

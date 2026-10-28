@@ -21,7 +21,7 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
   - **Alcance:** permisos `INTERNET` y `ACCESS_NETWORK_STATE`; `FamilyFinApp` y `AppContainer` (HttpClient, DataStore, repositorio) y `android:name` en el manifest; `buildConfig` con `BACKEND_BASE_URL`, `DEV_EMAIL`, `DEV_PASSWORD` leídos de `local.properties` (no versionado) solo en debug (vacíos en release; el build de debug falla con mensaje claro si faltan); `network_security_config` en `src/debug` que permite HTTP solo a `10.0.2.2`.
   - **Validación:** `./gradlew :app:assembleDebug`, `./gradlew :app:assembleRelease` o revisión de que release no admite cleartext, y revisión de que `local.properties` no se versiona.
   - **Hecho cuando:** compila, el manifest declara permisos y `Application`, el cleartext existe solo en debug y no hay secretos en el repositorio.
-  - **Evidencia:** `./gradlew :app:assembleDebug :app:assembleRelease` → BUILD SUCCESSFUL. Manifest de release con permisos y `FamilyFinApp` y sin `networkSecurityConfig`; solo el manifest de debug lo declara (`src/debug`, HTTP solo a `10.0.2.2`). `BuildConfig` de release con las 3 constantes vacías. Sin `DEV_EMAIL` en `local.properties`, `assembleDebug` falla con «Faltan propiedades en local.properties… DEV_EMAIL» (la tarea `checkDevProperties` solo engancha `preDebugBuild`). `git check-ignore local.properties` → ignorado. `AppContainer` incluye por ahora `HttpClient` (OkHttp, JSON, timeouts 10 s/15 s) y el DataStore `header_cache`; el repositorio se añade en T-12.
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:assembleRelease` → BUILD SUCCESSFUL. Manifest de release con permisos y `FamilyFinApp` y sin `networkSecurityConfig`; solo el manifest de debug lo declara (`src/debug`, HTTP solo a `10.0.2.2`). `BuildConfig` de release con las 3 constantes vacías. Sin `DEV_EMAIL` en `local.properties`, `assembleDebug` falla con «Faltan propiedades en local.properties… DEV_EMAIL» (la tarea `checkDevProperties` solo engancha `preDebugBuild`). `git check-ignore local.properties` → ignorado. `AppContainer` incluye por ahora `HttpClient` (OkHttp, JSON, timeouts 10 s/15 s) y el DataStore `header_cache`; el repositorio se añade en T-12. Ampliación posterior (probar con móvil físico): `DEV_TARGET=emulator|device` elige `BACKEND_BASE_URL` (`http://10.0.2.2:3000` / `http://localhost:3000` con `adb reverse`); el cleartext de debug admite también `localhost`. Verificado con `assembleDebug` y `assembleRelease`: BuildConfig con cada URL, y valor inválido → error claro.
 
 - [x] **T-03 · Exclusión de la caché de las copias de seguridad**
   - **Cubre:** privacidad (RF-07) · **Depende de:** T-01
@@ -39,26 +39,26 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Dominio y sesión
 
-- [ ] **T-05 · Modelos y contrato del repositorio**
+- [x] **T-05 · Modelos y contrato del repositorio**
   - **Cubre:** RF-01, RF-02, RF-04, RF-05 · **Depende de:** T-01
   - **Alcance:** `domain/header`: `Family(id, name, role)`, `FamilyRole` (OWNER, MEMBER), `HeaderData` (familias, nº de invitaciones, nombre, `savedAt` por recurso) y `HeaderRepository`; sin dependencias de Android, Compose ni DTOs.
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y el paquete de dominio no importa Android ni Compose.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. Creados en `domain/header`: `Family`, `FamilyRole`, `HeaderData` (con `Timed<T>`: valor + `savedAtMillis` por recurso, nulo si no hay dato), `HeaderRepository` (`header: Flow<HeaderData>` y `refresh()`) y `HeaderFailure`/`HeaderRefreshResult` (fallo independiente por recurso: red, rol insuficiente, no autorizado, datos inválidos, desconocido). Añadidos sobre el alcance para poder expresar CA-11 y la re-consulta por `FAMILY.INSUFFICIENT_ROLE`. `grep` de imports `android`/`androidx` en `domain` → sin resultados.
 
-- [ ] **T-06 · SessionProvider**
+- [x] **T-06 · SessionProvider**
   - **Cubre:** CA-18 (restricción: sesión iniciada) · **Depende de:** T-02, T-05
   - **Alcance:** interfaz `SessionProvider` (userId y token) y `StaticSessionProvider` temporal solo debug: `POST /auth/login` con `DEV_EMAIL`/`DEV_PASSWORD` para obtener `userId` y token; sin refresco; error explícito si el login falla; sin credenciales ni token en logs.
   - **Validación:** test con `ktor-client-mock` (login correcto e `IDENTITY.INVALID_CREDENTIALS`) en `./gradlew :app:testDebugUnitTest` y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** los tests pasan, compila y el repositorio solo depende de la interfaz.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.session.*"` → BUILD SUCCESSFUL; `StaticSessionProviderTest`: 4 tests, 0 fallos (login correcto con reutilización de la sesión, `IDENTITY.INVALID_CREDENTIALS` → `INVALID_CREDENTIALS`, sin credenciales → `NOT_CONFIGURED` sin llamar a la red, `toString` sin token). `SessionProvider.current()` devuelve `Session(userId, accessToken)` o lanza `SessionUnavailableException` con un `SessionFailure` (sin mensaje del backend). Sin `Log`/`println` en `session`. `StaticSessionProvider` vive en `main` (no en `src/debug`) para que compile en release, donde las credenciales vacías dan `NOT_CONFIGURED`; aún no se cablea en `AppContainer` (T-12/T-16). No probado contra el backend real.
 
-- [ ] **T-07 · Inicial del avatar**
+- [x] **T-07 · Inicial del avatar**
   - **Cubre:** RF-05 (CA-07) · **Depende de:** T-05
   - **Alcance:** función pura: primer *code point* de `displayName` en mayúscula; nombre vacío → sin inicial (icono genérico). Test unitario con «rocío» → «R».
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.header.*"`.
   - **Hecho cuando:** los tests pasan, incluido el caso vacío.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.header.*"` → BUILD SUCCESSFUL; `AvatarInitialTest`: 5 tests, 0 fallos («rocío» → «R» (CA-07), espacios iniciales, «émile» → «É», code point fuera del BMP sin cortar, vacío/blanco/nulo → `null`). Función `avatarInitial(displayName: String?): String?` en `domain/header/AvatarInitial.kt`, sin dependencias de Android.
 
 ## Datos
 
