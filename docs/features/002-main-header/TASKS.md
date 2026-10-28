@@ -92,12 +92,12 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Estado
 
-- [ ] **T-12 · MainViewModel y estado**
+- [x] **T-12 · MainViewModel y estado**
   - **Cubre:** RF-01, RF-02, RF-03, RF-07, RF-08 (CA-01, CA-05, CA-12) · **Depende de:** T-10, T-11
   - **Alcance:** `MainUiState` (`Loading`, `NoData`, `Content`, `Error`; contador, nombre y `hasLocalChanges` = false) y `MainViewModel` con `StateFlow`: favorita = primera; `activeFamilyId` solo en memoria; `selectorOpen`; reintento sin duplicar cargas; `onInsufficientRole` re-consulta familias sin cambiar la activa; activa desaparecida → favorita; refresco al iniciar y al recuperar red.
   - **Validación:** `MainViewModelTest` con `kotlinx-coroutines-test` en `./gradlew :app:testDebugUnitTest`.
   - **Hecho cuando:** los tests cubren favorita, cambio de activa, ViewModel nuevo = favorita, doble pulsación y `onInsufficientRole`.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest :app:assembleDebug` → BUILD SUCCESSFUL; `MainViewModelTest`: 13 tests, 0 fallos, con repositorio y conectividad falsos: favorita = primera; cambiar de activa cierra el selector; ViewModel nuevo = favorita (RF-03); una sola familia no abre selector (CA-19); activa desaparecida → favorita; doble reintento/`onStart`/doble apertura → una sola carga y una sola lista (CA-12); sin datos y fallo → `Error` y el reintento carga; con datos guardados y fallo → sin error y con `isStale`; fallo solo de invitaciones → familias sin contador (CA-11); contador y nombre no cambian al elegir familia; `onInsufficientRole` vuelve a consultar sin cambiar la activa y refleja el rol nuevo; recuperar red refresca (no en la primera emisión); lista vacía → `NoData`. Archivos: `ui/main/MainUiState.kt` (`FamiliesState`: `Loading`, `NoData`, `Content`, `Error`, y `MainUiState` con `hasLocalChanges = false`) y `ui/main/MainViewModel.kt` (`StateFlow` con `WhileSubscribed`, `activeFamilyId` solo en memoria, `refreshJob` único). Decisiones: `NoData` = el backend respondió una lista vacía; «sin datos mientras se consulta» tras borrar la caché de otro usuario (CA-18) se muestra como `Loading` y la UI (T-13) puede usar `header_no_data` en ese estado; `onStart()` es el punto de entrada para `ON_START` (T-16); la fábrica del ViewModel se crea en T-16.
 
 ## Interfaz
 
