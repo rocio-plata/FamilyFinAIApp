@@ -10,11 +10,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
+import com.rocioplata.familyfinaiapp.R
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
-// Muestra solo el nombre de la sección (RF-06).
+// Título de la sección seguido de la familia activa (RF-08); sin familia, solo el título.
 @Composable
-fun TabPlaceholder(destination: MainDestination, modifier: Modifier = Modifier) {
+fun TabPlaceholder(
+    destination: MainDestination,
+    modifier: Modifier = Modifier,
+    familyName: String? = null,
+) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -22,16 +27,26 @@ fun TabPlaceholder(destination: MainDestination, modifier: Modifier = Modifier) 
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = stringResource(destination.labelRes),
+            text = tabTitle(destination, familyName),
             style = MaterialTheme.typography.titleLarge,
         )
+    }
+}
+
+@Composable
+internal fun tabTitle(destination: MainDestination, familyName: String?): String {
+    val title = stringResource(destination.labelRes)
+    return if (familyName == null) {
+        title
+    } else {
+        stringResource(R.string.tab_content_title_with_family, title, familyName)
     }
 }
 
 @Preview(showBackground = true, name = "Movimientos")
 @Composable
 private fun MovementsPlaceholderPreview() {
-    FamilyFinAIAppTheme { TabPlaceholder(MainDestination.Movements) }
+    FamilyFinAIAppTheme { TabPlaceholder(MainDestination.Movements, familyName = "Familia Plata") }
 }
 
 @Preview(showBackground = true, name = "Reportes")

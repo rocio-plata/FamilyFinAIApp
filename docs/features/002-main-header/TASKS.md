@@ -101,40 +101,40 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Interfaz
 
-- [ ] **T-13 · Cabecera con datos reales**
+- [x] **T-13 · Cabecera con datos reales**
   - **Cubre:** RF-01, RF-02, RF-04, RF-05, RF-06, RF-07, RF-09 (CA-06, CA-08, CA-13, CA-19, CA-20) · **Depende de:** T-04, T-12
   - **Alcance:** retirar `header_family_name` y `header_family_role` de `strings.xml` (pendiente de T-04); modificar `MainHeader`: nombre y rol de la activa; estados carga, error con reintento y sin datos; una sola familia sin indicador ni clic; contador solo si N>0 con semántica plural; avatar con inicial o icono genérico, sin acción; icono de cambios locales a la izquierda de notificaciones, oculto si `hasLocalChanges` es false; áreas ≥48 dp, truncado de nombres largos, colores del tema; `@Preview` de los estados.
   - **Validación:** vistas previas y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** las vistas previas muestran los estados y cada elemento tiene etiqueta accesible.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:lintDebug` → BUILD SUCCESSFUL. `MainHeader(state: MainUiState, onFamilyClick, onRetry)` es stateless: nombre y rol de la activa; carga, error (toca para reintentar) y sin datos; con una sola familia sin flecha ni clic; contador con `Badge` solo si N>0 (tope «99+») y descripción plural; avatar con inicial o icono genérico, sin acción; icono `CloudOff` a la izquierda de notificaciones solo con `hasLocalChanges`; áreas de 48 dp, nombre truncado y colores del tema. Retiradas `header_family_name` y `header_family_role`. 5 `@Preview` (varias familias con invitaciones, una familia con nombre largo y cambios locales, cargando, error, sin datos). Desviación: `MainScreenContent` recibe `uiState`/callbacks con valores por defecto provisionales (muestra «Cargando») hasta T-16. No verificado: las vistas previas no se renderizaron (requieren Android Studio); los androidTest de la 001 se adaptan en T-18.
 
-- [ ] **T-14 · Selector de familia**
+- [x] **T-14 · Selector de familia**
   - **Cubre:** RF-02 (CA-02, CA-03, CA-04, CA-12) · **Depende de:** T-13
   - **Alcance:** `FamilySelectorSheet` con `ModalBottomSheet` único, lista desplazable con nombre y rol, activa marcada como seleccionada; elegir cierra y cambia la activa; Atrás cierra sin cambios.
   - **Validación:** vista previa y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y la vista previa muestra la lista con la activa marcada.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:lintDebug` → BUILD SUCCESSFUL. `ui/main/FamilySelectorSheet.kt`: `ModalBottomSheet` (`skipPartiallyExpanded`) con `LazyColumn` de nombre y rol, activa con check y semántica `selected` (descripción «…, seleccionada»); elegir llama a `onSelect(familyId)` y Atrás/tocar fuera llama a `onDismiss` sin cambiar la activa. El contenido (`FamilySelectorContent`) es stateless y tiene 1 `@Preview`. La hoja se monta una sola vez cuando `selectorOpen` es true, en T-16 (CA-12). No verificado: la vista previa no se renderizó aquí ni se probó en dispositivo.
 
-- [ ] **T-15 · Aviso de datos desactualizados**
+- [x] **T-15 · Aviso de datos desactualizados**
   - **Cubre:** RF-07 (CA-16) · **Depende de:** T-04, T-12
   - **Alcance:** `StaleDataBanner` bajo la cabecera, visible solo con datos guardados de más de 24 h y oculto tras un refresco correcto.
   - **Validación:** vista previa y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y la vista previa muestra el aviso.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:lintDebug` → BUILD SUCCESSFUL. `ui/main/StaleDataBanner.kt`: aviso stateless con icono y `header_stale_data_banner`, colores del tema y 1 `@Preview`. La visibilidad (solo con datos guardados de más de 24 h, oculto tras un refresco correcto) la decide `FamiliesState.Content.isStale`, ya cubierto por `MainViewModelTest` y `HeaderRepositoryImplTest`; el banner se coloca bajo la cabecera en T-16 con `if (isStale)`. No verificado: la vista previa no se renderizó aquí.
 
-- [ ] **T-16 · Integración en MainScreen y MainActivity**
+- [x] **T-16 · Integración en MainScreen y MainActivity**
   - **Cubre:** RF-03, RF-07 · **Depende de:** T-13, T-14, T-15
   - **Alcance:** `MainScreen` obtiene el ViewModel y usa `collectAsStateWithLifecycle`; refresco en `ON_START`; `MainScreenContent` recibe estado y callbacks (stateless) y pasa la familia activa al cuerpo; la pestaña activa sigue en `remember`.
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y la app abre con cabecera conectada al ViewModel.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:lintDebug` → BUILD SUCCESSFUL. `AppContainer` crea `ConnectivityObserver`, `StaticSessionProvider` (credenciales de `BuildConfig`) y `HeaderRepositoryImpl`. `MainScreen` obtiene `MainViewModel` con `viewModelFactory`, usa `collectAsStateWithLifecycle` y llama a `onStart()` en `ON_START` (`LifecycleEventEffect`); `MainScreenContent` es stateless y recibe estado y callbacks (abrir/cerrar selector, elegir, reintentar); muestra `StaleDataBanner` bajo la cabecera si `isStale` y una única `FamilySelectorSheet` si `selectorOpen`. La pestaña activa sigue en `remember`. La vista previa usa `MainScreenContent`. Pendiente: pasar la familia activa al cuerpo de las pestañas (T-17). Prueba en dispositivo: ver T-20.
 
-- [ ] **T-17 · Pestañas con la familia activa**
+- [x] **T-17 · Pestañas con la familia activa**
   - **Cubre:** RF-08 (CA-14, CA-15) · **Depende de:** T-16
   - **Alcance:** `TabPlaceholder` y `HomeContent` muestran «Título · Familia»; `key(familyId)` fuerza la recarga al cambiar de familia; Inicio incluido.
   - **Validación:** vistas previas y `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y cada pestaña muestra el formato con el nombre de la familia.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL. `TabPlaceholder` y `HomeContent` reciben `familyName` y muestran «Título · Familia» con `tab_content_title_with_family` (función `tabTitle`); sin familia (carga/error) muestran solo el título. `MainScreenContent` envuelve el cuerpo en `key(activeFamily.id)` para forzar la recarga al cambiar de familia, Inicio incluido. `HomeContent` pasa a mostrar el título centrado (antes vacío, RF-08) con `testTag("home_content")`; hay que ajustar los androidTest de la 001 que asumían Inicio vacío (T-18). Previews de Inicio y Movimientos con familia. No verificado: vistas previas no renderizadas; prueba en dispositivo en T-20.
 
 ## Validación
 

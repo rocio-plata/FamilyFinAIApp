@@ -4,6 +4,14 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.rocioplata.familyfinaiapp.data.header.HeaderLocalDataSource
+import com.rocioplata.familyfinaiapp.data.header.HeaderRemoteDataSource
+import com.rocioplata.familyfinaiapp.data.header.HeaderRepositoryImpl
+import com.rocioplata.familyfinaiapp.data.network.AndroidConnectivityObserver
+import com.rocioplata.familyfinaiapp.data.network.ConnectivityObserver
+import com.rocioplata.familyfinaiapp.domain.header.HeaderRepository
+import com.rocioplata.familyfinaiapp.session.SessionProvider
+import com.rocioplata.familyfinaiapp.session.StaticSessionProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
@@ -29,4 +37,20 @@ class AppContainer(context: Context) {
             requestTimeoutMillis = REQUEST_TIMEOUT_MS
         }
     }
+
+    val connectivityObserver: ConnectivityObserver = AndroidConnectivityObserver(context)
+
+    // Temporal hasta que exista una spec de autenticación.
+    private val sessionProvider: SessionProvider = StaticSessionProvider(
+        client = httpClient,
+        baseUrl = BuildConfig.BACKEND_BASE_URL,
+        email = BuildConfig.DEV_EMAIL,
+        password = BuildConfig.DEV_PASSWORD,
+    )
+
+    val headerRepository: HeaderRepository = HeaderRepositoryImpl(
+        remote = HeaderRemoteDataSource(httpClient, BuildConfig.BACKEND_BASE_URL),
+        local = HeaderLocalDataSource(headerCacheStore),
+        sessionProvider = sessionProvider,
+    )
 }
