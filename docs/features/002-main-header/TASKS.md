@@ -62,33 +62,33 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Datos
 
-- [ ] **T-08 · Origen de datos local**
+- [x] **T-08 · Origen de datos local**
   - **Cubre:** RF-07 (CA-10) · **Depende de:** T-05, T-06
   - **Alcance:** `HeaderLocalDataSource` con DataStore: JSON por recurso con `userId`, `savedAt` y `schemaVersion`; leer, guardar y borrar; `schemaVersion` desconocido → sin datos.
   - **Validación:** tests unitarios con DataStore temporal en `./gradlew :app:testDebugUnitTest`.
   - **Hecho cuando:** guardar y leer devuelve lo mismo, borrar deja vacío y versión desconocida se descarta.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.header.*"` y `:app:assembleDebug` → BUILD SUCCESSFUL; `HeaderLocalDataSourceTest`: 7 tests, 0 fallos (guardar/leer devuelve lo mismo, sin datos → nulo, `clear()` deja vacío, guardar un recurso no altera los demás, `schemaVersion` 99 → sin datos, JSON ilegible → sin datos, rol guardado desconocido → sin datos). `HeaderLocalDataSource` (`data/header`) usa un JSON por recurso (`families`, `pending_invitations`, `profile`) con `schemaVersion`, `userId` y `savedAtMillis`; expone `Cached<T>` con el `userId` para que el repositorio (T-10) decida el borrado por usuario y por antigüedad. DataStore temporal con `PreferenceDataStoreFactory`. Añadido sobre el alcance: un JSON ilegible también se trata como sin datos.
 
-- [ ] **T-09 · Origen de datos remoto**
+- [x] **T-09 · Origen de datos remoto**
   - **Cubre:** RF-01, RF-04, RF-05 · **Depende de:** T-05, T-06
   - **Alcance:** `HeaderRemoteDataSource` con Ktor: `GET /me/families`, `/me/invitations`, `/me/profile` con Bearer; DTOs `@Serializable` privados con `ignoreUnknownKeys`; timeouts conexión 10 s y solicitud 15 s; rol desconocido → error; lectura del código `FAMILY.INSUFFICIENT_ROLE`; sin `message` ni tokens en logs.
   - **Validación:** tests con `ktor-client-mock` en `./gradlew :app:testDebugUnitTest`.
   - **Hecho cuando:** los tests cubren éxito, error HTTP, rol inválido y timeout.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.header.*" :app:assembleDebug` → BUILD SUCCESSFUL; `HeaderRemoteDataSourceTest`: 10 tests, 0 fallos (éxito de los 3 GET con cabecera `Bearer` y ruta correcta, invitaciones = tamaño de la lista, rol desconocido y cuerpo malformado → `InvalidData`, 403 `FAMILY.INSUFFICIENT_ROLE` → `InsufficientRole`, 401 → `Unauthorized`, 500 → `Unknown`, timeout y sin conexión → `Network`). `HeaderRemoteDataSource` devuelve `RemoteResult<T>` (`Success` o `Failure(HeaderFailure)`) y recibe la `Session` en cada llamada; DTOs privados con `ignoreUnknownKeys`; timeouts de 10 s/15 s aplicados por solicitud (y en el `HttpClient` de `AppContainer`); solo se lee `error`, nunca `message`; sin `Log`/`println`. La prueba de timeout simula `HttpRequestTimeoutException` (no espera 15 s reales). No probado contra el backend real.
 
-- [ ] **T-10 · Repositorio y reglas de caché**
+- [x] **T-10 · Repositorio y reglas de caché**
   - **Cubre:** RF-07 (CA-09, CA-11, CA-16, CA-17, CA-18) · **Depende de:** T-08, T-09
   - **Alcance:** `HeaderRepositoryImpl` con reloj inyectable: caché de otro `userId` o ≥7 días → borrar; >24 h → marcar desactualizado hasta un refresco correcto; refresco en paralelo e independiente por recurso; sin datos válidos y fallo → error; con datos válidos y fallo → conserva caché; los `CancellationException` se relanzan.
   - **Validación:** tests unitarios con reloj falso en `./gradlew :app:testDebugUnitTest`.
   - **Hecho cuando:** pasan los escenarios de 1 h, 30 h, 8 días, otro usuario, sin red con y sin caché, y fallo solo de invitaciones.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest :app:assembleDebug` → BUILD SUCCESSFUL; `HeaderRepositoryImplTest`: 11 tests, 0 fallos, con reloj falso y DataStore temporal: carga inicial y guardado; caché de 1 h sin red (sin alerta); 30 h sin red (alerta `isStale`); 30 h + refresco correcto (sin alerta); 8 días → eliminada y no mostrada; otro usuario → eliminada, nunca mostrada (con y sin red); sin red y sin caché → fallo y sin datos; falla solo invitaciones (familias cargadas, sin contador; con caché conserva el contador); sesión no disponible → fallo `Unauthorized` sin tocar la caché. Decisiones de implementación: `HeaderData` gana `isStale` (calculado por el repositorio con el recurso más antiguo >24 h); si cualquier recurso guardado es de otro usuario o tiene ≥7 días se borra toda la caché; los tres recursos se piden en paralelo y cada éxito sustituye su recurso y su `savedAt`; `refresh()` se serializa con un `Mutex`; la cancelación no se captura. Limitación: la caché se valida con el `userId` de la sesión, así que necesita que `SessionProvider.current()` responda; con `StaticSessionProvider` (login por red) sin conexión no se muestra la caché (CA-10 solo se cumplirá con la spec de sesión que persista el `userId`).
 
-- [ ] **T-11 · Observador de conectividad**
+- [x] **T-11 · Observador de conectividad**
   - **Cubre:** RF-07 · **Depende de:** T-02
   - **Alcance:** `ConnectivityObserver` con `NetworkCallback` → `Flow<Boolean>`; emite al recuperar la red.
   - **Validación:** `./gradlew :app:assembleDebug` y prueba manual en T-20.
   - **Hecho cuando:** compila y se cancela el registro al dejar de colectar.
-  - **Evidencia:**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:lintDebug` → BUILD SUCCESSFUL. `ConnectivityObserver` (interfaz con `isOnline: Flow<Boolean>`, para poder sustituirla en los tests del ViewModel) y `AndroidConnectivityObserver` en `data/network`: `callbackFlow` con `registerDefaultNetworkCallback`, emite el estado inicial y cada cambio (`onAvailable`, `onCapabilitiesChanged`, `onLost`), `distinctUntilChanged`, y `awaitClose` desregistra el callback al dejar de colectar. Usa solo `ACCESS_NETWORK_STATE` (ya declarado). La prueba en ejecución (modo avión) queda para T-20.
 
 ## Estado
 
