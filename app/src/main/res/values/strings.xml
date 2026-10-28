@@ -7,11 +7,30 @@
     <string name="tab_budgets">Presupuestos</string>
     <string name="tab_assistant">Asistente</string>
 
-    <string name="header_family_name">Familia Plata</string>
-    <string name="header_family_role">Propietario</string>
     <string name="header_family_selector_description">Selector de familia: %1$s, %2$s</string>
     <string name="header_notifications_description">Notificaciones</string>
     <string name="header_avatar_description">Perfil de usuario</string>
+
+    <plurals name="header_notifications_count_description">
+        <item quantity="one">Notificaciones, %d invitación pendiente</item>
+        <item quantity="other">Notificaciones, %d invitaciones pendientes</item>
+    </plurals>
+    <string name="header_local_changes_description">Cambios solo en este dispositivo</string>
+    <string name="header_avatar_initial_description">Perfil de usuario, inicial %1$s</string>
+    <string name="header_family_loading">Cargando familias…</string>
+    <string name="header_family_error">No se pudieron cargar las familias</string>
+    <string name="header_family_error_description">No se pudieron cargar las familias. Toca para reintentar</string>
+    <string name="header_retry">Reintentar</string>
+    <string name="header_no_data">Sin datos todavía</string>
+    <string name="header_stale_data_banner">Los datos podrían estar desactualizados. Conéctate para actualizarlos.</string>
+
+    <string name="role_owner">Propietario</string>
+    <string name="role_member">Integrante</string>
+
+    <string name="family_selector_title">Elegir familia</string>
+    <string name="family_selector_item_description">%1$s, %2$s</string>
+    <string name="family_selector_item_selected_description">%1$s, %2$s, seleccionada</string>
+    <string name="tab_content_title_with_family">%1$s · %2$s</string>
 
     <string name="fab_add_description">Agregar</string>
 </resources>

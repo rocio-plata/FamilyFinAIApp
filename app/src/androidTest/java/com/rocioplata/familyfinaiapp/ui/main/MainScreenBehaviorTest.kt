@@ -24,7 +24,7 @@ class MainScreenBehaviorTest {
     @Test
     fun backFromNonHomeTabReturnsToHome() {
         composeTestRule.setContent {
-            FamilyFinAIAppTheme { MainScreen() }
+            FamilyFinAIAppTheme { TestMainHost(initial = MainUiState(families = contentState(), displayName = "rocío")) }
         }
 
         composeTestRule.onNodeWithText("Movimientos").performClick()
@@ -39,13 +39,13 @@ class MainScreenBehaviorTest {
     @Test
     fun interactiveElementsHaveAccessibleLabels() {
         composeTestRule.setContent {
-            FamilyFinAIAppTheme { MainScreen() }
+            FamilyFinAIAppTheme { TestMainHost(initial = MainUiState(families = contentState(), displayName = "rocío")) }
         }
 
         listOf(
             "Selector de familia: Familia Plata, Propietario",
             "Notificaciones",
-            "Perfil de usuario",
+            "Perfil de usuario, inicial R",
             "Agregar",
         ).forEach { description ->
             composeTestRule.onNodeWithContentDescription(description).assertIsDisplayed()
@@ -59,7 +59,7 @@ class MainScreenBehaviorTest {
     @Test
     fun repeatedTabAndFabClicksDoNotDuplicateEffects() {
         composeTestRule.setContent {
-            FamilyFinAIAppTheme { MainScreen() }
+            FamilyFinAIAppTheme { TestMainHost(initial = MainUiState(families = contentState(), displayName = "rocío")) }
         }
 
         repeat(5) {
