@@ -41,19 +41,19 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Datos remotos
 
-- [ ] **T-05 · Login y registro remotos**
+- [x] **T-05 · Login y registro remotos**
   - **Cubre:** RF-01, RF-02, RF-04 (CA-05, CA-06, CA-17) · **Depende de:** T-02
   - **Alcance:** `data/auth/AuthRemoteDataSource.kt` con `POST /auth/login` y `POST /auth/register` y DTOs privados (`toString()` sin secretos). Mapeo: 401 `IDENTITY.INVALID_CREDENTIALS` → `InvalidCredentials`; 409 `IDENTITY.EMAIL_ALREADY_REGISTERED` y 400 `IDENTITY.WEAK_PASSWORD`/`IDENTITY.INVALID_DISPLAY_NAME`/`SHARED.INVALID_EMAIL` → `RegistrationRejected`; `IOException` → `Network`; resto → `Unknown`. Solo se lee `error`. Relanza `CancellationException`.
   - **Validación:** `AuthRemoteDataSourceTest` con `ktor-client-mock` (éxito con `userId` y tokens, cada código, sin red, cuerpo inválido).
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.auth.*"` → BUILD SUCCESSFUL; `AuthRemoteDataSourceTest`: 13 tests, 0 fallos. Cubre: login 200 → `StoredSession`, POST a `/auth/login` sin `Authorization` y contraseña enviada sin recortar; 401 `IDENTITY.INVALID_CREDENTIALS` → `InvalidCredentials` (CA-05); 401 sin código conocido y 500 → `Unknown`; sin red → `Network` (CA-17); respuesta 200 incompleta → `Unknown`; registro 201 con los tres campos; 409 `IDENTITY.EMAIL_ALREADY_REGISTERED` y 400 `IDENTITY.WEAK_PASSWORD`/`IDENTITY.INVALID_DISPLAY_NAME`/`SHARED.INVALID_EMAIL` → `RegistrationRejected` (CA-06); código desconocido o estado distinto de 201 → `Unknown`. Implementación: `data/auth/AuthRemoteDataSource.kt` con `AuthCallResult` (`Success(StoredSession)` | `Failure(AuthFailure)`); DTOs privados con `toString()` sin secretos. Desviación respecto al plan: las esperas excesivas (`HttpRequestTimeoutException`, `ConnectTimeoutException`, `SocketTimeoutException`, que son `IOException`) se mapean a `Unknown` y no a `Network`, porque la tabla mobile de la SPEC distingue "espera excesiva" (mensaje genérico con reintento) de "sin conexión"; cubierto por `login_esperaExcesiva_devuelveUnknown`.
 
-- [ ] **T-06 · Renovación y cierre remotos**
+- [x] **T-06 · Renovación y cierre remotos**
   - **Cubre:** RF-06, RF-07, RF-08 · **Depende de:** T-05
   - **Alcance:** `POST /auth/refresh` (200 → nuevo par; 401 `AUTH.POSSIBLE_TOKEN_THEFT` → `Security`; otro 401 → `Expired`; `IOException` → red; 5xx → desconocido) y `POST /auth/logout` (204 → éxito; `IOException` → sin conexión; otros → desconocido).
   - **Validación:** casos añadidos a `AuthRemoteDataSourceTest`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.auth.*"` → BUILD SUCCESSFUL; `AuthRemoteDataSourceTest`: 23 tests, 0 fallos (13 de T-05 + 10 nuevos). Renovación: 200 → `RefreshCallResult.Success` por el cliente público, sin `Authorization` y con `refreshToken` en el cuerpo; 401 `AUTH.POSSIBLE_TOKEN_THEFT` → `Rejected(Security)`; 401 `AUTH.INVALID_REFRESH_TOKEN` o sin código → `Rejected(Expired)`; sin red → `Network`; 500, espera excesiva o respuesta incompleta → `Unknown`; `toString()` sin tokens. Logout: 204 → `Success` por el cliente autenticado (0 llamadas al público); sin red → `NoConnection`; 401 → `Unauthorized`; 500 o espera → `Unknown`. Cambios: `AuthRemoteDataSource` recibe ahora `publicClient` y `apiClient` (logout por `apiClient` para que el plugin añada el Bearer y renueve, según el plan); los tests de T-05 usan el mismo cliente en ambos. Se añade `LogoutCallResult.Unauthorized` (no previsto en la tarea) para que `SessionManager` (T-10) distinga una sesión ya cerrada durante la llamada. Se unifica el manejo de excepciones en un `Outcome` privado (respuesta, sin red, espera excesiva, otro error). Nota para T-12: `apiClient` → plugin → `SessionManager` → `AuthRemoteDataSource` → `apiClient` forma un ciclo de construcción; el plugin recibirá una función que resuelve `SessionManager` al llamarse.
 
 ## Sesión
 
