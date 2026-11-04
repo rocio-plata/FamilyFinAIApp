@@ -16,12 +16,12 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
   - **Hecho cuando:** los tests pasan y `domain/auth` no importa Android ni Ktor.
   - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.auth.*"` → BUILD SUCCESSFUL; `AuthValidationTest`: 12 tests, 0 fallos, 0 errores. `AuthValidation` (objeto) con `validateEmail`, `validateLoginPassword`, `validateNewPassword`, `validatePasswordConfirmation` y `validateDisplayName`, que devuelven `FieldError?` (`REQUIRED`, `INVALID_EMAIL`, `PASSWORD_TOO_SHORT`, `PASSWORDS_DO_NOT_MATCH`, `NAME_TOO_LONG`). Las longitudes cuentan unidades UTF-16, como `length` en el backend (supuesto: no verificado en su código). Una contraseña de login solo con espacios se acepta (no vacía), según la spec. `grep` de imports `android`/`androidx`/`io.ktor` en `domain/auth` → sin resultados.
 
-- [ ] **T-02 · Tipos de dominio y contratos**
+- [x] **T-02 · Tipos de dominio y contratos**
   - **Cubre:** RF-01, RF-02, RF-04, RF-07 · **Depende de:** T-01
   - **Alcance:** `AuthFailure` (`InvalidCredentials`, `RegistrationRejected`, `Network`, `Unknown`), `SessionEndReason` (`Expired`, `Security`, `LoggedOut`), contrato `AuthRepository` (`login`, `register`) y `SessionState` (`Loading`, `SignedOut(reason?)`, `SignedIn(userId, generation)`).
   - **Validación:** `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** compila y el dominio no importa Android, Ktor ni DTOs.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL (exit 0). Creados en `domain/auth`: `AuthFailure.kt`, `SessionState.kt` (con `SessionEndReason` y `SessionState`) y `AuthRepository.kt`. Añadido sobre el alcance: `AuthResult` (`Success` | `Failure(AuthFailure)`) como resultado de `login`/`register`, porque `kotlin.Result` exige un `Throwable` y el contrato no lanza por red o servidor. `grep` de `import` en `domain/auth` → ninguno.
 
 ## Datos locales
 
