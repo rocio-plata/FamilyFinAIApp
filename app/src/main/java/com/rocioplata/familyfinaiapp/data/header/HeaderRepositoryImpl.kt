@@ -45,6 +45,12 @@ class HeaderRepositoryImpl(
         fetch(session)
     }
 
+    // Espera a que termine un refresco en curso para que no vuelva a guardar datos tras el borrado.
+    override suspend fun clear() = mutex.withLock {
+        local.clear()
+        state.value = HeaderData()
+    }
+
     private suspend fun loadCache(userId: String) {
         val now = clock()
         val families = local.readFamilies()
@@ -118,7 +124,8 @@ class HeaderRepositoryImpl(
 
     private fun SessionFailure.toHeaderFailure(): HeaderFailure = when (this) {
         SessionFailure.NETWORK -> HeaderFailure.Network
-        SessionFailure.INVALID_CREDENTIALS, SessionFailure.NOT_CONFIGURED -> HeaderFailure.Unauthorized
+        SessionFailure.NOT_SIGNED_IN, SessionFailure.INVALID_CREDENTIALS, SessionFailure.NOT_CONFIGURED ->
+            HeaderFailure.Unauthorized
         SessionFailure.UNKNOWN -> HeaderFailure.Unknown
     }
 

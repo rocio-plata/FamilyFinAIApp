@@ -57,40 +57,40 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Sesión
 
-- [ ] **T-07 · Vaciado de la cabecera**
+- [x] **T-07 · Vaciado de la cabecera**
   - **Cubre:** RF-09 (CA-13) · **Depende de:** —
   - **Alcance:** `HeaderRepository.clear()` y su implementación en `HeaderRepositoryImpl`: `local.clear()` y estado en memoria a `HeaderData()`.
   - **Validación:** test en `HeaderRepositoryImplTest` (tras `clear()`, `header` emite vacío y la caché no tiene datos) y regresión de la clase.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest` → BUILD SUCCESSFUL; suite JVM completa: 88 tests, 0 fallos. `HeaderRepositoryImplTest`: 13 tests (11 previos + 2 nuevos): `clear_vaciaLaCacheYLosDatosEnMemoria` (tras un refresco, `header` emite familias, invitaciones y nombre nulos y la caché no tiene datos) y `clear_duranteUnRefresco_noQuedanDatosGuardadosAlTerminar` (un `clear()` lanzado con un refresco bloqueado en la red espera a que termine y deja la caché vacía). Implementación: `HeaderRepository.clear()` y en `HeaderRepositoryImpl` `local.clear()` + `HeaderData()` bajo el mismo `Mutex` que `refresh()`, para que un refresco en curso no vuelva a guardar datos del usuario anterior. `MainViewModelTest.FakeRepository` implementa `clear()`; sus 13 tests siguen en verde.
 
-- [ ] **T-08 · SessionManager: carga, inicio y fin de sesión**
+- [x] **T-08 · SessionManager: carga, inicio y fin de sesión**
   - **Cubre:** RF-05, RF-09, RF-10 (CA-07, CA-13) · **Depende de:** T-03, T-07
   - **Alcance:** `session/SessionManager.kt` con `StateFlow<SessionState>`, `load()` (sesión guardada → `SignedIn`; ninguna → borrar caché y `SignedOut(null)`), `start(session)` (guardar y `SignedIn` con nueva `generation`), `endSession(reason)` (borrar sesión, `onSessionEnded`, `SignedOut(reason)`), con `Mutex`. Implementa `SessionProvider`. Store abstraído para testear en JVM.
   - **Validación:** `SessionManagerTest` (JVM, store falso): cada transición, `onSessionEnded` llamado, `current()` sin sesión lanza `SessionUnavailableException`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest` → BUILD SUCCESSFUL; suite JVM: 99 tests, 0 fallos. `SessionManagerTest`: 11 tests con un store falso: estado inicial `Loading`; `load()` con sesión → `SignedIn(u-1, 1)` sin borrar datos; sin sesión → `SignedOut(null)` y datos del usuario borrados; archivo ilegible (`IOException`) → igual que sin sesión; `load()` solo lee una vez por proceso; `start()` guarda y entra; cada inicio cambia la generación; `endSession()` borra sesión y datos y guarda el motivo; repetido conserva el primer motivo y no vuelve a borrar; `current()` sin sesión lanza `NOT_SIGNED_IN`; otro usuario tras cerrar sesión entra con su sesión. Implementación: `session/SessionManager.kt` (`StateFlow<SessionState>`, `Mutex`, implementa `SessionProvider`; `current()` lee la sesión en memoria sin bloquear). `SessionFailure` gana `NOT_SIGNED_IN` (mapeado a `HeaderFailure.Unauthorized` en `HeaderRepositoryImpl`); los valores de `StaticSessionProvider` se retiran en T-13. Notas para tareas siguientes: (1) `logout()` (T-10) no debe hacer la llamada de red con el `Mutex` tomado, porque el plugin llamará a `refreshAfter`, que lo necesita; (2) si borrar sesión o datos falla, el estado pasa igualmente a `SignedOut` y la excepción se propaga: `RootViewModel` (T-15) debe tratarla.
 
-- [ ] **T-09 · SessionManager: renovación única**
+- [x] **T-09 · SessionManager: renovación única**
   - **Cubre:** RF-06, RF-07, RF-10 (CA-09, CA-10, CA-11, CA-14) · **Depende de:** T-06, T-08
   - **Alcance:** `refreshAfter(usedToken)`: con `Mutex`; si el token guardado difiere del usado, lo devuelve sin llamar al backend; si no, renueva, guarda el par nuevo **antes** de devolverlo; 401 → `endSession(Expired|Security)` y `null`; red o 5xx → sesión intacta y fallo.
   - **Validación:** `SessionManagerTest`: 10 llamadas concurrentes → 1 llamada a `/auth/refresh`; cada motivo de cierre; `IOException` conserva la sesión.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest` → BUILD SUCCESSFUL; suite JVM: 107 tests, 0 fallos. `SessionManagerTest`: 19 tests (11 de T-08 + 8 nuevos, con `AuthRemoteDataSource` real sobre `ktor-client-mock` que cuenta las llamadas a `/auth/refresh`): éxito → guarda el par nuevo, `current()` devuelve el token nuevo y se envía el refresh token anterior; **10 llamadas concurrentes → 1 sola llamada al backend** y todas reciben el token nuevo (CA-09); token ya renovado → sin llamada; 401 `AUTH.INVALID_REFRESH_TOKEN` → `SignedOut(Expired)` con sesión y datos borrados (CA-10); 401 `AUTH.POSSIBLE_TOKEN_THEFT` → `SignedOut(Security)` (CA-11); sin red → `Unavailable(offline = true)` y sesión intacta (CA-14); 500 → `Unavailable(offline = false)` y sesión intacta; sin sesión → `SessionEnded` sin llamada. Implementación: `refreshAfter(usedAccessToken)` bajo el `Mutex` y `RefreshOutcome` (`Refreshed(token)`, `SessionEnded`, `Unavailable(offline)`), para que el plugin (T-11) distinga reintentar, devolver el 401 o fallar como red/desconocido. `SessionManager` recibe ahora `AuthRemoteDataSource`. Desviación: el par renovado se actualiza en memoria **antes** de guardarlo en disco; si el guardado falla, la excepción se propaga pero el proceso sigue usando el par válido (con el orden inverso, un fallo de disco dejaría en memoria un refresh token ya invalidado por el backend).
 
-- [ ] **T-10 · SessionManager: cierre de sesión**
+- [x] **T-10 · SessionManager: cierre de sesión**
   - **Cubre:** RF-08 (CA-12, CA-21) · **Depende de:** T-09
   - **Alcance:** `logout()` → `LogoutResult` (`Success`, `NoConnection`, `Unknown`). 204 → `endSession(LoggedOut)`; sin red o error → sesión y caché intactas; si la sesión ya terminó durante la llamada → `Success`.
   - **Validación:** `SessionManagerTest` (204, `IOException`, 500, 401 con renovación rechazada).
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest` → BUILD SUCCESSFUL; suite JVM: 112 tests, 0 fallos. `SessionManagerTest`: 24 tests (19 previos + 5 nuevos): 204 → `Success`, `POST /auth/logout`, `SignedOut(LoggedOut)` con sesión y datos borrados (CA-12, con mock); sin red → `NoConnection` con sesión, estado y datos intactos (CA-21); 500 → `Unknown` con sesión intacta; 401 → se cierra igualmente en el teléfono (`Success`, regla de RF-08); sesión ya cerrada → `Success` sin llamar al backend y conservando el motivo anterior. Implementación: `logout()` y `LogoutResult` (`Success`, `NoConnection`, `Unknown`) en `SessionManager`; la llamada de red se hace sin el `Mutex` (lo exige el plugin, que usará `refreshAfter`) y solo `endSession` lo toma. Si el plugin cierra la sesión durante el logout (renovación rechazada), `endSession(LoggedOut)` no sobrescribe el motivo original. El Bearer del logout lo añade el plugin: se comprueba en T-11. La invalidación real en el backend queda para la spec de perfil (plan).
 
-- [ ] **T-11 · Plugin SessionAuth**
+- [x] **T-11 · Plugin SessionAuth**
   - **Cubre:** RF-06, RF-07 (CA-08, CA-09) · **Depende de:** T-09
   - **Alcance:** verificar el hook `Send` de `createClientPlugin` en Ktor 3.3.3 (alternativa del plan: `HttpSend.intercept`). `data/network/SessionAuthPlugin.kt`: Bearer con el token actual; ante 401, `refreshAfter` y un único reintento; si no hay token nuevo, devuelve el 401 original. Sin logs de tokens.
   - **Validación:** `SessionAuthPluginTest` con `ktor-client-mock`: Bearer presente; 401 → refresh → reintento 200; 401 tras reintento no renueva de nuevo; peticiones concurrentes con 401 → un solo refresh.
   - **Hecho cuando:** los tests pasan y la API usada queda anotada en la evidencia.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest` → BUILD SUCCESSFUL; suite JVM: 123 tests, 0 fallos. API verificada en el código fuente de `ktor-client-core-jvm` 3.3.3 (`plugins/api/CommonHooks.kt`): `Send` es un `ClientHook` con `Sender.proceed(HttpRequestBuilder)`, que puede llamarse más de una vez; no hace falta la alternativa `HttpSend.intercept`. `SessionAuthPluginTest`: 11 tests. Unitarios (7, con renovación simulada): Bearer con el token vigente; sin sesión → sin Bearer ni renovación; 401 → renueva con el token usado y reintenta con el nuevo (CA-08); 401 en el reintento → se devuelve sin renovar otra vez; renovación rechazada → 401 original sin reintento; renovación sin conexión → `SessionRefreshOfflineException` (`IOException`, error de red en los data sources); error del servidor → `SessionRefreshFailedException` (no `IOException`, error desconocido). Integración con `SessionManager` y `AuthRemoteDataSource` reales sobre un mismo `MockEngine` (4): 10 peticiones concurrentes con acceso caducado → **1 sola llamada a `/auth/refresh`**, todas 200 y par nuevo guardado (CA-09); renovación rechazada → 401 y `SignedOut(Expired)` con sesión borrada; `logout()` envía `Bearer acc-1` (completa CA-12 con mock); `logout()` con acceso caducado renueva durante la llamada y cierra sin bloquearse (confirma que el `Mutex` no se toma durante la red). Implementación: `data/network/SessionAuthPlugin.kt` (`createClientPlugin` + `on(Send)`, configurado con `accessToken: () -> String?` y `refresh: suspend (String) -> RefreshOutcome`, que se resuelven al llamarse y rompen el ciclo de construcción con `SessionManager`); `SessionManager.accessToken()`. Sin logs de tokens.
 
 ## Integración
 

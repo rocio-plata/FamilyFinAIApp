@@ -8,4 +8,7 @@ interface HeaderRepository {
 
     /** Consulta los tres recursos de forma independiente; nunca lanza por fallos de red o de servidor. */
     suspend fun refresh(): HeaderRefreshResult
+
+    /** Borra los datos guardados y en memoria al terminar la sesión (RF-09 de 003-auth). */
+    suspend fun clear()
 }

@@ -45,6 +45,10 @@ class MainViewModelTest {
             gate?.await()
             return onRefresh(this)
         }
+
+        override suspend fun clear() {
+            data.value = HeaderData()
+        }
     }
 
     private class FakeConnectivity : ConnectivityObserver {

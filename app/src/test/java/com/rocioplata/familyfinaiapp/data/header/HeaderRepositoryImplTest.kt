@@ -17,7 +17,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -42,7 +45,7 @@ class HeaderRepositoryImplTest {
     private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
 
     /** Rutas que fallan por red; el resto responde con datos válidos. */
-    private class Backend(var offline: Set<String> = emptySet())
+    private class Backend(var offline: Set<String> = emptySet(), var gate: CompletableDeferred<Unit>? = null)
 
     private class FixedSession(var userId: String = "u-1", var failure: SessionFailure? = null) : SessionProvider {
         override suspend fun current(): Session {
@@ -63,6 +66,7 @@ class HeaderRepositoryImplTest {
         val backend = Backend()
         val engine = MockEngine { request ->
             val path = request.url.encodedPath
+            backend.gate?.await()
             if (path in backend.offline) throw IOException("sin red")
             val body = when (path) {
                 "/me/families" -> """[{"familyId":"f-1","name":"Plata","role":"OWNER"}]"""
@@ -231,5 +235,40 @@ class HeaderRepositoryImplTest {
 
         assertEquals(HeaderFailure.Unauthorized, result.families)
         assertEquals(listOf(plata), env.local.readFamilies()?.value)
+    }
+
+    @Test
+    fun clear_vaciaLaCacheYLosDatosEnMemoria() = runTest {
+        val env = env()
+        env.repository.refresh()
+
+        env.repository.clear()
+
+        val data = env.repository.header.first()
+        assertNull(data.families)
+        assertNull(data.pendingInvitations)
+        assertNull(data.displayName)
+        assertNull(env.local.readFamilies())
+        assertNull(env.local.readPendingInvitations())
+        assertNull(env.local.readDisplayName())
+    }
+
+    @Test
+    fun clear_duranteUnRefresco_noQuedanDatosGuardadosAlTerminar() = runTest {
+        val env = env()
+        val gate = CompletableDeferred<Unit>()
+        env.backend.gate = gate
+        val refresh = async { env.repository.refresh() }
+        runCurrent()
+
+        val clear = async { env.repository.clear() }
+        runCurrent()
+        gate.complete(Unit)
+        refresh.await()
+        clear.await()
+
+        assertNull(env.repository.header.first().families)
+        assertNull(env.local.readFamilies())
+        assertNull(env.local.readDisplayName())
     }
 }
