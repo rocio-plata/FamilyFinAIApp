@@ -134,6 +134,8 @@ app/src/main/java/<paquete>/
 
 Cada feature tiene su carpeta en `docs/features/` y recorre SPEC → PLAN → TASKS.
 
+> El orden vigente y el estado de cada feature se siguen en [`docs/ROADMAP.md`](docs/ROADMAP.md); la tabla de abajo es la propuesta inicial.
+
 | # | Feature | Contexto del backend |
 | :--: | --- | --- |
 | 1 | `auth` — registro, login, sesión y refresh | Identity |
