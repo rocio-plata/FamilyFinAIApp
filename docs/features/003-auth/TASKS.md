@@ -25,19 +25,19 @@ tarea queda bloqueada, anotar el motivo en "Evidencia". -->
 
 ## Datos locales
 
-- [ ] **T-03 · Almacenamiento cifrado de la sesión**
+- [x] **T-03 · Almacenamiento cifrado de la sesión**
   - **Cubre:** RF-05, RF-09 (CA-07) · **Depende de:** T-02
   - **Alcance:** `data/session/SessionStore.kt`: DataStore `session` con un valor Base64(IV + AES-256-GCM) del JSON `{schemaVersion, userId, accessToken, refreshToken}`; clave `familyfin_session_key` en `AndroidKeyStore` (no exportable); `read()`, `save()`, `clear()`. Fallo al descifrar o versión desconocida → `null` y se borra el valor. Sin tokens en logs ni `toString()`.
   - **Validación:** `./gradlew :app:connectedDebugAndroidTest` con `SessionStoreTest` instrumentado (guardar y leer en una instancia nueva, `clear()`, valor corrupto → `null`, el archivo no contiene el token en claro).
   - **Hecho cuando:** los tests instrumentados pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.rocioplata.familyfinaiapp.data.session.SessionStoreTest` en el AVD `Pixel_9` (emulador sin ventana) → BUILD SUCCESSFUL; 8 tests, 0 fallos: lectura desde otra instancia, sin sesión → `null`, `clear()`, valor corrupto → `null` y borrado, clave del Keystore eliminada → `null` y borrado, `schemaVersion` desconocido → `null` y borrado, el archivo no contiene `userId` ni tokens en claro, `toString()` sin tokens. Implementación: `data/session/SessionCipher.kt` (`SessionCipher` + `KeystoreSessionCipher`, AES-256-GCM, IV de 12 bytes generado por el Keystore, etiqueta de 128 bits) y `data/session/SessionStore.kt` (`StoredSession`, interfaz `SessionStore` para poder usar un doble en JVM en T-08, `EncryptedSessionStore`). Desviaciones: el cifrado se separa en `SessionCipher` para poder probar el store sin Keystore; el DataStore `session` se crea en `AppContainer` en T-12 (el test usa un archivo temporal y un alias de clave propio). Un `IOException` de lectura de DataStore no se captura aquí; su manejo se decide en T-08/T-12.
 
-- [ ] **T-04 · Exclusión de la sesión de las copias de seguridad**
+- [x] **T-04 · Exclusión de la sesión de las copias de seguridad**
   - **Cubre:** restricción de la spec (privacidad) · **Depende de:** T-03
   - **Alcance:** excluir `datastore/session.preferences_pb` en `backup_rules.xml` y `data_extraction_rules.xml` (cloud-backup y device-transfer).
   - **Validación:** `./gradlew :app:assembleDebug` y revisión de los XML.
   - **Hecho cuando:** ambos archivos excluyen la sesión y compila.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL (exit 0). `backup_rules.xml` (full-backup-content) y `data_extraction_rules.xml` (cloud-backup y device-transfer) excluyen `domain="file" path="datastore/session.preferences_pb"`, junto a la exclusión existente de `header_cache`. Es el archivo que creará el DataStore `session` en T-12 (`preferencesDataStore(name = "session")`); el nombre debe mantenerse. Revisión de XML; no se probó un backup real.
 
 ## Datos remotos
 
