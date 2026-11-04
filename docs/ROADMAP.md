@@ -25,7 +25,7 @@ las TASKS de cada una.
 | :--: | --- | --- | --- | --- |
 | 1 | Andamiaje de la app | `001-scaffold` | Hecha | |
 | 2 | Cabecera principal | `002-main-header` | Hecha | Usa una sesión temporal (`StaticSessionProvider`) |
-| 3 | Autenticación y sesión | `auth` | Pendiente | |
+| 3 | Autenticación y sesión | `003-auth` | Tareas | BG-01: el registro del backend permite enumerar emails |
 | 4 | Categorías y tags | `categories` | Pendiente | |
 | 5 | Medios de pago | `payment-methods` | Pendiente | |
 | 6 | Movimientos | `financial-items` | Pendiente | |
