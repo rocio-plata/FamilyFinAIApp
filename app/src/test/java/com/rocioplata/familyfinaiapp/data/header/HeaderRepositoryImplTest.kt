@@ -229,7 +229,7 @@ class HeaderRepositoryImplTest {
     fun sesionNoDisponible_informaElFalloYNoTocaLaCache() = runTest {
         val env = env()
         env.seed(1.hours.inWholeMilliseconds)
-        env.session.failure = SessionFailure.INVALID_CREDENTIALS
+        env.session.failure = SessionFailure.NOT_SIGNED_IN
 
         val result = env.repository.refresh()
 

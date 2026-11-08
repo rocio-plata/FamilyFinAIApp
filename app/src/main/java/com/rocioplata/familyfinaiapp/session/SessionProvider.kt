@@ -8,8 +8,7 @@ data class Session(
     override fun toString(): String = "Session(userId=$userId)"
 }
 
-// INVALID_CREDENTIALS, NOT_CONFIGURED y NETWORK son de StaticSessionProvider; se retiran en T-13.
-enum class SessionFailure { NOT_SIGNED_IN, INVALID_CREDENTIALS, NOT_CONFIGURED, NETWORK, UNKNOWN }
+enum class SessionFailure { NOT_SIGNED_IN, UNKNOWN }
 
 class SessionUnavailableException(val failure: SessionFailure) : Exception(failure.name)
 

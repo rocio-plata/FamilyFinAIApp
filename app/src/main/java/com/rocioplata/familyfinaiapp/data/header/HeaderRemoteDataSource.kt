@@ -3,11 +3,9 @@ package com.rocioplata.familyfinaiapp.data.header
 import com.rocioplata.familyfinaiapp.domain.header.Family
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.header.HeaderFailure
-import com.rocioplata.familyfinaiapp.session.Session
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.timeout
-import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpStatusCode
@@ -21,13 +19,16 @@ sealed interface RemoteResult<out T> {
     data class Failure(val failure: HeaderFailure) : RemoteResult<Nothing>
 }
 
-/** Los tres GET de la cabecera. Nunca lanza por red o servidor; relanza la cancelación. */
+/**
+ * Los tres GET de la cabecera. [client] es el cliente autenticado: añade el Bearer y renueva la
+ * sesión por su cuenta. Nunca lanza por red o servidor; relanza la cancelación.
+ */
 class HeaderRemoteDataSource(
     private val client: HttpClient,
     private val baseUrl: String,
 ) {
-    suspend fun families(session: Session): RemoteResult<List<Family>> =
-        get(session, "/me/families") { dtos: List<FamilyDto> ->
+    suspend fun families(): RemoteResult<List<Family>> =
+        get("/me/families") { dtos: List<FamilyDto> ->
             val families = dtos.map { dto ->
                 val role = FamilyRole.entries.firstOrNull { it.name == dto.role }
                     ?: return@get RemoteResult.Failure(HeaderFailure.InvalidData)
@@ -36,20 +37,18 @@ class HeaderRemoteDataSource(
             RemoteResult.Success(families)
         }
 
-    suspend fun pendingInvitations(session: Session): RemoteResult<Int> =
-        get(session, "/me/invitations") { items: List<JsonElement> -> RemoteResult.Success(items.size) }
+    suspend fun pendingInvitations(): RemoteResult<Int> =
+        get("/me/invitations") { items: List<JsonElement> -> RemoteResult.Success(items.size) }
 
-    suspend fun displayName(session: Session): RemoteResult<String> =
-        get(session, "/me/profile") { profile: ProfileDto -> RemoteResult.Success(profile.displayName) }
+    suspend fun displayName(): RemoteResult<String> =
+        get("/me/profile") { profile: ProfileDto -> RemoteResult.Success(profile.displayName) }
 
     private suspend inline fun <reified D, T> get(
-        session: Session,
         path: String,
         map: (D) -> RemoteResult<T>,
     ): RemoteResult<T> {
         val response = try {
             client.get("${baseUrl.trimEnd('/')}$path") {
-                bearerAuth(session.accessToken)
                 timeout {
                     connectTimeoutMillis = CONNECT_TIMEOUT_MS
                     requestTimeoutMillis = REQUEST_TIMEOUT_MS
