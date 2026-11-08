@@ -3,7 +3,7 @@ package com.rocioplata.familyfinaiapp.data.header
 import com.rocioplata.familyfinaiapp.domain.header.Family
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.header.HeaderFailure
-import com.rocioplata.familyfinaiapp.session.Session
+import com.rocioplata.familyfinaiapp.data.network.SessionAuth
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -24,13 +24,14 @@ import org.junit.Test
 import java.io.IOException
 
 class HeaderRemoteDataSourceTest {
-    private val session = Session("u-1", "tok")
     private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
 
     private fun source(handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData): HeaderRemoteDataSource {
         val client = HttpClient(MockEngine(handler)) {
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
             install(HttpTimeout)
+            // El Bearer lo añade el cliente autenticado, no el data source.
+            install(SessionAuth) { accessToken = { "tok" } }
         }
         return HeaderRemoteDataSource(client, "http://localhost:3000")
     }
@@ -53,7 +54,7 @@ class HeaderRemoteDataSourceTest {
             )
         }
 
-        val result = source.families(session)
+        val result = source.families()
 
         assertEquals(
             RemoteResult.Success(listOf(Family("f-1", "Plata", FamilyRole.OWNER), Family("f-2", "Depto", FamilyRole.MEMBER))),
@@ -67,62 +68,62 @@ class HeaderRemoteDataSourceTest {
     fun invitaciones_exito_devuelveElTamanoDeLaLista() = runTest {
         val source = source(reply(HttpStatusCode.OK, """[{"id":"a","status":"PENDING"},{"id":"b","status":"PENDING"}]"""))
 
-        assertEquals(RemoteResult.Success(2), source.pendingInvitations(session))
+        assertEquals(RemoteResult.Success(2), source.pendingInvitations())
     }
 
     @Test
     fun perfil_exito_devuelveElNombre() = runTest {
         val source = source(reply(HttpStatusCode.OK, """{"userId":"u-1","email":"a@b.c","displayName":"rocío","createdAt":"x"}"""))
 
-        assertEquals(RemoteResult.Success("rocío"), source.displayName(session))
+        assertEquals(RemoteResult.Success("rocío"), source.displayName())
     }
 
     @Test
     fun rolDesconocido_esErrorDeDatos() = runTest {
         val source = source(reply(HttpStatusCode.OK, """[{"familyId":"f","name":"N","role":"ADMIN"}]"""))
 
-        assertEquals(RemoteResult.Failure(HeaderFailure.InvalidData), source.families(session))
+        assertEquals(RemoteResult.Failure(HeaderFailure.InvalidData), source.families())
     }
 
     @Test
     fun cuerpoMalformado_esErrorDeDatos() = runTest {
         val source = source(reply(HttpStatusCode.OK, """{"no":"es una lista"}"""))
 
-        assertEquals(RemoteResult.Failure(HeaderFailure.InvalidData), source.families(session))
+        assertEquals(RemoteResult.Failure(HeaderFailure.InvalidData), source.families())
     }
 
     @Test
     fun errorHttp403ConRolInsuficiente_seIdentifica() = runTest {
         val source = source(reply(HttpStatusCode.Forbidden, """{"error":"FAMILY.INSUFFICIENT_ROLE","message":"secreto","details":null}"""))
 
-        assertEquals(RemoteResult.Failure(HeaderFailure.InsufficientRole), source.families(session))
+        assertEquals(RemoteResult.Failure(HeaderFailure.InsufficientRole), source.families())
     }
 
     @Test
     fun error401_esNoAutorizado() = runTest {
         val source = source(reply(HttpStatusCode.Unauthorized, """{"error":"AUTH.INVALID_TOKEN","message":"x","details":null}"""))
 
-        assertEquals(RemoteResult.Failure(HeaderFailure.Unauthorized), source.pendingInvitations(session))
+        assertEquals(RemoteResult.Failure(HeaderFailure.Unauthorized), source.pendingInvitations())
     }
 
     @Test
     fun error500_esDesconocido() = runTest {
         val source = source(reply(HttpStatusCode.InternalServerError, "boom"))
 
-        assertEquals(RemoteResult.Failure(HeaderFailure.Unknown), source.displayName(session))
+        assertEquals(RemoteResult.Failure(HeaderFailure.Unknown), source.displayName())
     }
 
     @Test
     fun timeout_esErrorDeRed() = runTest {
         val source = source { throw HttpRequestTimeoutException("http://localhost:3000/me/families", 15_000L) }
 
-        assertEquals(RemoteResult.Failure(HeaderFailure.Network), source.families(session))
+        assertEquals(RemoteResult.Failure(HeaderFailure.Network), source.families())
     }
 
     @Test
     fun sinConexion_esErrorDeRed() = runTest {
         val source = source { throw IOException("sin red") }
 
-        assertEquals(RemoteResult.Failure(HeaderFailure.Network), source.pendingInvitations(session))
+        assertEquals(RemoteResult.Failure(HeaderFailure.Network), source.pendingInvitations())
     }
 }

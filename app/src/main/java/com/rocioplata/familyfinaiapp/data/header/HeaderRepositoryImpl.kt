@@ -45,6 +45,12 @@ class HeaderRepositoryImpl(
         fetch(session)
     }
 
+    // Espera a que termine un refresco en curso para que no vuelva a guardar datos tras el borrado.
+    override suspend fun clear() = mutex.withLock {
+        local.clear()
+        state.value = HeaderData()
+    }
+
     private suspend fun loadCache(userId: String) {
         val now = clock()
         val families = local.readFamilies()
@@ -65,9 +71,9 @@ class HeaderRepositoryImpl(
     }
 
     private suspend fun fetch(session: Session): HeaderRefreshResult = coroutineScope {
-        val families = async { remote.families(session) }
-        val invitations = async { remote.pendingInvitations(session) }
-        val profile = async { remote.displayName(session) }
+        val families = async { remote.families() }
+        val invitations = async { remote.pendingInvitations() }
+        val profile = async { remote.displayName() }
 
         val familiesResult = families.await()
         val invitationsResult = invitations.await()
@@ -117,8 +123,7 @@ class HeaderRepositoryImpl(
     private fun failAll(failure: HeaderFailure) = HeaderRefreshResult(failure, failure, failure)
 
     private fun SessionFailure.toHeaderFailure(): HeaderFailure = when (this) {
-        SessionFailure.NETWORK -> HeaderFailure.Network
-        SessionFailure.INVALID_CREDENTIALS, SessionFailure.NOT_CONFIGURED -> HeaderFailure.Unauthorized
+        SessionFailure.NOT_SIGNED_IN -> HeaderFailure.Unauthorized
         SessionFailure.UNKNOWN -> HeaderFailure.Unknown
     }
 

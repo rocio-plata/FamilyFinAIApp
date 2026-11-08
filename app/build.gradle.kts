@@ -10,7 +10,6 @@ val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use(::load)
 }
-val devCredentialNames = listOf("DEV_EMAIL", "DEV_PASSWORD")
 val devTargetUrls = mapOf(
     "emulator" to "http://10.0.2.2:3000",
     // Requiere `adb reverse tcp:3000 tcp:3000` con el dispositivo conectado por USB.
@@ -21,8 +20,6 @@ val devBackendUrl = localProperties.getProperty("BACKEND_BASE_URL")?.takeIf { it
     ?: devTargetUrls[devTarget].orEmpty()
 val devBuildConfig = mapOf(
     "BACKEND_BASE_URL" to devBackendUrl,
-    "DEV_EMAIL" to localProperties.getProperty("DEV_EMAIL", ""),
-    "DEV_PASSWORD" to localProperties.getProperty("DEV_PASSWORD", ""),
 )
 
 fun buildConfigString(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
@@ -99,22 +96,14 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 
-val missingDevProperties = devCredentialNames.filter { localProperties.getProperty(it).isNullOrBlank() }
 val invalidDevTarget = devTarget !in devTargetUrls && localProperties.getProperty("BACKEND_BASE_URL").isNullOrBlank()
 
 val checkDevProperties by tasks.registering {
-    val missing = missingDevProperties
     val invalidTarget = invalidDevTarget
     val target = devTarget
     doLast {
         if (invalidTarget) {
             throw GradleException("DEV_TARGET=\"$target\" no es válido en local.properties; usa emulator o device.")
-        }
-        if (missing.isNotEmpty()) {
-            throw GradleException(
-                "Faltan propiedades en local.properties (no versionado): ${missing.joinToString()}. " +
-                    "Ejemplo: DEV_TARGET=emulator, DEV_EMAIL=..., DEV_PASSWORD=...",
-            )
         }
     }
 }

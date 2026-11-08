@@ -28,9 +28,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
 @Composable
-fun MainScreen(modifier: Modifier = Modifier) {
+fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
     val container = (LocalContext.current.applicationContext as FamilyFinApp).container
     val viewModel: MainViewModel = viewModel(
+        key = viewModelKey,
         factory = viewModelFactory {
             initializer { MainViewModel(container.headerRepository, container.connectivityObserver) }
         },

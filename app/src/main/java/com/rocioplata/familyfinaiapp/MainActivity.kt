@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import com.rocioplata.familyfinaiapp.ui.main.MainScreen
+import com.rocioplata.familyfinaiapp.ui.root.AppRoot
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FamilyFinAIAppTheme {
-                MainScreen(modifier = Modifier.fillMaxSize())
+                AppRoot(modifier = Modifier.fillMaxSize())
             }
         }
     }

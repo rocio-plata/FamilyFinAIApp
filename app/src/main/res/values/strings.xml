@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">FamilyFinAIApp</string>
 
     <string name="tab_home">Inicio</string>
@@ -33,4 +33,43 @@
     <string name="tab_content_title_with_family">%1$s · %2$s</string>
 
     <string name="fab_add_description">Agregar</string>
+
+    <!-- Acceso (003-auth). Los límites son 8 y 60, nunca 1: no hacen falta plurales (PluralsCandidate).
+         Los %1$d de longitud mínima y máxima los pasa la interfaz desde
+         AuthValidation.MIN_PASSWORD_LENGTH y MAX_DISPLAY_NAME_LENGTH. -->
+    <string name="auth_brand_name">FamilyFin AI</string>
+    <string name="auth_tagline">Smarter family finances</string>
+
+    <string name="auth_tab_login">Iniciar sesión</string>
+    <string name="auth_tab_register">Crear cuenta</string>
+
+    <string name="auth_field_display_name">Nombre visible</string>
+    <string name="auth_field_email">Correo electrónico</string>
+    <string name="auth_field_password">Contraseña</string>
+    <string name="auth_field_password_confirmation">Repetir contraseña</string>
+    <string name="auth_password_helper" tools:ignore="PluralsCandidate">Mínimo %1$d caracteres</string>
+    <string name="auth_password_show">Mostrar contraseña</string>
+    <string name="auth_password_hide">Ocultar contraseña</string>
+
+    <string name="auth_button_login">Iniciar sesión</string>
+    <string name="auth_button_register">Crear cuenta</string>
+
+    <string name="auth_footer_to_register_prompt">¿No tienes cuenta?</string>
+    <string name="auth_footer_to_register_action">Crear cuenta</string>
+    <string name="auth_footer_to_login_prompt">¿Ya tienes cuenta?</string>
+    <string name="auth_footer_to_login_action">Iniciar sesión</string>
+
+    <string name="auth_error_required">Este campo es obligatorio.</string>
+    <string name="auth_error_invalid_email">Escribe un correo electrónico válido.</string>
+    <string name="auth_error_password_too_short" tools:ignore="PluralsCandidate">La contraseña debe tener al menos %1$d caracteres.</string>
+    <string name="auth_error_passwords_do_not_match">Las contraseñas no coinciden.</string>
+    <string name="auth_error_name_too_long" tools:ignore="PluralsCandidate">El nombre no puede superar los %1$d caracteres.</string>
+
+    <string name="auth_message_invalid_credentials">Correo o contraseña incorrectos.</string>
+    <string name="auth_message_registration_rejected">No pudimos crear la cuenta con esos datos. Si ya tienes una cuenta, inicia sesión.</string>
+    <string name="auth_message_generic_error">No pudimos completar la operación. Inténtalo de nuevo.</string>
+    <string name="auth_message_no_connection">Sin conexión. Revisa tu red e inténtalo de nuevo.</string>
+    <string name="auth_message_session_expired">Tu sesión expiró. Inicia sesión de nuevo.</string>
+    <string name="auth_message_session_security">Cerramos tu sesión por seguridad. Inicia sesión de nuevo.</string>
+    <string name="auth_message_logout_needs_connection">Necesitas conexión para cerrar sesión.</string>
 </resources>

@@ -164,13 +164,14 @@ y comportamiento, sin diseñar tablas, DTO, DAO ni almacenamiento. -->
 - **Backend:** `GET /me/families`, `GET /me/invitations` y `GET /me/profile`
   (con `userId`) están documentados en `api-contract.md` y `openapi.yaml`.
 - Se guardan en el dispositivo los últimos datos de familias, invitaciones y
-  nombre del usuario, solo para mostrarlos cuando no hay conexión. No se borran
-  al cerrar sesión. Esta spec parte de una sesión ya iniciada, por lo que el
+  nombre del usuario, solo para mostrarlos cuando no hay conexión. Se borran
+  al terminar la sesión, por cierre de sesión o porque el backend la invalida
+  (modificado por `003-auth`, RF-09; antes no se borraban al cerrar sesión). Esta spec parte de una sesión ya iniciada, por lo que el
   usuario autenticado se conoce antes de mostrar cualquier dato: los datos
   guardados de un usuario distinto se eliminan, nunca se muestran y se
   reemplazan por los del backend (confirmado).
-- Los datos guardados se eliminan a los 7 días de antigüedad o cuando otro
-  usuario accede a la app; hasta entonces se conservan. Eliminados, se tratan
+- Los datos guardados se eliminan a los 7 días de antigüedad, cuando otro
+  usuario accede a la app o al terminar la sesión (`003-auth`, RF-09); hasta entonces se conservan. Eliminados, se tratan
   como si no hubiera datos. Si tienen más de 24 horas, se informa al
   usuario con una alerta de que podrían estar desactualizados; la alerta
   desaparece al actualizar los datos con éxito.
