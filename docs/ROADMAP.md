@@ -26,7 +26,7 @@ las TASKS de cada una.
 | 1 | Andamiaje de la app | `001-scaffold` | Hecha | |
 | 2 | Cabecera principal | `002-main-header` | Hecha | Usa una sesión temporal (`StaticSessionProvider`) |
 | 3 | Autenticación y sesión | `003-auth` | Tareas | BG-01: el registro del backend permite enumerar emails |
-| 4 | Identidad visual de la app | `004-brand-identity` | Tareas | 12 tareas derivadas; sin empezar |
+| 4 | Identidad visual de la app | `004-brand-identity` | Hecha | CA-06 sin verificar: no se logró ver la pantalla de arranque del sistema |
 | 5 | Categorías y tags | `categories` | Pendiente | |
 | 6 | Medios de pago | `payment-methods` | Pendiente | |
 | 7 | Movimientos | `financial-items` | Pendiente | |
@@ -63,17 +63,12 @@ de `MainViewModel`.
   backend a mensajes.
 - **Backend:** Identity.
 
-### 4. Identidad visual de la app
+### 4. Identidad visual de la app — Hecha
 
-- **Por qué ahora:** la app aún muestra el icono y el nombre de la plantilla de
-  Android; conviene tener marca propia antes de seguir sumando pantallas.
-- **Alcance orientativo:** icono del lanzador (con versión redonda y temática),
-  nombre mostrado "FamilyFin AI" y logo de la pantalla de acceso (variantes
-  clara y oscura).
-- **Depende de:** auth (reemplaza el logo provisional de la pantalla de acceso).
-- **Decisiones que fuerza:** adaptación del diseño vectorial aportado al formato
-  de iconos de Android.
-- **Backend:** ninguno.
+Icono propio del lanzador (adaptativo, redondo y temático), nombre "FamilyFin AI"
+y logo de la pantalla de acceso en variantes clara y oscura, en lugar de los de la
+plantilla de Android. Queda sin verificar que la pantalla de arranque que dibuja
+el sistema muestre el icono nuevo (CA-06).
 
 ### 5. Categorías y tags
 

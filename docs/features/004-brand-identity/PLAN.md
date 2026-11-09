@@ -114,7 +114,7 @@ adaptaciones que permite la spec):
 | `stroke` con extremos y uniones redondeados (tejado oscuro) | `strokeLineCap` y `strokeLineJoin` en `round`, con `strokeColor` en degradado |
 | `opacity` y `stop-opacity` | color `#AARRGGBB` o `fillAlpha`/`strokeAlpha` |
 | `filter` (sombra suave) | se omite (decisión de la spec); el halo del oscuro ya está hecho con degradados |
-| `translate(0 4)` del SVG claro | se aplica a las coordenadas al convertir |
+| `translate(0 4)` del SVG claro | se aplica con un `group` con `translateY="4"` (equivale a sumarlo a cada coordenada y es más fiel al SVG; ver T-02) |
 
 
 ## Módulos y componentes afectados
