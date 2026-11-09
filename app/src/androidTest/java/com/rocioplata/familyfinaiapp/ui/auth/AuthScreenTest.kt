@@ -159,11 +159,14 @@ class AuthScreenTest {
     // Si Atrás cierra la app, `pressBack` lanzaría NoActivityResumedException.
     private fun pressBackToExit() = Espresso.pressBackUnconditionally()
 
-    // Al terminar la actividad desaparece la jerarquía de Compose, así que no se puede esperar con waitUntil.
-    private fun assertActivityFinishes() {
+    // Al terminar la actividad desaparece la jerarquía de Compose y `rule.activity` deja de poder leerse
+    // (falla con "Activity has been destroyed already"): se conserva la referencia antes de pulsar Atrás.
+    private fun hasFinished(activity: ComponentActivity) = activity.isFinishing || activity.isDestroyed
+
+    private fun assertActivityFinishes(activity: ComponentActivity) {
         val deadline = System.currentTimeMillis() + 5_000
-        while (!rule.activity.isFinishing && System.currentTimeMillis() < deadline) Thread.sleep(50)
-        assertTrue("La actividad debía terminar", rule.activity.isFinishing)
+        while (!hasFinished(activity) && System.currentTimeMillis() < deadline) Thread.sleep(50)
+        assertTrue("La actividad debía terminar", hasFinished(activity))
     }
 
     // CA-01
@@ -456,9 +459,11 @@ class AuthScreenTest {
     fun atrasEnElLogin_saleDeLaApp() {
         show()
 
+        val activity = rule.activity
+
         pressBackToExit()
 
-        assertActivityFinishes()
+        assertActivityFinishes(activity)
     }
 
     // CA-18
@@ -471,8 +476,9 @@ class AuthScreenTest {
         rule.waitForIdle()
         tab(LOGIN).assertIsSelected()
 
+        val activity = rule.activity
         pressBackToExit()
-        assertActivityFinishes()
+        assertActivityFinishes(activity)
     }
 
     // CA-18: igual, pero habiendo escrito antes en el registro.
@@ -490,7 +496,8 @@ class AuthScreenTest {
         tab(REGISTER).press()
         tab(LOGIN).press()
 
+        val activity = rule.activity
         pressBackToExit()
-        assertActivityFinishes()
+        assertActivityFinishes(activity)
     }
 }

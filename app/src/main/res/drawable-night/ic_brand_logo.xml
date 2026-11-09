@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Logo de FamilyFin AI (variante oscura), usado en la pantalla de acceso con el tema oscuro.
+    Fuente: docs/ui/snapshots/familyfin-ai-icon-dark.svg (512 x 512), convertido a mano.
+    Adaptaciones frente al SVG: los degradados con objectBoundingBox se expresan con las
+    coordenadas absolutas de cada forma y los halos (de la casa y de la chispa) son degradados
+    radiales con transparencia, sin filtros. La variante clara vive en drawable/ic_brand_logo.xml.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="88dp"
+    android:height="88dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- Fondo, halo de la casa y borde -->
+    <path
+        android:pathData="M112,0 H400 A112,112 0 0 1 512,112 V400 A112,112 0 0 1 400,512 H112 A112,112 0 0 1 0,400 V112 A112,112 0 0 1 112,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="0"
+                android:endY="512">
+                <item android:color="#0F2623" android:offset="0" />
+                <item android:color="#091412" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M112,0 H400 A112,112 0 0 1 512,112 V400 A112,112 0 0 1 400,512 H112 A112,112 0 0 1 0,400 V112 A112,112 0 0 1 112,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="256"
+                android:centerY="236"
+                android:gradientRadius="200">
+                <item android:color="#3312C88C" android:offset="0" />
+                <item android:color="#1212C88C" android:offset="0.55" />
+                <item android:color="#0012C88C" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M112,1.5 H400 A110.5,110.5 0 0 1 510.5,112 V400 A110.5,110.5 0 0 1 400,510.5 H112 A110.5,110.5 0 0 1 1.5,400 V112 A110.5,110.5 0 0 1 112,1.5 Z"
+        android:strokeColor="#1F5B52"
+        android:strokeAlpha="0.9"
+        android:strokeWidth="3" />
+
+    <!-- Tejado (detras de las barras): trazo con extremos y union redondeados -->
+    <path
+        android:pathData="M132.5,247.5 L256,148 L379,247.5"
+        android:strokeWidth="45"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="132"
+                android:startY="148"
+                android:endX="392"
+                android:endY="250">
+                <item android:color="#1FCB92" android:offset="0" />
+                <item android:color="#0C9A6C" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M256,131 L386,231"
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.35"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round" />
+
+    <!-- Barras con su reflejo -->
+    <path
+        android:pathData="M179,276 H179 A23,23 0 0 1 202,299 V361 A23,23 0 0 1 179,384 H179 A23,23 0 0 1 156,361 V299 A23,23 0 0 1 179,276 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="179"
+                android:startY="276"
+                android:endX="179"
+                android:endY="384">
+                <item android:color="#3CC2AB" android:offset="0" />
+                <item android:color="#167F78" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M179,278 H179 A21,21 0 0 1 200,299 V307 A21,21 0 0 1 179,328 H179 A21,21 0 0 1 158,307 V299 A21,21 0 0 1 179,278 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.10" />
+    <path
+        android:pathData="M256,228 H256 A23,23 0 0 1 279,251 V361 A23,23 0 0 1 256,384 H256 A23,23 0 0 1 233,361 V251 A23,23 0 0 1 256,228 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="256"
+                android:startY="228"
+                android:endX="256"
+                android:endY="384">
+                <item android:color="#4ED6A0" android:offset="0" />
+                <item android:color="#0DA070" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M256,231 H256 A20,20 0 0 1 276,251 V281 A20,20 0 0 1 256,301 H256 A20,20 0 0 1 236,281 V251 A20,20 0 0 1 256,231 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.16" />
+    <path
+        android:pathData="M333,186 H333 A23,23 0 0 1 356,209 V361 A23,23 0 0 1 333,384 H333 A23,23 0 0 1 310,361 V209 A23,23 0 0 1 333,186 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="333"
+                android:startY="186"
+                android:endX="333"
+                android:endY="384">
+                <item android:color="#62C6F9" android:offset="0" />
+                <item android:color="#0770AC" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M333,189 H333 A20,20 0 0 1 353,209 V255 A20,20 0 0 1 333,275 H333 A20,20 0 0 1 313,255 V209 A20,20 0 0 1 333,189 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.20" />
+
+    <!-- Base -->
+    <path
+        android:pathData="M156,376 H356 A12,12 0 0 1 368,388 V388 A12,12 0 0 1 356,400 H156 A12,12 0 0 1 144,388 V388 A12,12 0 0 1 156,376 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="144"
+                android:startY="388"
+                android:endX="368"
+                android:endY="388">
+                <item android:color="#29453F" android:offset="0" />
+                <item android:color="#335F55" android:offset="0.5" />
+                <item android:color="#29453F" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M147,377 H365 A1,1 0 0 1 366,378 V378 A1,1 0 0 1 365,379 H147 A1,1 0 0 1 146,378 V378 A1,1 0 0 1 147,377 Z"
+        android:fillColor="#3E7F6E"
+        android:fillAlpha="0.85" />
+
+    <!-- Chispa grande: halo, estrella y punto -->
+    <path
+        android:pathData="M302,131.5 a48,48 0 1,0 96,0 a48,48 0 1,0 -96,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="350"
+                android:centerY="131.5"
+                android:gradientRadius="48">
+                <item android:color="#57FFC43D" android:offset="0" />
+                <item android:color="#21FFC43D" android:offset="0.45" />
+                <item android:color="#00FFC43D" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M350,98 C352,121.5 360,129.5 383.5,131.5 C360,133.5 352,141.5 350,165 C348,141.5 340,133.5 316.5,131.5 C340,129.5 348,121.5 350,98 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="316.5"
+                android:startY="98"
+                android:endX="383.5"
+                android:endY="165">
+                <item android:color="#FFCB47" android:offset="0" />
+                <item android:color="#F4A01A" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M350,126 a5.5,5.5 0 1,1 0,11 a5.5,5.5 0 1,1 0,-11 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.95" />
+
+    <!-- Chispa pequena -->
+    <path
+        android:pathData="M392,158 C393,168 396,171 406,172 C396,173 393,176 392,186 C391,176 388,173 378,172 C388,171 391,168 392,158 Z"
+        android:fillColor="#F3BC52"
+        android:fillAlpha="0.95" />
+    <path
+        android:pathData="M392,169.5 a2.5,2.5 0 1,1 0,5 a2.5,2.5 0 1,1 0,-5 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.9" />
+</vector>

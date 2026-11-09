@@ -1,11 +1,10 @@
 package com.rocioplata.familyfinaiapp.ui.auth
 
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -117,15 +115,12 @@ fun AuthContent(
 @Composable
 private fun AuthHeader() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(24.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            // Decorativo: el nombre de la app va justo debajo.
-            Image(painter = painterResource(R.drawable.ic_launcher_foreground), contentDescription = null)
-        }
+        // Decorativo: el nombre de la app va justo debajo. El logo lleva su propio fondo.
+        Image(
+            painter = painterResource(R.drawable.ic_brand_logo),
+            contentDescription = null,
+            modifier = Modifier.size(88.dp),
+        )
         Text(
             text = stringResource(R.string.auth_brand_name),
             style = MaterialTheme.typography.headlineMedium,
@@ -423,6 +418,11 @@ private fun AuthPreview(state: AuthUiState) {
 @Preview(showBackground = true, heightDp = 780)
 @Composable
 private fun AuthContentLoginPreview() = AuthPreview(AuthUiState())
+
+// El tema oscuro sigue el ajuste del sistema: la preview nocturna muestra también la variante oscura del logo.
+@Preview(showBackground = true, heightDp = 780, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun AuthContentLoginNightPreview() = AuthPreview(AuthUiState())
 
 @Preview(showBackground = true, heightDp = 780)
 @Composable

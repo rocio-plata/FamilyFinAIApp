@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">FamilyFinAIApp</string>
+    <string name="app_name">FamilyFin AI</string>
 
     <string name="tab_home">Inicio</string>
     <string name="tab_movements">Movimientos</string>
