@@ -24,8 +24,8 @@ las TASKS de cada una.
 | Orden | Funcionalidad | Carpeta | Estado | Notas |
 | :--: | --- | --- | --- | --- |
 | 1 | Andamiaje de la app | `001-scaffold` | Hecha | |
-| 2 | Cabecera principal | `002-main-header` | Hecha | Usa una sesión temporal (`StaticSessionProvider`) |
-| 3 | Autenticación y sesión | `003-auth` | Tareas | BG-01: el registro del backend permite enumerar emails |
+| 2 | Cabecera principal | `002-main-header` | Hecha | Ya usa la sesión real de la 003; su caché se vacía al terminar la sesión. Pendientes de verificar: TalkBack y CA-18 con dos cuentas reales |
+| 3 | Autenticación y sesión | `003-auth` | Hecha | BG-01: el registro del backend permite enumerar emails. Sin verificar: CA-03, CA-12 y CA-21 de extremo a extremo y TalkBack con voz |
 | 4 | Identidad visual de la app | `004-brand-identity` | Hecha | CA-06 sin verificar: no se logró ver la pantalla de arranque del sistema |
 | 5 | Categorías y tags | `categories` | Pendiente | |
 | 6 | Medios de pago | `payment-methods` | Pendiente | |
@@ -51,10 +51,10 @@ Selector de familia activa, contador de invitaciones pendientes, inicial del
 perfil y caché offline de solo lectura. La familia activa vive solo en memoria
 de `MainViewModel`.
 
-### 3. Autenticación y sesión
+### 3. Autenticación y sesión — Hecha
 
 - **Por qué ahora:** todas las funcionalidades necesitan una sesión real y la
-  actual es temporal.
+  que había era temporal (retirada).
 - **Alcance orientativo:** registro, login, almacenamiento seguro de tokens,
   refresh con rotación, cierre de sesión por refresh fallido o reuso, logout.
 - **Depende de:** 001.

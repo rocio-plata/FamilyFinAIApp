@@ -271,4 +271,22 @@ class HeaderRepositoryImplTest {
         assertNull(env.local.readFamilies())
         assertNull(env.local.readDisplayName())
     }
+
+    @Test
+    fun clear_duranteUnRefresco_noEsperaALaRed() = runTest {
+        val env = env()
+        val gate = CompletableDeferred<Unit>()
+        env.backend.gate = gate
+        val refresh = async { env.repository.refresh() }
+        runCurrent()
+
+        val clear = async { env.repository.clear() }
+        runCurrent()
+
+        // El borrado termina con el refresco todavía esperando la respuesta del backend.
+        assertTrue(clear.isCompleted)
+        assertFalse(refresh.isCompleted)
+        gate.complete(Unit)
+        refresh.await()
+    }
 }
