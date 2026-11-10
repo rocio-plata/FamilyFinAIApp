@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Capa monocromatica del icono adaptativo de FamilyFin AI (icono tematico de Android 13 y posteriores).
+    El sistema solo usa el canal alfa y tinta la silueta con los colores del fondo de pantalla del usuario, por eso
+    todo es negro y sin degradados. Misma escala (0,165) y posicion (11,68; 12,75) que el primer plano, de modo
+    que cabe en la zona segura de 66 dp. Los alfas mantienen la jerarquia del icono a color: el tejado es algo
+    mas tenue que la barra alta, que lo cruza y asi se distingue; la base y la chispa pequena son mas suaves.
+    Forma del SVG docs/ui/snapshots/familyfin-ai-icon.svg; el grupo interior equivale a su translate(0 4).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.165"
+        android:scaleY="0.165"
+        android:translateX="11.68"
+        android:translateY="12.75">
+        <group android:translateY="4">
+            <!-- Tejado -->
+            <path
+                android:pathData="M256,122 C264,122 271,126 277,131 L394,228 C403,235 404,249 396,258 C388,267 374,268 365,261 L256,172 L147,261 C138,268 124,267 116,258 C108,249 109,235 118,228 L235,131 C241,126 248,122 256,122 Z"
+                android:fillColor="#000000"
+                android:fillAlpha="0.88" />
+            <!-- Barras (de menor a mayor) y base -->
+            <path
+                android:pathData="M179,272 H179 A23,23 0 0 1 202,295 V365 A23,23 0 0 1 179,388 H179 A23,23 0 0 1 156,365 V295 A23,23 0 0 1 179,272 Z"
+                android:fillColor="#000000"
+                android:fillAlpha="0.72" />
+            <path
+                android:pathData="M256,224 H256 A23,23 0 0 1 279,247 V365 A23,23 0 0 1 256,388 H256 A23,23 0 0 1 233,365 V247 A23,23 0 0 1 256,224 Z"
+                android:fillColor="#000000"
+                android:fillAlpha="0.9" />
+            <path
+                android:pathData="M333,182 H333 A23,23 0 0 1 356,205 V365 A23,23 0 0 1 333,388 H333 A23,23 0 0 1 310,365 V205 A23,23 0 0 1 333,182 Z"
+                android:fillColor="#000000" />
+            <path
+                android:pathData="M156,372 H356 A12,12 0 0 1 368,384 V384 A12,12 0 0 1 356,396 H156 A12,12 0 0 1 144,384 V384 A12,12 0 0 1 156,372 Z"
+                android:fillColor="#000000"
+                android:fillAlpha="0.6" />
+            <!-- Chispas -->
+            <path
+                android:pathData="M348,96 C350,120 358,128 382,130 C358,132 350,140 348,164 C346,140 338,132 314,130 C338,128 346,120 348,96 Z"
+                android:fillColor="#000000" />
+            <path
+                android:pathData="M388,154 C389,164 392,167 402,168 C392,169 389,172 388,182 C387,172 384,169 374,168 C384,167 387,164 388,154 Z"
+                android:fillColor="#000000"
+                android:fillAlpha="0.7" />
+        </group>
+    </group>
+</vector>

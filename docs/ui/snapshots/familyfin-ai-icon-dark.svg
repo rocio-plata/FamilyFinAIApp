@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>FamilyFin AI - icono (modo oscuro)</title>
+  <!-- Variante oscura del icono. Dibujada a mano a partir de familyfin_ai_app_icon_dark_mode.png.
+       Sin filtros (sombras ni desenfoques): el halo se resuelve con degradados radiales,
+       de modo que pueda convertirse a recursos vectoriales de Android. -->
+  <defs>
+    <linearGradient id="bgDark" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0F2623"/>
+      <stop offset="100%" stop-color="#091412"/>
+    </linearGradient>
+    <radialGradient id="houseHalo" cx="256" cy="236" r="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#12C88C" stop-opacity="0.20"/>
+      <stop offset="55%" stop-color="#12C88C" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#12C88C" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="roofGrad" x1="132" y1="148" x2="392" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1FCB92"/>
+      <stop offset="100%" stop-color="#0C9A6C"/>
+    </linearGradient>
+    <linearGradient id="barTeal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3CC2AB"/>
+      <stop offset="100%" stop-color="#167F78"/>
+    </linearGradient>
+    <linearGradient id="barGreen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4ED6A0"/>
+      <stop offset="100%" stop-color="#0DA070"/>
+    </linearGradient>
+    <linearGradient id="barBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#62C6F9"/>
+      <stop offset="100%" stop-color="#0770AC"/>
+    </linearGradient>
+    <linearGradient id="baseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#29453F"/>
+      <stop offset="50%" stop-color="#335F55"/>
+      <stop offset="100%" stop-color="#29453F"/>
+    </linearGradient>
+    <linearGradient id="sparkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFCB47"/>
+      <stop offset="100%" stop-color="#F4A01A"/>
+    </linearGradient>
+    <radialGradient id="sparkHalo" cx="0" cy="0" r="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFC43D" stop-opacity="0.34"/>
+      <stop offset="45%" stop-color="#FFC43D" stop-opacity="0.13"/>
+      <stop offset="100%" stop-color="#FFC43D" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Fondo y borde -->
+  <rect width="512" height="512" rx="112" fill="url(#bgDark)"/>
+  <rect width="512" height="512" rx="112" fill="url(#houseHalo)"/>
+  <rect x="1.5" y="1.5" width="509" height="509" rx="110.5" fill="none" stroke="#1F5B52" stroke-opacity="0.9" stroke-width="3"/>
+
+  <!-- Tejado (detrás de las barras) -->
+  <path d="M132.5 247.5 L256 148 L379 247.5" fill="none" stroke="url(#roofGrad)" stroke-width="45" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 131 L386 231" fill="none" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Barras -->
+  <rect x="156" y="276" width="46" height="108" rx="23" fill="url(#barTeal)"/>
+  <rect x="158" y="278" width="42" height="50" rx="21" fill="#FFFFFF" fill-opacity="0.10"/>
+  <rect x="233" y="228" width="46" height="156" rx="23" fill="url(#barGreen)"/>
+  <rect x="236" y="231" width="40" height="70" rx="20" fill="#FFFFFF" fill-opacity="0.16"/>
+  <rect x="310" y="186" width="46" height="198" rx="23" fill="url(#barBlue)"/>
+  <rect x="313" y="189" width="40" height="86" rx="20" fill="#FFFFFF" fill-opacity="0.20"/>
+
+  <!-- Base -->
+  <rect x="144" y="376" width="224" height="24" rx="12" fill="url(#baseGrad)"/>
+  <rect x="146" y="377" width="220" height="2" rx="1" fill="#3E7F6E" fill-opacity="0.85"/>
+
+  <!-- Chispas -->
+  <g transform="translate(350 131.5)">
+    <circle cx="0" cy="0" r="48" fill="url(#sparkHalo)"/>
+    <path d="M0 -33.5 C2 -10 10 -2 33.5 0 C10 2 2 10 0 33.5 C-2 10 -10 2 -33.5 0 C-10 -2 -2 -10 0 -33.5Z" fill="url(#sparkGrad)"/>
+    <circle cx="0" cy="0" r="5.5" fill="#FFFFFF" fill-opacity="0.95"/>
+  </g>
+  <g transform="translate(392 172)">
+    <path d="M0 -14 C1 -4 4 -1 14 0 C4 1 1 4 0 14 C-1 4 -4 1 -14 0 C-4 -1 -1 -4 0 -14Z" fill="#F3BC52" fill-opacity="0.95"/>
+    <circle cx="0" cy="0" r="2.5" fill="#FFFFFF" fill-opacity="0.9"/>
+  </g>
+</svg>
