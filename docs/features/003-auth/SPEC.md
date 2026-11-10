@@ -91,9 +91,11 @@ criterios, decisiones del plan y tareas. -->
   provocan un cierre de sesión.
 - **RF-07:** Cuando el backend invalida la sesión, la app la cierra (RF-09) y
   muestra el inicio de sesión con un mensaje:
-  - Sesión expirada o no válida: "Tu sesión expiró. Inicia sesión de nuevo."
-  - Posible robo de sesión: "Cerramos tu sesión por seguridad. Inicia sesión de
-    nuevo."
+  - Sesión expirada (el backend no reconoce el token de renovación: no existe o
+    caducó): "Tu sesión expiró. Inicia sesión de nuevo."
+  - Posible robo de sesión (el backend recibe un token de renovación ya usado o
+    revocado, por ejemplo tras cerrar las sesiones desde otro dispositivo):
+    "Cerramos tu sesión por seguridad. Inicia sesión de nuevo."
 - **RF-08:** Existe la capacidad de cerrar sesión: avisa al backend, que cierra
   las sesiones del usuario en todos sus dispositivos, termina la sesión local
   (RF-09) y muestra el inicio de sesión. Sin conexión no se cierra la sesión:
@@ -242,8 +244,8 @@ Repite el formato según sea necesario. -->
 - **CA-07 · RF-05:** Dada una sesión iniciada, cuando se termina el proceso (o se reinicia el teléfono) y se reabre la app, entonces se entra directamente a la pantalla principal sin ver el login.
 - **CA-08 · RF-06:** Dada una sesión con el acceso caducado, cuando la app consulta datos, entonces los obtiene sin mostrar el login ni errores.
 - **CA-09 · RF-06:** Dado el acceso caducado, cuando varias consultas se lanzan a la vez, entonces todas se completan y la sesión sigue activa.
-- **CA-10 · RF-07:** Dada una sesión que el backend ya no acepta (expirada o revocada), cuando la app intenta renovarla, entonces muestra el login con "Tu sesión expiró. Inicia sesión de nuevo."
-- **CA-11 · RF-07:** Dado que el backend detecta un posible robo de sesión, cuando la app intenta renovarla, entonces muestra el login con "Cerramos tu sesión por seguridad. Inicia sesión de nuevo."
+- **CA-10 · RF-07:** Dada una sesión cuyo token de renovación el backend ya no reconoce (no existe o caducó), cuando la app intenta renovarla, entonces muestra el login con "Tu sesión expiró. Inicia sesión de nuevo."
+- **CA-11 · RF-07:** Dado un token de renovación que el backend considera ya usado o revocado (posible robo de sesión; ocurre también tras cerrar las sesiones desde otro dispositivo), cuando la app intenta renovarla, entonces muestra el login con "Cerramos tu sesión por seguridad. Inicia sesión de nuevo."
 - **CA-12 · RF-08:** Dada una sesión iniciada, cuando se ejecuta el cierre de sesión, entonces el backend recibe el aviso, la app muestra el login y la sesión anterior deja de ser válida en el backend.
 - **CA-13 · RF-09:** Dada una sesión terminada (RF-07 o RF-08), cuando se reabre la app sin conexión, entonces se muestra el login con campos vacíos y no queda ningún dato del usuario anterior.
 - **CA-14 · RF-10:** Dada una sesión guardada y datos de cabecera guardados, cuando se abre la app sin conexión, entonces se entra a la pantalla principal con esos datos y, al recuperar la conexión, se actualizan sin cerrar la sesión.
@@ -274,8 +276,8 @@ No marques los criterios como superados durante la especificación. -->
 | CA-07 | Iniciar sesión; matar el proceso o reiniciar; reabrir | Pantalla principal directa |
 | CA-08 | Sesión con acceso caducado (esperar 15 min o backend de prueba); recargar | Datos cargados sin login ni error |
 | CA-09 | Acceso caducado; lanzar varias consultas a la vez | Todas completan; sesión activa |
-| CA-10 | Revocar o expirar la renovación en el backend; recargar | Login con mensaje de sesión expirada |
-| CA-11 | Reutilizar una renovación ya usada (backend de prueba) | Login con mensaje de seguridad |
+| CA-10 | Que el backend no reconozca el token de renovación (inexistente o caducado); recargar | Login con mensaje de sesión expirada |
+| CA-11 | Reutilizar una renovación ya usada o revocada (p. ej. cerrar las sesiones desde otro cliente, esperar la caducidad del acceso y recargar) | Login con mensaje de seguridad |
 | CA-12 | Ejecutar el cierre de sesión; usar la sesión anterior contra el backend | Login; backend rechaza la sesión anterior |
 | CA-13 | Terminar la sesión; reabrir sin red | Login vacío; sin datos del usuario anterior |
 | CA-14 | Con sesión y caché, abrir sin red; activar red | Pantalla principal con caché; se actualiza; sigue la sesión |
@@ -294,6 +296,12 @@ No marques los criterios como superados durante la especificación. -->
 <!-- Al resolverlas, actualiza las secciones afectadas. Escribe Ninguna cuando
 no queden pendientes funcionales ni restricciones por decidir. -->
 
+- Resuelto · Ajuste posterior (pruebas manuales de T-21, 2026-11-10): una
+  sesión cerrada desde otro dispositivo con `logout` deja el token de renovación
+  revocado y el backend responde `AUTH.POSSIBLE_TOKEN_THEFT`, no
+  `AUTH.INVALID_REFRESH_TOKEN`. RF-07, CA-10 y CA-11 se precisaron para que
+  «expirada» (token inexistente o caducado) y «revocada o reutilizada» (mensaje de
+  seguridad) no se solapen; sigue el contrato del backend.
 - Resuelto · Cambio en la 002: RF-09 sustituye la regla de la 002 de no
   borrar los datos guardados al cerrar sesión. Actualizados
   `002-main-header/SPEC.md` y `002-main-header/PLAN.md`.

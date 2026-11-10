@@ -25,11 +25,25 @@ comportamiento observable, el alcance o la persistencia.
   `com.rocioplata.familyfinaiapp`, salvo que exista un requisito explícito para
   cambiarlos.
 - Respetar los SDK y versiones configurados en los archivos Gradle. No
-  actualizar dependencias o herramientas sin una necesidad concreta. Valores
-  actuales: minSdk 34, target/compileSdk 36, Java 11.
+  actualizar dependencias o herramientas sin una necesidad concreta.
 - No asumir que una librería o una arquitectura descrita en documentación
   externa ya está configurada: verificar primero el código y
   `gradle/libs.versions.toml`.
+
+## Entorno de desarrollo
+
+Los builds debug dependen de la tarea `checkDevProperties` (enganchada a
+`preDebugBuild`), que falla si `local.properties` (no versionado) no define
+`DEV_EMAIL` y `DEV_PASSWORD`, o si `DEV_TARGET` no es `emulator`
+(`http://10.0.2.2:3000`) o `device` (`http://localhost:3000`, requiere
+`adb reverse tcp:3000 tcp:3000`). `adb reverse` también sirve para el emulador:
+con `DEV_TARGET=device` fijo, `scripts/dev-reverse.sh` lo aplica a todos los
+dispositivos y emuladores conectados (repetir tras reiniciarlos).
+`BACKEND_BASE_URL` lo sobrescribe. Estos valores llegan como campos
+`BuildConfig`; en release quedan vacíos. Nunca escribir sus valores en código,
+logs ni documentación.
+
+minSdk 34, target/compileSdk 36, Java 11.
 
 ## Convenciones de implementación
 
@@ -70,43 +84,53 @@ comportamiento observable, el alcance o la persistencia.
 - Antes de agregar navegación, revisar la solución existente y no introducir
   dos stacks de navegación diferentes sin una decisión documentada.
 
-### Arquitectura actual
+## Arquitectura actual del código
 
-Paquetes bajo `app/src/main/java/com/rocioplata/familyfinaiapp/`, organizados por
-capa y luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no
-según la estructura `core/` + `features/` propuesta en el README.
+Paquetes bajo `app/src/main/java/com/rocioplata/familyfinaiapp/`, organizados por capa y
+luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según la estructura
+`core/` + `features/` propuesta en el README.
 
-- **DI manual**: `FamilyFinApp` (Application) crea un `AppContainer` con el
-  `HttpClient` de Ktor (OkHttp, kotlinx.serialization con `ignoreUnknownKeys`,
-  timeouts), DataStore, `ConnectivityObserver`, `SessionProvider` y los
-  repositorios. Los ViewModels se crean en la entrada de pantalla con
-  `viewModelFactory { initializer { ... } }` leyendo el container desde
-  `LocalContext.current.applicationContext`.
-- **Sesión**: `SessionProvider.current()` lanza
-  `SessionUnavailableException(SessionFailure)`. `StaticSessionProvider` es
-  temporal (login con credenciales de desarrollo, en memoria, sin refresh) hasta
-  que exista la spec de autenticación. `Session` y los DTOs de login
-  sobrescriben `toString()` para no filtrar tokens.
-- **Datos**: los data sources remotos devuelven `RemoteResult.Success/Failure`
-  con fallos de dominio tipados (`HeaderFailure`) y nunca lanzan por
-  red/servidor; sí relanzan `CancellationException`. Los repositorios exponen un
-  `Flow` de datos y un `suspend refresh()` que devuelve un resultado por recurso
-  (cada recurso se refresca de forma independiente).
-- **Caché offline** (`HeaderLocalDataSource`): un JSON por recurso en DataStore
-  Preferences con `schemaVersion`, `userId` y `savedAt`. El repositorio descarta
-  caché de otro usuario o de ≥7 días y marca `isStale` a partir de 24 h. Versión
-  desconocida o JSON ilegible = sin datos.
-- **Presentación**: `MainViewModel` combina el flujo del repositorio con estado
-  local (familia activa solo en memoria, selector abierto, refresco en curso) en
-  un `StateFlow<MainUiState>`; `FamiliesState` es un sealed interface
-  (Loading/NoData/Content/Error). Se refresca al iniciar, en `ON_START` y al
-  recuperar conectividad. `MainScreen` tiene una sobrecarga con estado
-  (ViewModel) y otra stateless.
-- **Navegación**: aún no hay librería; las pestañas inferiores son el enum
-  `MainDestination` (su orden es el de la barra).
-- **Tests**: unitarios JVM con `kotlinx-coroutines-test` y `ktor-client-mock`;
-  los de UI (`androidTest`) usan `TestMainHost`, que reproduce lo mínimo del
-  ViewModel sobre la sobrecarga stateless de `MainScreen`, sin red ni caché.
+- **DI manual**: `FamilyFinApp` (Application) crea un `AppContainer` con el `HttpClient` de
+  Ktor (OkHttp, kotlinx.serialization con `ignoreUnknownKeys`, timeouts), DataStore,
+  `ConnectivityObserver`, `SessionManager` y los repositorios. Hay dos `HttpClient`: uno público
+  (login, registro, renovación) y otro de API con el plugin `SessionAuth`. Los ViewModels se crean en la
+  entrada de pantalla con `viewModelFactory { initializer { ... } }` leyendo el container
+  desde `LocalContext.current.applicationContext`.
+- **Sesión**: `SessionManager` (ámbito de aplicación, `session/`) es la única fuente de verdad:
+  expone `StateFlow<SessionState>` (`Loading`, `SignedOut(motivo?)`, `SignedIn(userId, generación)`)
+  y es el `SessionProvider` de los repositorios (`current()` lanza
+  `SessionUnavailableException(SessionFailure)`). Lee la sesión guardada una vez por proceso, la
+  guarda cifrada con AES-GCM y clave del Keystore (`EncryptedSessionStore`, excluida de las copias
+  de seguridad) y, bajo un `Mutex`, hace una sola renovación ante varios 401 (el backend rota el
+  refresh token y revoca todas las sesiones si se reutiliza uno). El plugin `SessionAuth`
+  (`data/network`) añade el Bearer y, ante un 401, renueva una vez y reintenta. Si el backend
+  rechaza la renovación, la sesión termina con motivo `Expired` o `Security` y se borran sesión y
+  caché de cabecera (`onSessionEnded`); sin red la sesión se conserva. `endSession` no debe
+  esperar al refresco de cabecera en curso: `HeaderRepositoryImpl.clear()` usa su propio candado y
+  un contador de época (ver `SessionEndDuringHeaderRefreshTest`). `Session`, los DTOs de auth y
+  `RefreshOutcome` sobrescriben `toString()` para no filtrar tokens.
+- **Datos**: los data sources remotos devuelven `RemoteResult.Success/Failure` con fallos de
+  dominio tipados (`HeaderFailure`) y nunca lanzan por red/servidor; sí relanzan
+  `CancellationException`. Los repositorios exponen un `Flow` de datos y un `suspend refresh()`
+  que devuelve un resultado por recurso (cada recurso se refresca de forma independiente).
+- **Caché offline** (`HeaderLocalDataSource`): un JSON por recurso en DataStore Preferences con
+  `schemaVersion`, `userId` y `savedAt`. El repositorio descarta caché de otro usuario o de
+  ≥7 días y marca `isStale` a partir de 24 h. Versión desconocida o JSON ilegible = sin datos.
+- **Presentación**: `MainViewModel` combina el flujo del repositorio con estado local
+  (familia activa solo en memoria, selector abierto, refresco en curso) en un
+  `StateFlow<MainUiState>`; `FamiliesState` es un sealed interface
+  (Loading/NoData/Content/Error). Se refresca al iniciar, en `ON_START` y al recuperar
+  conectividad. `MainScreen` tiene una sobrecarga con estado (ViewModel) y otra stateless.
+  `AuthViewModel` (`ui/auth`) gestiona login y registro con las reglas de `AuthValidation` y los
+  mensajes de `AuthTexts`; `AuthContent` es la parte stateless.
+- **Navegación**: aún no hay librería. `AppRoot`/`RootViewModel` eligen la pantalla según
+  `SessionState`: nada en `Loading`, `AuthScreen` en `SignedOut` y `MainScreen` en `SignedIn`; la
+  generación de la sesión reinicia el estado de los ViewModels al cambiar de usuario. Las pestañas
+  inferiores son el enum `MainDestination` (su orden es el de la barra).
+- **Tests**: unitarios JVM con `kotlinx-coroutines-test` y `ktor-client-mock`; los de UI
+  (`androidTest`) usan `TestMainHost`, que reproduce lo mínimo del ViewModel sobre la
+  sobrecarga stateless de `MainScreen`, sin red ni caché; los de acceso (`AuthScreenTest`,
+  `AppRootTest`) usan `AuthContent` y `AppRootContent` con repositorios falsos.
 
 ## Documentación y especificaciones
 
@@ -128,6 +152,19 @@ según la estructura `core/` + `features/` propuesta en el README.
   consistentes con la implementación.
 - Actualizar la documentación directamente relacionada cuando cambie el
   comportamiento o una decisión técnica.
+
+## Referencias
+
+- `docs/ROADMAP.md` — orden de implementación y estado de cada funcionalidad; actualizarlo
+  cuando una funcionalidad cambie de estado.
+- `docs/features/<NNN-nombre>/` — SPEC/PLAN/TASKS por funcionalidad. Los requisitos se citan en
+  el código como `RF-xx`.
+- `docs/backend/api-contract.md` y `docs/backend/openapi.yaml` — contrato con el backend
+  (`familyFinAI-backend`). Dinero como entero en la unidad menor (`Money {amount, currency}`),
+  nunca `Double`; los errores llegan con un `code` de dominio.
+- `docs/DESIGN.md` — sistema visual (colores, tipografía, componentes).
+- La app nunca contiene secretos de BD ni API keys de IA; lo que propone la IA nunca se guarda
+  sin confirmación del usuario.
 
 ## Validación
 
@@ -158,33 +195,6 @@ compilación Android.
 Si cambia la configuración de variantes, inspeccionar las tareas Gradle
 disponibles y usar la variante correspondiente.
 
-### Configuración local y backend de desarrollo
-
-Los builds debug dependen de la tarea `checkDevProperties` (enganchada a
-`preDebugBuild`), que falla si `local.properties` (no versionado) no define
-`DEV_EMAIL` y `DEV_PASSWORD`, o si `DEV_TARGET` no es `emulator`
-(`http://10.0.2.2:3000`) o `device` (`http://localhost:3000`, requiere
-`adb reverse tcp:3000 tcp:3000`). `adb reverse` también sirve para el emulador:
-con `DEV_TARGET=device` fijo, `scripts/dev-reverse.sh` lo aplica a todos los
-dispositivos y emuladores conectados (repetir tras reiniciarlos).
-`BACKEND_BASE_URL` lo sobrescribe. Estos valores llegan como campos
-`BuildConfig`; en release quedan vacíos. Nunca escribir sus valores en código,
-logs ni documentación.
-
-## Referencias
-
-- `docs/ROADMAP.md` — orden de implementación y estado de cada funcionalidad;
-  actualizarlo cuando una funcionalidad cambie de estado.
-- `docs/features/<NNN-nombre>/` — SPEC/PLAN/TASKS por funcionalidad. Los
-  requisitos se citan en el código como `RF-xx`.
-- `docs/backend/api-contract.md` y `docs/backend/openapi.yaml` — contrato con el
-  backend (`familyFinAI-backend`). Dinero como entero en la unidad menor
-  (`Money {amount, currency}`), nunca `Double`; los errores llegan con un `code`
-  de dominio.
-- `docs/DESIGN.md` — sistema visual (colores, tipografía, componentes).
-- La app nunca contiene secretos de BD ni API keys de IA; lo que propone la IA
-  nunca se guarda sin confirmación del usuario.
-
 ## Informe de finalización
 
 Resumir el comportamiento implementado, los documentos de funcionalidad
@@ -196,6 +206,9 @@ no pudieron ejecutarse por limitaciones del entorno.
 
 ## Cambios y control de versiones
 
+- Este archivo es la única fuente de instrucciones del proyecto. `CLAUDE.md` solo enlaza a él y
+  no debe contener información propia: cualquier regla, comando, decisión o contexto nuevo se
+  añade aquí, nunca en `CLAUDE.md`.
 - Revisar el estado del repositorio antes de editar y preservar cambios ajenos.
 - Mantener los cambios enfocados; no hacer refactors o actualizaciones
   no relacionados.

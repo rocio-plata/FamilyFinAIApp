@@ -33,6 +33,12 @@ class HeaderRepositoryImpl(
     private val state = MutableStateFlow(HeaderData())
     private val mutex = Mutex()
 
+    // Protege solo las escrituras de caché y estado (nunca la red). `clear()` lo usa sin esperar al
+    // `mutex` de refresco: un refresco en curso puede estar esperando la renovación de la sesión,
+    // que a su vez termina la sesión y llama a `clear()` (interbloqueo si compartieran candado).
+    private val storageLock = Mutex()
+    private var clearEpoch = 0
+
     override val header: Flow<HeaderData> = state
 
     override suspend fun refresh(): HeaderRefreshResult = mutex.withLock {
@@ -41,12 +47,17 @@ class HeaderRepositoryImpl(
         } catch (e: SessionUnavailableException) {
             return failAll(e.failure.toHeaderFailure())
         }
-        loadCache(session.userId)
-        fetch(session)
+        val epoch = storageLock.withLock {
+            loadCache(session.userId)
+            clearEpoch
+        }
+        fetch(session, epoch)
     }
 
-    // Espera a que termine un refresco en curso para que no vuelva a guardar datos tras el borrado.
-    override suspend fun clear() = mutex.withLock {
+    // No espera a un refresco en curso: subir `clearEpoch` hace que ese refresco descarte lo que
+    // obtenga en vez de guardarlo tras el borrado.
+    override suspend fun clear() = storageLock.withLock {
+        clearEpoch++
         local.clear()
         state.value = HeaderData()
     }
@@ -70,7 +81,7 @@ class HeaderRepositoryImpl(
         )
     }
 
-    private suspend fun fetch(session: Session): HeaderRefreshResult = coroutineScope {
+    private suspend fun fetch(session: Session, epoch: Int): HeaderRefreshResult = coroutineScope {
         val families = async { remote.families() }
         val invitations = async { remote.pendingInvitations() }
         val profile = async { remote.displayName() }
@@ -80,17 +91,21 @@ class HeaderRepositoryImpl(
         val profileResult = profile.await()
         val now = clock()
 
-        if (familiesResult is RemoteResult.Success) {
-            local.saveFamilies(session.userId, now, familiesResult.value)
-            state.update { build(families = Timed(familiesResult.value, now), current = it) }
-        }
-        if (invitationsResult is RemoteResult.Success) {
-            local.savePendingInvitations(session.userId, now, invitationsResult.value)
-            state.update { build(invitations = Timed(invitationsResult.value, now), current = it) }
-        }
-        if (profileResult is RemoteResult.Success) {
-            local.saveDisplayName(session.userId, now, profileResult.value)
-            state.update { build(name = Timed(profileResult.value, now), current = it) }
+        storageLock.withLock {
+            // Si se borró la caché mientras se esperaba la red, no se guarda nada (RF-09).
+            if (epoch != clearEpoch) return@withLock
+            if (familiesResult is RemoteResult.Success) {
+                local.saveFamilies(session.userId, now, familiesResult.value)
+                state.update { build(families = Timed(familiesResult.value, now), current = it) }
+            }
+            if (invitationsResult is RemoteResult.Success) {
+                local.savePendingInvitations(session.userId, now, invitationsResult.value)
+                state.update { build(invitations = Timed(invitationsResult.value, now), current = it) }
+            }
+            if (profileResult is RemoteResult.Success) {
+                local.saveDisplayName(session.userId, now, profileResult.value)
+                state.update { build(name = Timed(profileResult.value, now), current = it) }
+            }
         }
 
         HeaderRefreshResult(

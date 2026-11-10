@@ -150,7 +150,7 @@ Dirección de dependencias dentro de `:app`: `ui` → `domain` ← `data`;
 | `session/StaticSessionProvider.kt` y su test | Eliminar | Sustituido por `SessionManager`. | RF-11 |
 | `data/network/SessionAuthPlugin.kt` | Crear | Plugin de cliente Ktor: Bearer en cada petición; ante 401, renovación compartida y un único reintento; nunca registra tokens. | RF-06, RF-07 |
 | `data/header/HeaderRemoteDataSource.kt` | Modificar | Usa `apiClient` y deja de añadir `bearerAuth` por su cuenta. Sin otros cambios de comportamiento. | RF-06 |
-| `domain/header/HeaderRepository.kt`, `data/header/HeaderRepositoryImpl.kt` | Modificar | Nuevo `clear()`: vacía caché (`local.clear()`) y estado en memoria. | RF-09 |
+| `domain/header/HeaderRepository.kt`, `data/header/HeaderRepositoryImpl.kt` | Modificar | Nuevo `clear()`: vacía caché (`local.clear()`) y estado en memoria. No espera a un refresco en curso (que puede estar esperando la renovación de la sesión que termina): usa un candado de almacenamiento propio y un contador de época por el que ese refresco descarta lo que obtenga después. Cambio hecho en T-21 tras detectar un interbloqueo. | RF-09 |
 | `AppContainer.kt` | Modificar | `publicClient`, `apiClient`, `SessionStore`, `SessionManager` (con `onSessionEnded = headerRepository::clear`), `AuthRepository`; sin `BuildConfig.DEV_*`. | RF-05, RF-11 |
 | `ui/root/AppRoot.kt`, `RootViewModel.kt` | Crear | Muestra fondo vacío / `AuthScreen` / `MainScreen` según `SessionState`; `MainScreen` con `key(generation)` y ViewModel con clave por generación para no reutilizar estado de una sesión anterior. | RF-01, RF-05, RF-07 |
 | `ui/auth/AuthScreen.kt`, `AuthContent` (sin estado) | Crear | Logo, nombre y lema; `SingleChoiceSegmentedButtonRow` "Iniciar sesión / Crear cuenta"; formularios; enlace al pie; mensaje de sesión terminada; progreso en el botón; desplazable con teclado (`imePadding`). | RF-01–RF-04, RF-07, RF-12 |
@@ -159,7 +159,7 @@ Dirección de dependencias dentro de `:app`: `ui` → `domain` ← `data`;
 | `res/values/strings.xml` | Modificar | Textos de acceso, errores y mensajes de la spec. | Todos |
 | `res/xml/backup_rules.xml`, `data_extraction_rules.xml` | Modificar | Excluir `datastore/session.preferences_pb`. | Restricción de la spec |
 | `app/build.gradle.kts` | Modificar | Quitar `DEV_EMAIL`/`DEV_PASSWORD` (campos, comprobación y mensaje). `checkDevProperties` solo valida `DEV_TARGET`. | RF-11 |
-| `CLAUDE.md`, `docs/ROADMAP.md` | Modificar | Quitar la referencia a credenciales de desarrollo y a la sesión temporal; estado del roadmap. | Documentación |
+| `AGENTS.md` (antes `CLAUDE.md`, que ahora solo enlaza a él), `docs/ROADMAP.md` | Modificar | Quitar la referencia a credenciales de desarrollo y a la sesión temporal; estado del roadmap. | Documentación |
 
 ## Datos y contratos
 
@@ -274,8 +274,8 @@ Todos los tests son nuevos salvo indicación. "Mock" = `ktor-client-mock`.
 | CA-07 | Instrumentado `SessionStoreTest` (guardar, leer en instancia nueva) + manual (matar proceso y reiniciar) | Emulador con Keystore | Test + nota manual |
 | CA-08 | Unit `SessionAuthPluginTest` (401 → refresh → reintento OK) + manual (esperar >15 min) | JVM mock; emulador + backend | Test + nota manual |
 | CA-09 | Unit `SessionAuthPluginTest`/`SessionManagerTest` (N peticiones concurrentes con 401 → una sola llamada a `/auth/refresh`) | JVM mock | Test en verde (cuenta de llamadas) |
-| CA-10 | Unit `SessionManagerTest` (refresh 401 `AUTH.INVALID_REFRESH_TOKEN` → `SignedOut(Expired)`) + UI (mensaje) + manual (logout desde otro cliente y esperar caducidad) | JVM mock; emulador + backend | Tests + nota manual |
-| CA-11 | Unit (refresh 401 `AUTH.POSSIBLE_TOKEN_THEFT` → `SignedOut(Security)`) + UI (mensaje) | JVM mock; emulador | Tests en verde |
+| CA-10 | Unit `SessionManagerTest` (refresh 401 `AUTH.INVALID_REFRESH_TOKEN` → `SignedOut(Expired)`) + UI (mensaje); sin prueba manual: contra el backend real no hay forma sencilla de provocar un token inexistente o caducado desde fuera | JVM mock | Tests en verde |
+| CA-11 | Unit (refresh 401 `AUTH.POSSIBLE_TOKEN_THEFT` → `SignedOut(Security)`) + UI (mensaje) + manual (logout desde otro cliente y esperar la caducidad del acceso) | JVM mock; emulador + backend | Tests + nota manual |
 | CA-12 | Unit `SessionManagerTest` (logout 204 → `SignedOut(LoggedOut)`, sesión y caché borradas, petición con Bearer). Backend real: en la spec de perfil | JVM mock | Test en verde |
 | CA-13 | Unit (`endSession` → store vacío + `onSessionEnded` llamado) + unit `HeaderRepositoryImplTest` (`clear()` vacía caché y memoria) + manual (reabrir sin red) | JVM con DataStore temporal; emulador | Tests + nota manual |
 | CA-14 | Unit `SessionManagerTest` (refresh con `IOException` → sesión intacta) + manual (modo avión, reabrir, activar red) | JVM mock; emulador | Test + nota manual |
