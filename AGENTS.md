@@ -32,13 +32,16 @@ comportamiento observable, el alcance o la persistencia.
 
 ## Entorno de desarrollo
 
-Los builds debug dependen de la tarea `checkDevProperties` (enganchada a `preDebugBuild`),
-que falla si `DEV_TARGET` en `local.properties` (no versionado) no es `emulator`
-(`http://10.0.2.2:3000`, el valor por defecto) o `device` (`http://localhost:3000`, requiere
-`adb reverse tcp:3000 tcp:3000`). `BACKEND_BASE_URL` lo sobrescribe; en release queda vacío. La
-app ya no lleva credenciales de desarrollo: se entra por la pantalla de acceso. Solo
-`AuthWiringTest` (instrumentado) usa una cuenta real y la recibe por los argumentos `email` y
-`password` del runner; nunca escribir esos valores en código, logs ni documentación.
+Los builds debug dependen de la tarea `checkDevProperties` (enganchada a
+`preDebugBuild`), que falla si `local.properties` (no versionado) no define
+`DEV_EMAIL` y `DEV_PASSWORD`, o si `DEV_TARGET` no es `emulator`
+(`http://10.0.2.2:3000`) o `device` (`http://localhost:3000`, requiere
+`adb reverse tcp:3000 tcp:3000`). `adb reverse` también sirve para el emulador:
+con `DEV_TARGET=device` fijo, `scripts/dev-reverse.sh` lo aplica a todos los
+dispositivos y emuladores conectados (repetir tras reiniciarlos).
+`BACKEND_BASE_URL` lo sobrescribe. Estos valores llegan como campos
+`BuildConfig`; en release quedan vacíos. Nunca escribir sus valores en código,
+logs ni documentación.
 
 minSdk 34, target/compileSdk 36, Java 11.
 
@@ -177,7 +180,7 @@ cambio:
 Para una prueba local concreta, usar:
 
 ```bash
-./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.SomeTest"
+./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.ui.main.MainViewModelTest"
 ```
 
 Para cambios que requieran pruebas instrumentadas, ejecutar
