@@ -1,0 +1,12 @@
+# Brechas de backend — spec 005-categories
+
+Verificado contra `docs/backend/api-contract.md` (§3.4.2) y
+`docs/backend/openapi.yaml`. No se ha verificado el código del backend.
+
+| ID | Brecha | Estado | Evidencia |
+| --- | --- | --- | --- |
+| BG-01 | No existe una operación para reactivar una categoría o un tag archivados (`deprecate` no tiene inversa). La app trata el archivado como irreversible y lo advierte al confirmar (RF-12, RF-18); el selector Activa/Archivada reversible del mockup `006-category-edit.png` no puede ofrecerse. | Abierta, no bloqueante | Contrato §3.4.2 y rutas `/categories/{categoryId}/deprecate` y `/tags/{tagId}/deprecate` de `openapi.yaml`: no hay ruta de reactivación |
+| BG-02 | La categoría no tiene color: el contrato solo define `type`, `name`, `icon` y `status`, y ni el alta ni la edición aceptan un color. La app no ofrece el selector de tonalidad del mockup `006-category-edit.png` ni los colores por categoría de `001-home.png` y `005-categories-list.png`; todas las categorías usan el mismo estilo. | Abierta, no bloqueante | Contrato §3.4.2 (`POST`, `GET` y `PATCH /families/:familyId/categories`) y esquema `Category` de `openapi.yaml`: no hay campo de color |
+| BG-03 | La categoría no informa su fecha de archivado: el contrato no devuelve ninguna fecha asociada al cambio de estado. La app marca las archivadas solo como "Archivada" (RF-04), sin el texto "Archivada en …" del mockup `005-categories-list.png`. | Abierta, no bloqueante | Contrato §3.4.2 (`GET /families/:familyId/categories`) y esquema `Category` de `openapi.yaml`: sin campos de fecha |
+| BG-04 | Las categorías no pueden reordenarse: no tienen posición (`displayOrder` existe solo en los tags) ni hay una operación de orden como la de tags (`PUT …/tags/order`). La app las muestra en el orden que devuelve el backend y no ofrece la acción "Reordenar" del mockup `005-categories-list.png`. | Abierta, no bloqueante | Contrato §3.4.2 y esquema `Category` de `openapi.yaml`: sin `displayOrder` ni ruta de orden para categorías |
+| BG-05 | El backend no crea categorías de ingreso por defecto: al crear una familia solo genera 9 categorías de gasto (`EXPENSE`). La pestaña "Ingresos" de una familia nueva empieza vacía y la app muestra el estado vacío con la invitación a crear una (solo el Propietario puede hacerlo). | Abierta, no bloqueante | Informado por la persona el 2026-11-11 a partir del código del backend (`CreateDefaultCategoriesOnFamilyCreatedEventHandler`); no verificado por el agente. El contrato no describe las categorías por defecto |
