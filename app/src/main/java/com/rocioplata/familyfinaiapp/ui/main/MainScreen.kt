@@ -24,6 +24,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rocioplata.familyfinaiapp.FamilyFinApp
+import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
+import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import androidx.compose.ui.tooling.preview.Preview
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
@@ -47,6 +49,23 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onDismissSelector = viewModel::dismissSelector,
         onManageCategories = viewModel::openCategories,
         onCategoriesBack = viewModel::categoriesBack,
+        categoriesContent = { route ->
+            val family = (uiState.families as? FamiliesState.Content)?.activeFamily
+            if (route == CategoriesRoute.List && family != null) {
+                CategoriesScreen(
+                    familyId = family.id,
+                    canManage = family.role == FamilyRole.OWNER,
+                    viewModelKey = "${viewModelKey ?: "main"}-categories-${family.id}",
+                    onBack = viewModel::categoriesBack,
+                    onCategoryClick = viewModel::openCategoryEdit,
+                    onCreateClick = viewModel::openCategoryCreate,
+                    modifier = modifier,
+                )
+            } else {
+                // El alta y la edición se conectan en T-19 y T-20.
+                CategoriesPlaceholder(onBack = viewModel::categoriesBack, modifier = modifier)
+            }
+        },
         modifier = modifier,
     )
 }
@@ -63,15 +82,21 @@ fun MainScreen(
     modifier: Modifier = Modifier,
     onManageCategories: () -> Unit = {},
     onCategoriesBack: () -> Unit = {},
+    categoriesContent: (@Composable (CategoriesRoute) -> Unit)? = null,
 ) {
     var selected by remember { mutableStateOf(MainDestination.Home) }
     BackHandler(enabled = selected != MainDestination.Home && uiState.categoriesRoute == null) {
         selected = MainDestination.Home
     }
     // La gestión de categorías ocupa toda la pantalla: sin cabecera de familia ni barra de pestañas.
-    if (uiState.categoriesRoute != null) {
+    val route = uiState.categoriesRoute
+    if (route != null) {
         BackHandler(onBack = onCategoriesBack)
-        CategoriesPlaceholder(onBack = onCategoriesBack, modifier = modifier)
+        if (categoriesContent != null) {
+            categoriesContent(route)
+        } else {
+            CategoriesPlaceholder(onBack = onCategoriesBack, modifier = modifier)
+        }
         return
     }
     MainScreenContent(
