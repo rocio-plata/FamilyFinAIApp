@@ -64,6 +64,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     onBack = viewModel::categoriesBack,
                     onCategoryClick = viewModel::openCategoryEdit,
                     onCreateClick = viewModel::openCategoryCreate,
+                    onInsufficientRole = viewModel::onInsufficientRole,
                     modifier = modifier,
                 )
                 else -> CategoryEditScreen(

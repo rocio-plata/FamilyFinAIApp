@@ -17,6 +17,12 @@ sealed interface CategoryEditEvent {
 
     /** El alta se completó: la pantalla pasa a editar la categoría creada (RF-09). */
     data class Created(val categoryId: String) : CategoryEditEvent
+
+    /**
+     * Eliminar falló porque la categoría activa tiene movimientos asociados: se ofrece archivarla en su
+     * lugar (RF-13). Aceptar llama a `archive()`; rechazar solo confirma el evento.
+     */
+    data object OfferArchive : CategoryEditEvent
 }
 
 sealed interface CategoryEditUiState {
@@ -25,6 +31,9 @@ sealed interface CategoryEditUiState {
 
     /** Edición de una categoría que ya no está en la lista de la familia. */
     data object NotFound : CategoryEditUiState
+
+    /** La categoría se archivó o eliminó: la pantalla vuelve al listado, ya actualizado (RF-12, RF-13). */
+    data object Finished : CategoryEditUiState
 
     data class Form(
         val isCreate: Boolean,

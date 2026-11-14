@@ -76,6 +76,10 @@ fun CategoryEditScreen(
             LoadingScreen(onBack, modifier)
             GoneDialog(messageRes = CategoryFailure.NotFound.messageRes(), onDismiss = onBack)
         }
+        CategoryEditUiState.Finished -> {
+            LoadingScreen(onBack, modifier)
+            LaunchedEffect(Unit) { onBack() }
+        }
         is CategoryEditUiState.Form -> CategoryEditContent(
             state = current,
             onLeave = onBack,
@@ -83,6 +87,8 @@ fun CategoryEditScreen(
             onIconChange = viewModel::setIcon,
             onTypeChange = viewModel::setType,
             onSubmit = viewModel::submit,
+            onArchive = viewModel::archive,
+            onDelete = viewModel::delete,
             onEventConsumed = viewModel::consumeEvent,
             onCreated = onCreated,
             modifier = modifier,

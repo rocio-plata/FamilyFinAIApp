@@ -27,6 +27,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -37,7 +38,10 @@ class CategoriesViewModelTest {
         val data = MutableStateFlow(CategoriesData())
         val refreshed = mutableListOf<String>()
         var gate: CompletableDeferred<Unit>? = null
+        var deleteGate: CompletableDeferred<Unit>? = null
         var onRefresh: (FakeRepository) -> CategoryResult<Unit> = { CategoryResult.Success(Unit) }
+        val deletes = mutableListOf<String>()
+        var deleteResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
         val requestedFamilies = mutableListOf<String>()
 
         override fun categories(familyId: String): Flow<CategoriesData> {
@@ -57,7 +61,15 @@ class CategoriesViewModelTest {
             unused()
 
         override suspend fun deprecateCategory(familyId: String, categoryId: String) = unused()
-        override suspend fun deleteCategory(familyId: String, categoryId: String) = unused()
+        override suspend fun deleteCategory(familyId: String, categoryId: String): CategoryResult<Unit> {
+            deletes += categoryId
+            deleteGate?.await()
+            if (deleteResult is CategoryResult.Success) {
+                data.value = CategoriesData(data.value.categories?.filterNot { it.id == categoryId }, data.value.isStale)
+            }
+            return deleteResult
+        }
+
         override suspend fun addTag(familyId: String, categoryId: String, name: String) = unused()
         override suspend fun renameTag(familyId: String, categoryId: String, tagId: String, name: String) = unused()
         override suspend fun reorderTags(familyId: String, categoryId: String, activeTagIdsInOrder: List<String>) =
@@ -105,12 +117,15 @@ class CategoriesViewModelTest {
     private val bono = category("c-5", "Bono", type = CategoryType.INCOME, status = CategoryStatus.DEPRECATED)
     private val all = listOf(comida, casa, gimnasio, sueldo, bono)
 
+    private var roleCalls = 0
+
     private fun TestScope.create(
         repo: FakeRepository,
         connectivity: FakeConnectivity = FakeConnectivity(),
         familyId: String = "f-1",
     ): CategoriesViewModel {
-        val vm = CategoriesViewModel(repo, familyId, connectivity)
+        roleCalls = 0
+        val vm = CategoriesViewModel(repo, familyId, connectivity) { roleCalls++ }
         backgroundScope.launch { vm.uiState.collect {} }
         advanceUntilIdle()
         return vm
@@ -462,5 +477,127 @@ class CategoriesViewModelTest {
 
         assertEquals(listOf("c-2", "c-1"), vm.content().active.map { it.id() })
         assertEquals(2, vm.content().expenseActiveCount)
+    }
+
+    // --- Eliminar una archivada (T-21; RF-13; CA-12, CA-20) ---
+
+    @Test
+    fun eliminarArchivada_pideEliminarla_yDesapareceDelListado() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+
+        vm.deleteArchived("c-3")
+        advanceUntilIdle()
+
+        assertEquals(listOf("c-3"), repo.deletes)
+        assertTrue(vm.content().archived.isEmpty())
+        assertNull(vm.content().event)
+        assertFalse(vm.content().isBusy)
+    }
+
+    @Test
+    fun eliminarArchivada_conMovimientosAsociados_soloInforma() = runTest {
+        val repo = repoWith().apply { deleteResult = CategoryResult.Failure(CategoryFailure.HasAssociatedItems) }
+        val vm = create(repo)
+
+        vm.deleteArchived("c-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.CannotDelete, vm.content().event)
+        assertEquals(listOf("c-3"), vm.content().archived.map { it.id() })
+    }
+
+    @Test
+    fun eliminar_soloSePuedeUnaCategoriaArchivada() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+
+        vm.deleteArchived("c-1")
+        vm.deleteArchived("c-404")
+        advanceUntilIdle()
+
+        assertTrue(repo.deletes.isEmpty())
+    }
+
+    @Test
+    fun eliminarArchivada_sinConexionOConError_avisaYNoCambiaNada() = runTest {
+        listOf(CategoryFailure.Offline, CategoryFailure.Network, CategoryFailure.Unknown).forEach { failure ->
+            val repo = repoWith().apply { deleteResult = CategoryResult.Failure(failure) }
+            val vm = create(repo)
+
+            vm.deleteArchived("c-3")
+            advanceUntilIdle()
+
+            assertEquals(CategoriesEvent.Failed(failure), vm.content().event)
+            assertEquals(listOf("c-3"), vm.content().archived.map { it.id() })
+            assertFalse(vm.content().isBusy)
+        }
+    }
+
+    @Test
+    fun eliminarArchivada_rolInsuficiente_avisaYNotificaAlHeader() = runTest {
+        val repo = repoWith().apply { deleteResult = CategoryResult.Failure(CategoryFailure.InsufficientRole) }
+        val vm = create(repo)
+
+        vm.deleteArchived("c-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.Failed(CategoryFailure.InsufficientRole), vm.content().event)
+        assertEquals(1, roleCalls)
+    }
+
+    @Test
+    fun eliminarArchivada_queYaNoExiste_avisaYActualizaElListado() = runTest {
+        val repo = repoWith().apply { deleteResult = CategoryResult.Failure(CategoryFailure.NotFound) }
+        val vm = create(repo)
+        val refreshesBefore = repo.refreshed.size
+
+        vm.deleteArchived("c-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.Failed(CategoryFailure.NotFound), vm.content().event)
+        assertEquals(refreshesBefore + 1, repo.refreshed.size)
+    }
+
+    @Test
+    fun eliminarArchivada_noAutorizado_loResuelveLaSesion_sinMensaje() = runTest {
+        val repo = repoWith().apply { deleteResult = CategoryResult.Failure(CategoryFailure.Unauthorized) }
+        val vm = create(repo)
+
+        vm.deleteArchived("c-3")
+        advanceUntilIdle()
+
+        assertNull(vm.content().event)
+        assertFalse(vm.content().isBusy)
+    }
+
+    @Test
+    fun eliminarArchivada_dosPulsaciones_unaSolaLlamada_yMientrasTantoEstaOcupado() = runTest {
+        val repo = repoWith().apply { deleteGate = CompletableDeferred() }
+        val vm = create(repo)
+
+        vm.deleteArchived("c-3")
+        vm.deleteArchived("c-3")
+        advanceUntilIdle()
+        assertTrue(vm.content().isBusy)
+        repo.deleteGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.deletes.size)
+        assertFalse(vm.content().isBusy)
+    }
+
+    @Test
+    fun elEventoSeConsumeUnaVez() = runTest {
+        val repo = repoWith().apply { deleteResult = CategoryResult.Failure(CategoryFailure.HasAssociatedItems) }
+        val vm = create(repo)
+        vm.deleteArchived("c-3")
+        advanceUntilIdle()
+        assertEquals(CategoriesEvent.CannotDelete, vm.content().event)
+
+        vm.consumeEvent()
+        advanceUntilIdle()
+
+        assertNull(vm.content().event)
     }
 }

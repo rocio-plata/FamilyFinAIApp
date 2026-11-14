@@ -27,6 +27,7 @@ fun CategoriesScreen(
     onBack: () -> Unit,
     onCategoryClick: (String) -> Unit,
     onCreateClick: (CategoryType) -> Unit,
+    onInsufficientRole: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val container = (LocalContext.current.applicationContext as FamilyFinApp).container
@@ -34,7 +35,9 @@ fun CategoriesScreen(
         key = viewModelKey,
         factory = viewModelFactory {
             initializer {
-                CategoriesViewModel(container.categoriesRepository, familyId, container.connectivityObserver)
+                CategoriesViewModel(
+                    container.categoriesRepository, familyId, container.connectivityObserver, onInsufficientRole,
+                )
             }
         },
     )
@@ -53,8 +56,8 @@ fun CategoriesScreen(
         onCategoryClick = onCategoryClick,
         onCreateClick = onCreateClick,
         onToggleArchived = viewModel::toggleArchived,
-        // La acción de eliminar una archivada se conecta en T-21 y T-22.
-        onDeleteArchived = {},
+        onDeleteArchived = viewModel::deleteArchived,
+        onEventConsumed = viewModel::consumeEvent,
         modifier = modifier,
     )
 }

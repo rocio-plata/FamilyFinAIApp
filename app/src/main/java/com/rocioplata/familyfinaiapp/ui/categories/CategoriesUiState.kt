@@ -1,6 +1,7 @@
 package com.rocioplata.familyfinaiapp.ui.categories
 
 import com.rocioplata.familyfinaiapp.domain.categories.Category
+import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 
@@ -9,6 +10,15 @@ data class CategoryItem(
     val category: Category,
     val activeTags: List<Tag>,
 )
+
+/** Algo que el listado debe mostrar una sola vez y luego confirmar con `consumeEvent()`. */
+sealed interface CategoriesEvent {
+    /** Un cambio falló: aviso, sin cambiar nada (RF-21). */
+    data class Failed(val failure: CategoryFailure) : CategoriesEvent
+
+    /** Eliminar una categoría archivada con movimientos asociados: solo se informa (RF-13). */
+    data object CannotDelete : CategoriesEvent
+}
 
 sealed interface CategoriesUiState {
     /** Sin datos todavía (ni caché ni respuesta): primera carga. */
@@ -35,6 +45,9 @@ sealed interface CategoriesUiState {
         /** Los datos tienen más de 24 h (RF-20). */
         val isStale: Boolean,
         val isRefreshing: Boolean,
+        /** Hay una operación de cambio en curso: las acciones quedan deshabilitadas (CA-21). */
+        val isBusy: Boolean = false,
+        val event: CategoriesEvent? = null,
     ) : CategoriesUiState {
         val selectedActiveCount: Int
             get() = if (selectedType == CategoryType.EXPENSE) expenseActiveCount else incomeActiveCount

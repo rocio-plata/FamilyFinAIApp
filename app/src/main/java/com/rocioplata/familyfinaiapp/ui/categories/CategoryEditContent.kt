@@ -24,15 +24,19 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -53,6 +57,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -83,11 +88,16 @@ fun CategoryEditContent(
     onIconChange: (String?) -> Unit,
     onTypeChange: (CategoryType) -> Unit,
     onSubmit: () -> Unit,
+    onArchive: () -> Unit,
+    onDelete: () -> Unit,
     onEventConsumed: () -> Unit,
     onCreated: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showDiscard by rememberSaveable { mutableStateOf(false) }
+    // Archivar y eliminar se confirman antes de pedirlos (RF-12, RF-13); se conservan al recrear la pantalla.
+    var confirmArchive by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
     val requestLeave = {
         if (state.hasUnsavedChanges) showDiscard = true else onLeave()
     }
@@ -107,7 +117,8 @@ fun CategoryEditContent(
                 onEventConsumed()
                 message = failedText
             }
-            is CategoryEditEvent.Leave, null -> Unit
+            // Leave y OfferArchive se resuelven con su diálogo.
+            is CategoryEditEvent.Leave, CategoryEditEvent.OfferArchive, null -> Unit
         }
     }
     // El aviso se muestra aparte de la confirmación del evento: consumirlo no debe cancelarlo.
@@ -155,7 +166,81 @@ fun CategoryEditContent(
             TypeSelector(state, onTypeChange)
             NameField(state, onNameChange, onSubmit)
             IconSelector(state, onIconChange)
+            if (!state.isCreate && !state.readOnly) {
+                ArchiveAndDeleteActions(
+                    enabled = !state.isBusy,
+                    onArchive = { confirmArchive = true },
+                    onDelete = { confirmDelete = true },
+                )
+            }
         }
+    }
+
+    if (confirmArchive) {
+        AlertDialog(
+            onDismissRequest = { confirmArchive = false },
+            title = { Text(stringResource(R.string.categories_dialog_archive_title)) },
+            text = { Text(stringResource(R.string.categories_dialog_archive_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmArchive = false
+                        onArchive()
+                    },
+                    enabled = !state.isBusy,
+                    modifier = Modifier.testTag("archive_confirm"),
+                ) { Text(stringResource(R.string.categories_archive_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmArchive = false }, modifier = Modifier.testTag("archive_cancel")) {
+                    Text(stringResource(R.string.categories_dialog_cancel))
+                }
+            },
+        )
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.categories_dialog_delete_title)) },
+            text = { Text(stringResource(R.string.categories_dialog_delete_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDelete = false
+                        onDelete()
+                    },
+                    enabled = !state.isBusy,
+                    modifier = Modifier.testTag("delete_confirm"),
+                ) { Text(stringResource(R.string.categories_delete_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }, modifier = Modifier.testTag("delete_cancel")) {
+                    Text(stringResource(R.string.categories_dialog_cancel))
+                }
+            },
+        )
+    }
+    // Eliminar falló por movimientos asociados: se ofrece archivar la categoría en su lugar (RF-13).
+    if (event is CategoryEditEvent.OfferArchive) {
+        AlertDialog(
+            onDismissRequest = onEventConsumed,
+            title = { Text(stringResource(R.string.categories_dialog_has_items_title)) },
+            text = { Text(stringResource(R.string.categories_dialog_has_items_offer_archive_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onEventConsumed()
+                        onArchive()
+                    },
+                    modifier = Modifier.testTag("offer_archive_confirm"),
+                ) { Text(stringResource(R.string.categories_archive_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = onEventConsumed, modifier = Modifier.testTag("offer_archive_cancel")) {
+                    Text(stringResource(R.string.categories_dialog_cancel))
+                }
+            },
+        )
     }
 
     if (showDiscard) {
@@ -215,6 +300,33 @@ private fun SubmitButton(state: CategoryEditUiState.Form, onSubmit: () -> Unit) 
             CircularProgressIndicator(modifier = Modifier.size(18.dp).testTag("category_edit_progress"), strokeWidth = 2.dp)
         } else {
             Text(stringResource(if (state.isCreate) R.string.categories_create_button else R.string.categories_save_button))
+        }
+    }
+}
+
+/** «Archivar» (irreversible, BG-01) y «Eliminar»: solo el Propietario y en una categoría activa. */
+@Composable
+private fun ArchiveAndDeleteActions(enabled: Boolean, onArchive: () -> Unit, onDelete: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = onArchive,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("category_edit_archive"),
+        ) {
+            Icon(Icons.Filled.Archive, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(stringResource(R.string.categories_archive_action), modifier = Modifier.padding(start = 8.dp))
+        }
+        Button(
+            onClick = onDelete,
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("category_edit_delete"),
+        ) {
+            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(stringResource(R.string.categories_delete_action), modifier = Modifier.padding(start = 8.dp))
         }
     }
 }
@@ -355,6 +467,8 @@ private fun IconCell(
         modifier = modifier
             .heightIn(min = 48.dp)
             .aspectRatio(1f)
+            // En solo lectura las celdas se atenúan: no responden y no deben parecer activas.
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) colors.primaryContainer else colors.surfaceContainerHigh)
             .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
@@ -379,6 +493,7 @@ private fun IconCell(
 }
 
 private const val ICONS_PER_ROW = 5
+private const val DISABLED_ALPHA = 0.6f
 
 private fun previewForm(
     isCreate: Boolean = false,
@@ -398,7 +513,7 @@ private fun PreviewHost(state: CategoryEditUiState.Form) {
     FamilyFinAIAppTheme {
         CategoryEditContent(
             state = state, onLeave = {}, onNameChange = {}, onIconChange = {}, onTypeChange = {},
-            onSubmit = {}, onEventConsumed = {}, onCreated = {},
+            onSubmit = {}, onArchive = {}, onDelete = {}, onEventConsumed = {}, onCreated = {},
         )
     }
 }

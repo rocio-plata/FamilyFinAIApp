@@ -44,6 +44,10 @@ class CategoryEditViewModel(
     private val nameError = MutableStateFlow<NameFieldError?>(null)
     private val busy = MutableStateFlow(false)
     private val event = MutableStateFlow<CategoryEditEvent?>(null)
+    private val finished = MutableStateFlow(false)
+
+    // Mientras se elimina, la categoría desaparece de la lista antes de que llegue la respuesta: no es «no encontrada».
+    private val deleting = MutableStateFlow(false)
 
     // Una sola colección del flujo del repositorio, compartida por el estado y por las comprobaciones.
     private val categories: StateFlow<List<Category>?> = repository.categories(familyId)
@@ -55,9 +59,11 @@ class CategoryEditViewModel(
         draft,
         nameError,
         canManage,
-        combine(busy, event) { isBusy, pending -> isBusy to pending },
-    ) { list, draft, nameError, canManage, (isBusy, pending) ->
-        buildState(list?.firstOrNull { it.id == categoryId }, list != null, draft, nameError, canManage, isBusy, pending)
+        combine(busy, event, finished, deleting) { isBusy, pending, done, isDeleting ->
+            Ops(isBusy, pending, done, isDeleting)
+        },
+    ) { list, draft, nameError, canManage, ops ->
+        buildState(list?.firstOrNull { it.id == categoryId }, list != null, draft, nameError, canManage, ops)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), CategoryEditUiState.Loading)
 
     init {
@@ -129,6 +135,29 @@ class CategoryEditViewModel(
         )
     }
 
+    /** Archivar la categoría activa, ya confirmado por la persona (RF-12): es irreversible (BG-01). */
+    fun archive() {
+        val id = categoryId ?: return
+        if (isReadOnly()) return
+        run(
+            operation = { repository.deprecateCategory(familyId, id) },
+            onSuccess = { finished.value = true },
+        )
+    }
+
+    /** Eliminar la categoría activa, ya confirmado (RF-13). Con movimientos asociados se ofrece archivarla. */
+    fun delete() {
+        val id = categoryId ?: return
+        if (isReadOnly()) return
+        run(
+            operation = {
+                deleting.value = true
+                repository.deleteCategory(familyId, id).also { if (it !is CategoryResult.Success) deleting.value = false }
+            },
+            onSuccess = { finished.value = true },
+        )
+    }
+
     /** La pantalla ya mostró o gestionó el evento pendiente. */
     fun consumeEvent() {
         event.value = null
@@ -164,6 +193,7 @@ class CategoryEditViewModel(
                 event.value = CategoryEditEvent.Failed(failure)
                 refreshList()
             }
+            CategoryFailure.HasAssociatedItems -> event.value = CategoryEditEvent.OfferArchive
             // Lo resuelve la sesión (003): no hay mensaje propio.
             CategoryFailure.Unauthorized -> Unit
             else -> event.value = CategoryEditEvent.Failed(failure)
@@ -185,12 +215,12 @@ class CategoryEditViewModel(
         draft: Draft?,
         nameError: NameFieldError?,
         canManage: Boolean,
-        isBusy: Boolean,
-        pending: CategoryEditEvent?,
+        ops: Ops,
     ): CategoryEditUiState {
+        if (ops.finished) return CategoryEditUiState.Finished
         if (!isCreate) {
             if (!listLoaded) return CategoryEditUiState.Loading
-            if (category == null) return CategoryEditUiState.NotFound
+            if (category == null) return if (ops.deleting) CategoryEditUiState.Loading else CategoryEditUiState.NotFound
         }
         draft ?: return CategoryEditUiState.Loading
         val archived = category?.status == CategoryStatus.DEPRECATED
@@ -207,8 +237,8 @@ class CategoryEditViewModel(
             archived = archived,
             tags = category?.tags.orEmpty().sortedWith(compareBy({ it.status != TagStatus.ACTIVE }, { it.displayOrder })),
             hasUnsavedChanges = !readOnly && hasChanges(category, draft),
-            isBusy = isBusy,
-            event = pending,
+            isBusy = ops.busy,
+            event = ops.event,
         )
     }
 
@@ -224,6 +254,8 @@ class CategoryEditViewModel(
         NameError.REQUIRED -> NameFieldError.REQUIRED
         NameError.TOO_LONG -> NameFieldError.TOO_LONG
     }
+
+    private data class Ops(val busy: Boolean, val event: CategoryEditEvent?, val finished: Boolean, val deleting: Boolean)
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L

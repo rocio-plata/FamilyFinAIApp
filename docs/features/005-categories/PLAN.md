@@ -3,6 +3,7 @@
 **SPEC de referencia:** `docs/features/005-categories/SPEC.md`
 **Versión de la spec revisada:** SPEC aprobada el 2026-11-11, con RF-01 a RF-21 y CA-01 a CA-24 (sin commit propio al redactar este plan; rama `feature/005-categories` sobre `e7d4ac7`).
 **Estado:** Aprobado <!-- Borrador | En revisión | Aprobado -->
+**Revisión posterior a la aprobación (2026-11-14, a petición de la persona):** la tabla de traducción de errores se corrige con lo comprobado al implementar T-04 y T-20 (prefijo real `FINANCIAL_TRACKING.*`; la espera excesiva es `Network`). No cambia ningún requisito ni criterio de la spec.
 
 <!-- PARA LA PERSONA
 Copia esta plantilla como PLAN.md junto a la SPEC.md aprobada.
@@ -203,19 +204,23 @@ Señala impacto sobre modelos, contratos o componentes compartidos. -->
   `schemaVersion = 1`; versión desconocida o JSON ilegible = sin datos. La
   caché de cabecera no cambia de formato.
 
-Traducción de errores (`error` del cuerpo; `message` no se lee):
+Traducción de errores (`error` del cuerpo; `message` no se lee). El contrato (§4 y
+§9) documenta los códigos de categorías y tags como `FINANCIAL.*`, pero el backend
+los emite como `FINANCIAL_TRACKING.*` (comprobado contra el backend local y su
+código el 2026-11-14, ver BG-06 de `BACKEND_GAPS.md`); la app acepta los dos
+prefijos. En la tabla, `*.X` significa `FINANCIAL_TRACKING.X` o `FINANCIAL.X`:
 
 | Respuesta | `CategoryFailure` | Efecto en la interfaz |
 | --- | --- | --- |
-| `FINANCIAL.INSUFFICIENT_ROLE` o `FAMILY.INSUFFICIENT_ROLE` | `InsufficientRole` | Aviso + `MainViewModel.onInsufficientRole()` (RF-08) |
-| `FINANCIAL.DUPLICATE_CATEGORY_NAME`, `FINANCIAL.DUPLICATE_TAG_NAME` | `DuplicateName` | Mensaje junto al campo |
-| `FINANCIAL.CATEGORY_HAS_ASSOCIATED_ITEMS`, `FINANCIAL.TAG_HAS_ASSOCIATED_ITEMS` | `HasAssociatedItems` | Oferta de archivar o solo aviso (RF-13, RF-18) |
-| `FINANCIAL.CATEGORY_NOT_ACTIVE` | `CategoryNotActive` | Aviso y refresco de la lista |
+| `*.INSUFFICIENT_ROLE` o `FAMILY.INSUFFICIENT_ROLE` | `InsufficientRole` | Aviso + `MainViewModel.onInsufficientRole()` (RF-08) |
+| `*.DUPLICATE_CATEGORY_NAME`, `*.DUPLICATE_TAG_NAME` | `DuplicateName` | Mensaje junto al campo |
+| `*.CATEGORY_HAS_ASSOCIATED_ITEMS`, `*.TAG_HAS_ASSOCIATED_ITEMS` | `HasAssociatedItems` | Oferta de archivar o solo aviso (RF-13, RF-18) |
+| `*.CATEGORY_NOT_ACTIVE` | `CategoryNotActive` | Aviso y refresco de la lista |
 | `404` (cualquier código) | `NotFound` | Aviso, refresco y vuelta al listado |
 | `401` tras la renovación | `Unauthorized` | Lo resuelve la sesión (003) |
-| `IOException` | `Network` | Error con reintento |
+| `IOException`, incluida la espera excesiva (en Ktor el timeout es un `IOException`) | `Network` | Error con reintento |
 | Sin conexión antes de enviar | `Offline` | "Requiere conexión" (RF-21) |
-| Resto, incluida la espera excesiva | `Unknown` | Error genérico con reintento |
+| Resto (otro código o estado, incluido el rechazo del orden de tags) | `Unknown` | Error genérico con reintento |
 
 ## Estado, operaciones y errores
 
@@ -362,8 +367,9 @@ Escribe Ninguna en las decisiones pendientes cuando estén resueltas. -->
   - *Orden de tags con cambios ajenos.* Si otro Propietario añade o elimina
     un tag mientras se reordena, la lista enviada ya no coincide y el backend
     la rechaza. Medida: revertir, informar y refrescar (ver "Reordenar tags").
-    El código de error de ese rechazo no está en el contrato: se trata como
-    error genérico.
+    El rechazo no está en el contrato; el código del backend lo llama
+    `FINANCIAL_TRACKING.INVALID_TAG_ORDER`, pero la app no lo distingue y lo trata
+    como error genérico (`Unknown`), porque la medida es la misma.
   - *Arrastre propio.* Sin librería, el gesto puede ser frágil con texto
     grande o listas largas. Medida: las acciones "Subir"/"Bajar" comparten la
     misma lógica y sirven de alternativa; prueba manual específica.

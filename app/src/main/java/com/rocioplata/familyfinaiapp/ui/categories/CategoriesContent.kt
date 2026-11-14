@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -38,6 +39,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -96,8 +99,29 @@ fun CategoriesContent(
     onCreateClick: (CategoryType) -> Unit,
     onToggleArchived: () -> Unit,
     onDeleteArchived: (String) -> Unit,
+    onEventConsumed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Eliminar una archivada se confirma antes de pedirlo (RF-13); se conserva al recrear la pantalla.
+    var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+    var message by remember { mutableStateOf<String?>(null) }
+    val event = (state as? CategoriesUiState.Content)?.event
+    val failedText = (event as? CategoriesEvent.Failed)?.failure?.let { stringResource(it.messageRes()) }
+    LaunchedEffect(event) {
+        if (event is CategoriesEvent.Failed) {
+            onEventConsumed()
+            message = failedText
+        }
+    }
+    // El aviso se muestra aparte de la confirmación del evento: consumirlo no debe cancelarlo.
+    LaunchedEffect(message) {
+        message?.let {
+            snackbar.showSnackbar(it)
+            message = null
+        }
+    }
+
     // Abierto de entrada si ya hay una búsqueda (por ejemplo, tras recrear la pantalla).
     var searchOpen by rememberSaveable { mutableStateOf((state as? CategoriesUiState.Content)?.query?.isNotEmpty() == true) }
     val query = (state as? CategoriesUiState.Content)?.query.orEmpty()
@@ -110,6 +134,8 @@ fun CategoriesContent(
 
     Scaffold(
         modifier = modifier.testTag("categories_screen"),
+        // Con el teclado abierto el aviso no debe quedar tapado por él.
+        snackbarHost = { SnackbarHost(snackbar, modifier = Modifier.imePadding()) },
         topBar = {
             Column {
                 if (searchOpen) {
@@ -153,10 +179,47 @@ fun CategoriesContent(
                     onCategoryClick = onCategoryClick,
                     onCreateClick = onCreateClick,
                     onToggleArchived = onToggleArchived,
-                    onDeleteArchived = onDeleteArchived,
+                    onDeleteArchived = { pendingDelete = it },
                 )
             }
         }
+    }
+
+    val busy = (state as? CategoriesUiState.Content)?.isBusy == true
+    pendingDelete?.let { id ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.categories_dialog_delete_title)) },
+            text = { Text(stringResource(R.string.categories_dialog_delete_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDelete = null
+                        onDeleteArchived(id)
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.testTag("delete_confirm"),
+                ) { Text(stringResource(R.string.categories_delete_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }, modifier = Modifier.testTag("delete_cancel")) {
+                    Text(stringResource(R.string.categories_dialog_cancel))
+                }
+            },
+        )
+    }
+    // Una archivada con movimientos asociados no se puede eliminar y no admite la oferta de archivar (RF-13).
+    if (event is CategoriesEvent.CannotDelete) {
+        AlertDialog(
+            onDismissRequest = onEventConsumed,
+            title = { Text(stringResource(R.string.categories_dialog_has_items_title)) },
+            text = { Text(stringResource(R.string.categories_dialog_has_items_archived_message)) },
+            confirmButton = {
+                TextButton(onClick = onEventConsumed, modifier = Modifier.testTag("cannot_delete_confirm")) {
+                    Text(stringResource(R.string.categories_dialog_understood))
+                }
+            },
+        )
     }
 }
 
@@ -280,6 +343,7 @@ private fun ContentState(
                         ArchivedRow(
                             item = item,
                             canManage = canManage,
+                            menuEnabled = !state.isBusy,
                             onClick = { onCategoryClick(item.category.id) },
                             onDelete = { onDeleteArchived(item.category.id) },
                         )
@@ -441,10 +505,16 @@ private fun ArchivedHeader(count: Int, expanded: Boolean, onClick: () -> Unit) {
 
 /**
  * Fila de una categoría archivada: atenuada y con el texto «Archivada» (no solo el color). Solo el
- * Propietario ve el menú ⋮ con «Eliminar» (RF-13); la acción se conecta en T-21 y T-22.
+ * Propietario ve el menú ⋮ con «Eliminar» (RF-13), que pide confirmación.
  */
 @Composable
-private fun ArchivedRow(item: CategoryItem, canManage: Boolean, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun ArchivedRow(
+    item: CategoryItem,
+    canManage: Boolean,
+    menuEnabled: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val icon = CategoryIcons.displayOf(item.category.icon)
     var menuOpen by remember { mutableStateOf(false) }
     Surface(
@@ -487,7 +557,11 @@ private fun ArchivedRow(item: CategoryItem, canManage: Boolean, onClick: () -> U
             }
             if (canManage) {
                 Box {
-                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("archived_menu_${item.category.id}")) {
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        enabled = menuEnabled,
+                        modifier = Modifier.testTag("archived_menu_${item.category.id}"),
+                    ) {
                         Icon(
                             imageVector = Icons.Filled.MoreVert,
                             contentDescription = stringResource(R.string.categories_archived_menu_description, item.category.name),
@@ -533,6 +607,7 @@ private fun PreviewHost(state: CategoriesUiState, canManage: Boolean = true) {
         CategoriesContent(
             state = state, canManage = canManage, onBack = {}, onQueryChange = {}, onSelectType = {},
             onRetry = {}, onCategoryClick = {}, onCreateClick = {}, onToggleArchived = {}, onDeleteArchived = {},
+            onEventConsumed = {},
         )
     }
 }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -45,6 +46,10 @@ class CategoryEditViewModelTest {
             CategoryResult.Success(Category("c-new", it.type, it.name, it.icon, CategoryStatus.ACTIVE, emptyList()))
         }
         var updateResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
+        val archives = mutableListOf<String>()
+        val deletes = mutableListOf<String>()
+        var archiveResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
+        var deleteResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
 
         override fun categories(familyId: String): Flow<CategoriesData> = data
 
@@ -86,8 +91,29 @@ class CategoryEditViewModelTest {
         }
 
         override suspend fun clear() = Unit
-        override suspend fun deprecateCategory(familyId: String, categoryId: String) = unused()
-        override suspend fun deleteCategory(familyId: String, categoryId: String) = unused()
+        override suspend fun deprecateCategory(familyId: String, categoryId: String): CategoryResult<Unit> {
+            archives += categoryId
+            gate?.await()
+            if (archiveResult is CategoryResult.Success) {
+                data.value = CategoriesData(
+                    data.value.categories?.map { if (it.id == categoryId) it.copy(status = CategoryStatus.DEPRECATED) else it },
+                )
+            }
+            return archiveResult
+        }
+
+        override suspend fun deleteCategory(familyId: String, categoryId: String): CategoryResult<Unit> {
+            deletes += categoryId
+            gate?.await()
+            if (deleteResult is CategoryResult.Success) {
+                data.value = CategoriesData(data.value.categories?.filterNot { it.id == categoryId })
+                // Como en el dispositivo: la lista se actualiza y la respuesta llega después, dando
+                // tiempo a que la pantalla observe la categoría ya ausente.
+                yield()
+            }
+            return deleteResult
+        }
+
         override suspend fun addTag(familyId: String, categoryId: String, name: String) = unused()
         override suspend fun renameTag(familyId: String, categoryId: String, tagId: String, name: String) = unused()
         override suspend fun reorderTags(familyId: String, categoryId: String, activeTagIdsInOrder: List<String>) = unused()
@@ -634,5 +660,220 @@ class CategoryEditViewModelTest {
         advanceUntilIdle()
 
         assertEquals("Alimentación", vm.form().name)
+    }
+
+    // --- Archivar y eliminar (T-21; RF-12, RF-13; CA-11, CA-12, CA-20) ---
+
+    @Test
+    fun archivar_pideArchivarLaCategoria_yAlTerminarVuelveAlListado() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.archive()
+        advanceUntilIdle()
+
+        assertEquals(listOf("c-1"), repo.archives)
+        assertEquals(CategoryEditUiState.Finished, vm.uiState.value)
+        assertEquals(CategoryStatus.DEPRECATED, repo.data.value.categories?.first()?.status)
+    }
+
+    @Test
+    fun archivar_dosPulsaciones_unaSolaLlamada() = runTest {
+        val repo = repoWith(comida).apply { gate = CompletableDeferred() }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.archive()
+        vm.archive()
+        advanceUntilIdle()
+        assertTrue(vm.form().isBusy)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.archives.size)
+    }
+
+    @Test
+    fun archivar_sinConexion_avisa_noCambiaNada_yPuedeReintentar() = runTest {
+        val repo = repoWith(comida).apply { archiveResult = CategoryResult.Failure(CategoryFailure.Offline) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.archive()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.Offline), vm.form().event)
+        assertFalse(vm.form().isBusy)
+        assertFalse(vm.form().archived)
+
+        vm.consumeEvent()
+        repo.archiveResult = CategoryResult.Success(Unit)
+        vm.archive()
+        advanceUntilIdle()
+        assertEquals(CategoryEditUiState.Finished, vm.uiState.value)
+        assertEquals(2, repo.archives.size)
+    }
+
+    @Test
+    fun archivar_rolInsuficiente_avisaYNotificaAlHeader() = runTest {
+        val repo = repoWith(comida).apply { archiveResult = CategoryResult.Failure(CategoryFailure.InsufficientRole) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.archive()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.InsufficientRole), vm.form().event)
+        assertEquals(1, roleCalls)
+    }
+
+    @Test
+    fun archivar_unaCategoriaQueYaNoExiste_avisaYVuelveAlListadoActualizandolo() = runTest {
+        val repo = repoWith(comida).apply { archiveResult = CategoryResult.Failure(CategoryFailure.NotFound) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.archive()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Leave(CategoryFailure.NotFound), vm.form().event)
+        assertEquals(1, repo.refreshes)
+    }
+
+    @Test
+    fun archivar_unaCategoriaYaArchivadaEnOtroLugar_avisaYActualiza() = runTest {
+        val repo = repoWith(comida).apply { archiveResult = CategoryResult.Failure(CategoryFailure.CategoryNotActive) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.archive()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.CategoryNotActive), vm.form().event)
+        assertEquals(1, repo.refreshes)
+    }
+
+    @Test
+    fun archivarYEliminar_noHacenNadaEnSoloLecturaNiEnAlta() = runTest {
+        val member = repoWith(comida)
+        val memberVm = create(member, categoryId = "c-1", canManage = false)
+        memberVm.archive()
+        memberVm.delete()
+        advanceUntilIdle()
+        assertTrue(member.archives.isEmpty() && member.deletes.isEmpty())
+
+        val archived = repoWith(gimnasio)
+        val archivedVm = create(archived, categoryId = "c-2")
+        archivedVm.archive()
+        archivedVm.delete()
+        advanceUntilIdle()
+        assertTrue(archived.archives.isEmpty() && archived.deletes.isEmpty())
+
+        val creating = repoWith(comida)
+        val creatingVm = create(creating)
+        creatingVm.archive()
+        creatingVm.delete()
+        advanceUntilIdle()
+        assertTrue(creating.archives.isEmpty() && creating.deletes.isEmpty())
+    }
+
+    @Test
+    fun eliminar_pideEliminarLaCategoria_yAlTerminarVuelveAlListado_sinPasarPorNoEncontrada() = runTest {
+        val repo = repoWith(comida)
+        val vm = CategoryEditViewModel(repo, "f-1", "c-1", CategoryType.EXPENSE, true) { }
+        val seen = mutableListOf<CategoryEditUiState>()
+        backgroundScope.launch { vm.uiState.collect { seen += it } }
+        advanceUntilIdle()
+
+        vm.delete()
+        advanceUntilIdle()
+
+        assertEquals(listOf("c-1"), repo.deletes)
+        assertEquals(CategoryEditUiState.Finished, vm.uiState.value)
+        assertFalse(seen.any { it == CategoryEditUiState.NotFound })
+        assertTrue(repo.data.value.categories?.isEmpty() == true)
+    }
+
+    @Test
+    fun eliminar_dosPulsaciones_unaSolaLlamada() = runTest {
+        val repo = repoWith(comida).apply { gate = CompletableDeferred() }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.delete()
+        vm.delete()
+        advanceUntilIdle()
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.deletes.size)
+    }
+
+    @Test
+    fun eliminar_conMovimientosAsociados_ofreceArchivar_yAceptarArchiva() = runTest {
+        val repo = repoWith(comida).apply { deleteResult = CategoryResult.Failure(CategoryFailure.HasAssociatedItems) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.delete()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.OfferArchive, vm.form().event)
+        assertFalse(vm.form().archived)
+        assertTrue(repo.archives.isEmpty())
+
+        vm.consumeEvent()
+        vm.archive()
+        advanceUntilIdle()
+
+        assertEquals(listOf("c-1"), repo.archives)
+        assertEquals(CategoryEditUiState.Finished, vm.uiState.value)
+    }
+
+    @Test
+    fun eliminar_conMovimientosAsociados_rechazarLaOfertaNoCambiaNada() = runTest {
+        val repo = repoWith(comida).apply { deleteResult = CategoryResult.Failure(CategoryFailure.HasAssociatedItems) }
+        val vm = create(repo, categoryId = "c-1")
+        vm.delete()
+        advanceUntilIdle()
+
+        vm.consumeEvent()
+        advanceUntilIdle()
+
+        assertNull(vm.form().event)
+        assertTrue(repo.archives.isEmpty())
+        assertEquals(1, repo.deletes.size)
+        assertEquals(comida, repo.data.value.categories?.first())
+    }
+
+    @Test
+    fun eliminar_sinConexion_avisa_yLaPantallaSigueMostrandoLaCategoria() = runTest {
+        val repo = repoWith(comida).apply { deleteResult = CategoryResult.Failure(CategoryFailure.Offline) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.delete()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.Offline), vm.form().event)
+        assertEquals("Alimentación", vm.form().name)
+        assertFalse(vm.form().isBusy)
+    }
+
+    @Test
+    fun eliminar_rolInsuficiente_avisaYNotificaAlHeader() = runTest {
+        val repo = repoWith(comida).apply { deleteResult = CategoryResult.Failure(CategoryFailure.InsufficientRole) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.delete()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.InsufficientRole), vm.form().event)
+        assertEquals(1, roleCalls)
+    }
+
+    @Test
+    fun eliminar_conUnBorradorSinGuardar_seElimina_sinPedirDescarte() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+        type(vm, "Otro nombre")
+        assertTrue(vm.form().hasUnsavedChanges)
+
+        vm.delete()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditUiState.Finished, vm.uiState.value)
     }
 }

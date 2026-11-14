@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.hasAnyDescendant
@@ -51,6 +52,7 @@ class CategoriesContentTest {
         val opened = mutableListOf<String>()
         val created = mutableListOf<CategoryType>()
         val deleted = mutableListOf<String>()
+        var consumed = 0
     }
 
     // --- Datos de prueba ---
@@ -77,10 +79,12 @@ class CategoriesContentTest {
         isEmpty: Boolean = false,
         noResults: Boolean = false,
         isStale: Boolean = false,
+        isBusy: Boolean = false,
+        event: CategoriesEvent? = null,
     ) = CategoriesUiState.Content(
         selectedType = type, expenseActiveCount = expenseCount, incomeActiveCount = incomeCount, query = query,
         active = active, archived = archived, archivedExpanded = expanded, isEmpty = isEmpty,
-        noResults = noResults, isStale = isStale, isRefreshing = false,
+        noResults = noResults, isStale = isStale, isRefreshing = false, isBusy = isBusy, event = event,
     )
 
     private val alimentacion = item("c1", "Alimentación", "shopping_cart", tags = arrayOf("Súper", "Feria", "Despensa"))
@@ -128,6 +132,7 @@ class CategoriesContentTest {
                 update { it.copy(archivedExpanded = !it.archivedExpanded) }
             },
             onDeleteArchived = { events.deleted += it },
+            onEventConsumed = { events.consumed++ },
         )
     }
 
@@ -259,8 +264,45 @@ class CategoriesContentTest {
         rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
         rule.onNodeWithText("Eliminar").assertIsDisplayed()
         rule.onNodeWithText("Eliminar").performClick()
+        // Pide confirmación antes de eliminar (RF-13).
+        rule.onNodeWithText("¿Eliminar la categoría?").assertIsDisplayed()
+        assertEquals(emptyList<String>(), events.deleted)
+        rule.onNodeWithTag("delete_confirm").performClick()
 
         assertEquals(listOf("c4"), events.deleted)
+    }
+
+    @Test
+    fun cancellingTheDeleteConfirmationDeletesNothing() {
+        val events = show(content(archived = listOf(gimnasio), expanded = true), canManage = true)
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+        rule.onNodeWithText("Eliminar").performClick()
+
+        rule.onNodeWithTag("delete_cancel").performClick()
+
+        rule.onAllNodesWithText("¿Eliminar la categoría?").assertCountEquals(0)
+        assertEquals(emptyList<String>(), events.deleted)
+    }
+
+    @Test
+    fun anArchivedCategoryWithItemsShowsOnlyAnInformativeDialog() {
+        val events = show(content(archived = listOf(gimnasio), expanded = true, event = CategoriesEvent.CannotDelete))
+
+        rule.onNodeWithText("No se puede eliminar").assertIsDisplayed()
+        rule.onNodeWithText(
+            "Esta categoría archivada tiene movimientos asociados y no se puede eliminar.",
+        ).assertIsDisplayed()
+        rule.onAllNodesWithText("Archivar").assertCountEquals(0)
+        rule.onNodeWithTag("cannot_delete_confirm").performClick()
+
+        assertEquals(1, events.consumed)
+    }
+
+    @Test
+    fun theArchivedMenuIsDisabledWhileAnOperationIsInProgress() {
+        show(content(archived = listOf(gimnasio), expanded = true, isBusy = true), canManage = true)
+
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").assertIsNotEnabled()
     }
 
     @Test
