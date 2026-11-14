@@ -39,7 +39,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -154,7 +157,7 @@ fun TagList(
                         draggingId = tag.id
                         dragOffset = 0f
                     },
-                    onDrag = { dragOffset += it },
+                    onDragTo = { dragOffset = it },
                     onDragEnd = {
                         val target = dragTarget
                         val moved = tag.id
@@ -290,7 +293,7 @@ private fun TagRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
+    onDragTo: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
 ) {
@@ -334,7 +337,7 @@ private fun TagRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (showHandle) DragHandle(tag, onDragStart, onDrag, onDragEnd, onDragCancel)
+            if (showHandle) DragHandle(tag, onDragStart, onDragTo, onDragEnd, onDragCancel)
             Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(
                     text = tag.name,
@@ -365,29 +368,40 @@ private fun TagRow(
     }
 }
 
-/** Asa de arrastre de 48 dp: arrastrarla en vertical mueve el tag; el movimiento se pide al soltar. */
+/**
+ * Asa de arrastre de 48 dp: arrastrarla en vertical mueve el tag; el movimiento se pide al soltar. El
+ * desplazamiento se mide en coordenadas de ventana: la fila entera se traslada con el dedo y, medido en
+ * coordenadas locales del propio asa, cada gesto se cancelaría en parte con ese desplazamiento.
+ */
 @Composable
 private fun DragHandle(
     tag: Tag,
     onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
+    onDragTo: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
 ) {
     // Los callbacks cambian al recomponer mientras dura el gesto: se lee siempre el último.
     val start by rememberUpdatedState(onDragStart)
-    val drag by rememberUpdatedState(onDrag)
+    val dragTo by rememberUpdatedState(onDragTo)
     val end by rememberUpdatedState(onDragEnd)
     val cancel by rememberUpdatedState(onDragCancel)
+    var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Box(
         modifier = Modifier
             .size(48.dp)
+            .onGloballyPositioned { coordinates = it }
             .pointerInput(tag.id) {
+                var startY = 0f
+                fun windowY(local: Offset) = coordinates?.localToWindow(local)?.y ?: 0f
                 detectDragGestures(
-                    onDragStart = { start() },
-                    onDrag = { change, amount ->
+                    onDragStart = { local ->
+                        startY = windowY(local)
+                        start()
+                    },
+                    onDrag = { change, _ ->
                         change.consume()
-                        drag(amount.y)
+                        dragTo(windowY(change.position) - startY)
                     },
                     onDragEnd = { end() },
                     onDragCancel = { cancel() },
