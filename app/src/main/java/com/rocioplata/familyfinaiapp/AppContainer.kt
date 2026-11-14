@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.rocioplata.familyfinaiapp.data.auth.AuthRemoteDataSource
 import com.rocioplata.familyfinaiapp.data.auth.AuthRepositoryImpl
+import com.rocioplata.familyfinaiapp.data.categories.CategoriesLocalDataSource
+import com.rocioplata.familyfinaiapp.data.categories.CategoriesRemoteDataSource
+import com.rocioplata.familyfinaiapp.data.categories.CategoriesRepositoryImpl
 import com.rocioplata.familyfinaiapp.data.header.HeaderLocalDataSource
 import com.rocioplata.familyfinaiapp.data.header.HeaderRemoteDataSource
 import com.rocioplata.familyfinaiapp.data.header.HeaderRepositoryImpl
@@ -15,6 +18,7 @@ import com.rocioplata.familyfinaiapp.data.network.SessionAuth
 import com.rocioplata.familyfinaiapp.data.session.EncryptedSessionStore
 import com.rocioplata.familyfinaiapp.data.session.KeystoreSessionCipher
 import com.rocioplata.familyfinaiapp.domain.auth.AuthRepository
+import com.rocioplata.familyfinaiapp.domain.categories.CategoriesRepository
 import com.rocioplata.familyfinaiapp.domain.header.HeaderRepository
 import com.rocioplata.familyfinaiapp.session.SessionManager
 import io.ktor.client.HttpClient
@@ -26,16 +30,20 @@ import kotlinx.serialization.json.Json
 
 private val Context.headerCacheStore: DataStore<Preferences> by preferencesDataStore(name = HEADER_CACHE_NAME)
 
-// El nombre debe coincidir con la exclusión de backups (backup_rules.xml, data_extraction_rules.xml).
+// Los nombres deben coincidir con las exclusiones de backups (backup_rules.xml, data_extraction_rules.xml).
+private val Context.categoriesCacheStore: DataStore<Preferences> by preferencesDataStore(name = CATEGORIES_CACHE_NAME)
+
 private val Context.sessionStore: DataStore<Preferences> by preferencesDataStore(name = SESSION_STORE_NAME)
 
 const val HEADER_CACHE_NAME = "header_cache"
+const val CATEGORIES_CACHE_NAME = "categories_cache"
 const val SESSION_STORE_NAME = "session"
 private const val CONNECT_TIMEOUT_MS = 10_000L
 private const val REQUEST_TIMEOUT_MS = 15_000L
 
 class AppContainer(context: Context) {
     val headerCacheStore: DataStore<Preferences> = context.applicationContext.headerCacheStore
+    val categoriesCacheStore: DataStore<Preferences> = context.applicationContext.categoriesCacheStore
 
     /** Cliente sin Bearer, para `/auth/login`, `/auth/register` y `/auth/refresh`. */
     val publicClient: HttpClient = HttpClient(OkHttp) {
@@ -68,7 +76,10 @@ class AppContainer(context: Context) {
         SessionManager(
             store = EncryptedSessionStore(context.applicationContext.sessionStore, KeystoreSessionCipher()),
             remote = authRemote,
-            onSessionEnded = { headerRepository.clear() },
+            onSessionEnded = {
+                headerRepository.clear()
+                categoriesRepository.clear()
+            },
         )
     }
 
@@ -79,6 +90,15 @@ class AppContainer(context: Context) {
             remote = HeaderRemoteDataSource(apiClient, BuildConfig.BACKEND_BASE_URL),
             local = HeaderLocalDataSource(headerCacheStore),
             sessionProvider = sessionManager,
+        )
+    }
+
+    val categoriesRepository: CategoriesRepository by lazy {
+        CategoriesRepositoryImpl(
+            remote = CategoriesRemoteDataSource(apiClient, BuildConfig.BACKEND_BASE_URL),
+            local = CategoriesLocalDataSource(categoriesCacheStore),
+            sessionProvider = sessionManager,
+            connectivity = connectivityObserver,
         )
     }
 }

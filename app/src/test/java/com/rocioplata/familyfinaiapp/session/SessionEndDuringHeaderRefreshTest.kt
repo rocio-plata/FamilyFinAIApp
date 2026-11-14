@@ -22,7 +22,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -88,8 +90,12 @@ class SessionEndDuringHeaderRefreshTest {
         local.saveFamilies("u-1", 1L, listOf(Family("f-1", "Plata", FamilyRole.OWNER)))
         manager.load()
 
-        // Con el interbloqueo, esta llamada no terminaba nunca.
-        val result = withTimeout(5_000) { repository.refresh() }
+        // Con el interbloqueo, esta llamada no terminaba nunca. El límite usa tiempo real: el MockEngine
+        // responde en otro hilo y, con el tiempo virtual de `runTest`, el reloj saltaba los 5 s al quedar
+        // el test inactivo esperando esa respuesta (fallo intermitente sin ningún interbloqueo).
+        val result = withContext(Dispatchers.Default.limitedParallelism(1)) {
+            withTimeout(5_000) { repository.refresh() }
+        }
 
         assertEquals(HeaderFailure.Unauthorized, result.families)
         assertEquals(SessionState.SignedOut(SessionEndReason.Expired), manager.state.value)
