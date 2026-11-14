@@ -53,8 +53,11 @@ class CategoryEditViewModelTest {
 
         override fun categories(familyId: String): Flow<CategoriesData> = data
 
+        var onRefresh: () -> Unit = {}
+
         override suspend fun refresh(familyId: String): CategoryResult<Unit> {
             refreshes++
+            onRefresh()
             return CategoryResult.Success(Unit)
         }
 
@@ -114,12 +117,80 @@ class CategoryEditViewModelTest {
             return deleteResult
         }
 
-        override suspend fun addTag(familyId: String, categoryId: String, name: String) = unused()
-        override suspend fun renameTag(familyId: String, categoryId: String, tagId: String, name: String) = unused()
-        override suspend fun reorderTags(familyId: String, categoryId: String, activeTagIdsInOrder: List<String>) = unused()
-        override suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String) = unused()
-        override suspend fun deleteTag(familyId: String, categoryId: String, tagId: String) = unused()
-        private fun unused(): Nothing = error("Fuera del alcance de T-19")
+        val tagAdds = mutableListOf<String>()
+        val tagRenames = mutableListOf<Pair<String, String>>()
+        val tagArchives = mutableListOf<String>()
+        val tagDeletes = mutableListOf<String>()
+        var addTagResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
+        var renameTagResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
+        var archiveTagResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
+        var deleteTagResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
+
+        private fun changeTags(categoryId: String, change: (List<Tag>) -> List<Tag>) {
+            data.value = CategoriesData(
+                data.value.categories?.map { if (it.id == categoryId) it.copy(tags = change(it.tags)) else it },
+            )
+        }
+
+        override suspend fun addTag(familyId: String, categoryId: String, name: String): CategoryResult<Unit> {
+            tagAdds += name
+            gate?.await()
+            if (addTagResult is CategoryResult.Success) {
+                changeTags(categoryId) { tags -> tags + Tag("t-new-${tags.size}", name, TagStatus.ACTIVE, tags.size) }
+            }
+            return addTagResult
+        }
+
+        override suspend fun renameTag(familyId: String, categoryId: String, tagId: String, name: String): CategoryResult<Unit> {
+            tagRenames += tagId to name
+            gate?.await()
+            if (renameTagResult is CategoryResult.Success) {
+                changeTags(categoryId) { tags -> tags.map { if (it.id == tagId) it.copy(name = name) else it } }
+            }
+            return renameTagResult
+        }
+
+        override suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> {
+            tagArchives += tagId
+            gate?.await()
+            if (archiveTagResult is CategoryResult.Success) {
+                changeTags(categoryId) { tags ->
+                    tags.map { if (it.id == tagId) it.copy(status = TagStatus.DEPRECATED) else it }
+                }
+            }
+            return archiveTagResult
+        }
+
+        override suspend fun deleteTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> {
+            tagDeletes += tagId
+            gate?.await()
+            if (deleteTagResult is CategoryResult.Success) {
+                changeTags(categoryId) { tags -> tags.filterNot { it.id == tagId } }
+            }
+            return deleteTagResult
+        }
+
+        val reorders = mutableListOf<List<String>>()
+        var reorderResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
+
+        override suspend fun reorderTags(
+            familyId: String,
+            categoryId: String,
+            activeTagIdsInOrder: List<String>,
+        ): CategoryResult<Unit> {
+            reorders += activeTagIdsInOrder
+            gate?.await()
+            if (reorderResult is CategoryResult.Success) {
+                // Como el repositorio real: los activos en el nuevo orden y después los archivados.
+                changeTags(categoryId) { tags ->
+                    val archived = tags.filter { it.status == TagStatus.DEPRECATED }.sortedBy { it.displayOrder }
+                    val byId = tags.associateBy { it.id }
+                    (activeTagIdsInOrder.mapNotNull { byId[it] } + archived).mapIndexed { index, tag -> tag.copy(displayOrder = index) }
+                }
+            }
+            return reorderResult
+        }
+        private fun unused(): Nothing = error("Fuera del alcance de T-23")
     }
 
     @Before
@@ -875,5 +946,670 @@ class CategoryEditViewModelTest {
         advanceUntilIdle()
 
         assertEquals(CategoryEditUiState.Finished, vm.uiState.value)
+    }
+
+    // --- Tags: añadir, renombrar, quitar y archivar (T-23; RF-15, RF-16, RF-18, RF-19) ---
+
+    private fun CategoryEditViewModel.tagIds() = form().tags.map { it.id }
+    private fun CategoryEditViewModel.tagNames() = form().tags.map { it.name }
+
+    private fun TestScope.typeTag(vm: CategoryEditViewModel, text: String) {
+        vm.setNewTagName(text)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun anadirTag_enviaElNombreRecortado_apareceAlFinalDeLosActivos_yVaciaElCampo() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+        typeTag(vm, "  Despensa  ")
+
+        vm.addTag()
+        advanceUntilIdle()
+
+        assertEquals(listOf("Despensa"), repo.tagAdds)
+        assertEquals(listOf("Súper", "Feria", "Despensa", "Viejo"), vm.tagNames())
+        assertEquals("", vm.form().newTagName)
+        assertNull(vm.form().tagError)
+        assertNull(vm.form().event)
+    }
+
+    @Test
+    fun anadirTag_conNombreVacioODeEspacios_noSeEnvia() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.addTag()
+        advanceUntilIdle()
+        assertEquals(NameFieldError.REQUIRED, vm.form().tagError)
+
+        typeTag(vm, "   ")
+        vm.addTag()
+        advanceUntilIdle()
+        assertEquals(NameFieldError.REQUIRED, vm.form().tagError)
+        assertTrue(repo.tagAdds.isEmpty())
+    }
+
+    @Test
+    fun anadirTag_elTopeEsDe30_yElErrorDesapareceAlEscribir() = runTest {
+        val vm = create(repoWith(comida), categoryId = "c-1")
+        vm.addTag()
+        advanceUntilIdle()
+        assertEquals(NameFieldError.REQUIRED, vm.form().tagError)
+
+        typeTag(vm, "a".repeat(40))
+
+        assertEquals(30, vm.form().newTagName.length)
+        assertNull(vm.form().tagError)
+    }
+
+    @Test
+    fun anadirTag_duplicado_muestraElErrorJuntoAlCampo_ConservaLoEscrito_yNoLoAnade() = runTest {
+        val repo = repoWith(comida).apply { addTagResult = CategoryResult.Failure(CategoryFailure.DuplicateName) }
+        val vm = create(repo, categoryId = "c-1")
+        typeTag(vm, "Súper")
+
+        vm.addTag()
+        advanceUntilIdle()
+
+        assertEquals(NameFieldError.DUPLICATE, vm.form().tagError)
+        assertEquals("Súper", vm.form().newTagName)
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+        assertNull(vm.form().event)
+        assertNull(vm.form().nameError)
+
+        typeTag(vm, "Súper2")
+        assertNull(vm.form().tagError)
+    }
+
+    @Test
+    fun anadirTag_sinConexion_avisa_yConservaLoEscrito() = runTest {
+        val repo = repoWith(comida).apply { addTagResult = CategoryResult.Failure(CategoryFailure.Offline) }
+        val vm = create(repo, categoryId = "c-1")
+        typeTag(vm, "Despensa")
+
+        vm.addTag()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.Offline), vm.form().event)
+        assertEquals("Despensa", vm.form().newTagName)
+        assertFalse(vm.form().isBusy)
+    }
+
+    @Test
+    fun anadirTag_dosPulsaciones_unaSolaLlamada() = runTest {
+        val repo = repoWith(comida).apply { gate = CompletableDeferred() }
+        val vm = create(repo, categoryId = "c-1")
+        typeTag(vm, "Despensa")
+
+        vm.addTag()
+        vm.addTag()
+        advanceUntilIdle()
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.tagAdds.size)
+    }
+
+    @Test
+    fun anadirTag_aUnaCategoriaYaNoActiva_avisaYActualiza() = runTest {
+        val repo = repoWith(comida).apply { addTagResult = CategoryResult.Failure(CategoryFailure.CategoryNotActive) }
+        val vm = create(repo, categoryId = "c-1")
+        typeTag(vm, "Despensa")
+
+        vm.addTag()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.CategoryNotActive), vm.form().event)
+        assertEquals(1, repo.refreshes)
+    }
+
+    @Test
+    fun anadirTag_rolInsuficiente_avisaYNotificaAlHeader() = runTest {
+        val repo = repoWith(comida).apply { addTagResult = CategoryResult.Failure(CategoryFailure.InsufficientRole) }
+        val vm = create(repo, categoryId = "c-1")
+        typeTag(vm, "Despensa")
+
+        vm.addTag()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.InsufficientRole), vm.form().event)
+        assertEquals(1, roleCalls)
+    }
+
+    @Test
+    fun tags_enSoloLecturaOEnAlta_seIgnoranTodasLasOperaciones() = runTest {
+        val contexts = listOf(
+            create(repoWith(comida), categoryId = "c-1", canManage = false) to "integrante",
+            create(repoWith(gimnasio.copy(tags = listOf(Tag("t-9", "Pesas", TagStatus.ACTIVE, 0)))), categoryId = "c-2") to "archivada",
+            create(repoWith(comida)) to "alta",
+        )
+        contexts.forEach { (vm, _) ->
+            vm.setNewTagName("x")
+            vm.addTag()
+            vm.startRename("t-1")
+            vm.removeTag("t-1")
+            vm.archiveTag("t-1")
+            advanceUntilIdle()
+            assertEquals("", vm.form().newTagName)
+            assertNull(vm.form().renaming)
+        }
+    }
+
+    @Test
+    fun tags_enSoloLectura_noLlamanAlBackend() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1", canManage = false)
+
+        vm.addTag()
+        vm.removeTag("t-1")
+        vm.archiveTag("t-1")
+        advanceUntilIdle()
+
+        assertTrue(repo.tagAdds.isEmpty() && repo.tagDeletes.isEmpty() && repo.tagArchives.isEmpty())
+    }
+
+    // --- Renombrar ---
+
+    @Test
+    fun renombrar_abreElDialogoConElNombreActual_soloParaTagsActivos() = runTest {
+        val vm = create(repoWith(comida), categoryId = "c-1")
+
+        vm.startRename("t-2")
+        advanceUntilIdle()
+        assertEquals(TagRenameDraft("t-2", "Feria", null), vm.form().renaming)
+
+        vm.cancelRename()
+        vm.startRename("t-3") // archivado
+        vm.startRename("t-404")
+        advanceUntilIdle()
+        assertNull(vm.form().renaming)
+    }
+
+    @Test
+    fun renombrar_enviaElNombreRecortado_ycierraElDialogo() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+        vm.startRename("t-2")
+        vm.setRenameText("  Mercado  ")
+        advanceUntilIdle()
+
+        vm.confirmRename()
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-2" to "Mercado"), repo.tagRenames)
+        assertNull(vm.form().renaming)
+        assertEquals(listOf("Súper", "Mercado", "Viejo"), vm.tagNames())
+    }
+
+    @Test
+    fun renombrar_sinCambiosReales_noLlamaAlBackend_yCierraElDialogo() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+        vm.startRename("t-2")
+        vm.setRenameText("Feria ")
+        advanceUntilIdle()
+
+        vm.confirmRename()
+        advanceUntilIdle()
+
+        assertTrue(repo.tagRenames.isEmpty())
+        assertNull(vm.form().renaming)
+    }
+
+    @Test
+    fun renombrar_nombreVacio_noSeEnvia_yElDialogoSigue() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+        vm.startRename("t-2")
+        vm.setRenameText("   ")
+        advanceUntilIdle()
+
+        vm.confirmRename()
+        advanceUntilIdle()
+
+        assertEquals(NameFieldError.REQUIRED, vm.form().renaming?.error)
+        assertTrue(repo.tagRenames.isEmpty())
+
+        vm.setRenameText("x")
+        advanceUntilIdle()
+        assertNull(vm.form().renaming?.error)
+    }
+
+    @Test
+    fun renombrar_duplicado_muestraElErrorEnElDialogo_yConservaElTexto() = runTest {
+        val repo = repoWith(comida).apply { renameTagResult = CategoryResult.Failure(CategoryFailure.DuplicateName) }
+        val vm = create(repo, categoryId = "c-1")
+        vm.startRename("t-2")
+        vm.setRenameText("Súper")
+        advanceUntilIdle()
+
+        vm.confirmRename()
+        advanceUntilIdle()
+
+        assertEquals(TagRenameDraft("t-2", "Súper", NameFieldError.DUPLICATE), vm.form().renaming)
+        assertNull(vm.form().event)
+    }
+
+    @Test
+    fun renombrar_sinConexion_avisa_yElDialogoConservaLoEscrito() = runTest {
+        val repo = repoWith(comida).apply { renameTagResult = CategoryResult.Failure(CategoryFailure.Offline) }
+        val vm = create(repo, categoryId = "c-1")
+        vm.startRename("t-2")
+        vm.setRenameText("Mercado")
+        advanceUntilIdle()
+
+        vm.confirmRename()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.Offline), vm.form().event)
+        assertEquals("Mercado", vm.form().renaming?.name)
+    }
+
+    @Test
+    fun renombrar_unTagQueYaNoExiste_avisaDelTag_cierraElDialogo_yActualizaLaLista() = runTest {
+        val repo = repoWith(comida).apply { renameTagResult = CategoryResult.Failure(CategoryFailure.NotFound) }
+        val vm = create(repo, categoryId = "c-1")
+        vm.startRename("t-2")
+        vm.setRenameText("Mercado")
+        advanceUntilIdle()
+
+        vm.confirmRename()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.TagNotFound, vm.form().event)
+        assertNull(vm.form().renaming)
+        assertEquals(1, repo.refreshes)
+    }
+
+    @Test
+    fun renombrar_siLaCategoriaYaNoExiste_laPantallaPasaANoEncontrada() = runTest {
+        val repo = repoWith(comida).apply {
+            renameTagResult = CategoryResult.Failure(CategoryFailure.NotFound)
+            onRefresh = { data.value = CategoriesData(emptyList()) }
+        }
+        val vm = create(repo, categoryId = "c-1")
+        vm.startRename("t-2")
+        vm.setRenameText("Mercado")
+        advanceUntilIdle()
+
+        vm.confirmRename()
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditUiState.NotFound, vm.uiState.value)
+    }
+
+    // --- Quitar y archivar ---
+
+    @Test
+    fun quitarTag_sinMovimientos_loElimina() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.removeTag("t-1")
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-1"), repo.tagDeletes)
+        assertEquals(listOf("Feria", "Viejo"), vm.tagNames())
+        assertNull(vm.form().event)
+    }
+
+    @Test
+    fun quitarTag_activoConMovimientos_ofreceArchivarlo_yAceptarLoArchiva() = runTest {
+        val repo = repoWith(comida).apply { deleteTagResult = CategoryResult.Failure(CategoryFailure.HasAssociatedItems) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.removeTag("t-1")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.OfferArchiveTag("t-1"), vm.form().event)
+        assertTrue(repo.tagArchives.isEmpty())
+
+        vm.consumeEvent()
+        vm.archiveTag("t-1")
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-1"), repo.tagArchives)
+        // Archivado: pasa tras los activos y queda marcado.
+        assertEquals(listOf("t-2", "t-1", "t-3"), vm.tagIds())
+        assertEquals(TagStatus.DEPRECATED, vm.form().tags.first { it.id == "t-1" }.status)
+    }
+
+    @Test
+    fun quitarTag_activoConMovimientos_rechazarLaOfertaNoCambiaNada() = runTest {
+        val repo = repoWith(comida).apply { deleteTagResult = CategoryResult.Failure(CategoryFailure.HasAssociatedItems) }
+        val vm = create(repo, categoryId = "c-1")
+        vm.removeTag("t-1")
+        advanceUntilIdle()
+
+        vm.consumeEvent()
+        advanceUntilIdle()
+
+        assertNull(vm.form().event)
+        assertTrue(repo.tagArchives.isEmpty())
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+    }
+
+    @Test
+    fun quitarTag_archivadoConMovimientos_soloInforma() = runTest {
+        val repo = repoWith(comida).apply { deleteTagResult = CategoryResult.Failure(CategoryFailure.HasAssociatedItems) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.removeTag("t-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.TagCannotDelete, vm.form().event)
+        assertTrue(repo.tagArchives.isEmpty())
+    }
+
+    @Test
+    fun quitarTag_archivadoSinMovimientos_loElimina() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.removeTag("t-3")
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-3"), repo.tagDeletes)
+        assertEquals(listOf("t-1", "t-2"), vm.tagIds())
+    }
+
+    @Test
+    fun quitarTag_unTagDesconocido_noLlamaAlBackend() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.removeTag("t-404")
+        vm.archiveTag("t-404")
+        advanceUntilIdle()
+
+        assertTrue(repo.tagDeletes.isEmpty() && repo.tagArchives.isEmpty())
+    }
+
+    @Test
+    fun quitarTag_sinConexion_avisa_yNoCambiaNada() = runTest {
+        val repo = repoWith(comida).apply { deleteTagResult = CategoryResult.Failure(CategoryFailure.Offline) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.removeTag("t-1")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.Offline), vm.form().event)
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+    }
+
+    @Test
+    fun quitarTag_dosPulsaciones_unaSolaLlamada() = runTest {
+        val repo = repoWith(comida).apply { gate = CompletableDeferred() }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.removeTag("t-1")
+        vm.removeTag("t-1")
+        advanceUntilIdle()
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.tagDeletes.size)
+    }
+
+    @Test
+    fun archivarTag_soloSeArchivaUnTagActivo() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.archiveTag("t-3") // ya archivado
+        advanceUntilIdle()
+        assertTrue(repo.tagArchives.isEmpty())
+
+        vm.archiveTag("t-2")
+        advanceUntilIdle()
+        assertEquals(listOf("t-2"), repo.tagArchives)
+    }
+
+    @Test
+    fun archivarTag_unTagQueYaNoExiste_avisaDelTag() = runTest {
+        val repo = repoWith(comida).apply { archiveTagResult = CategoryResult.Failure(CategoryFailure.NotFound) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.archiveTag("t-2")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.TagNotFound, vm.form().event)
+        assertEquals(1, repo.refreshes)
+    }
+
+    // --- Reordenar tags (T-24; RF-17; CA-16, CA-20) ---
+
+    @Test
+    fun reordenar_moverUnTag_enviaSoloLosActivosEnElNuevoOrden_yLosArchivadosSiguenAlFinal() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        assertEquals(listOf(listOf("t-2", "t-1")), repo.reorders)
+        assertEquals(listOf("t-2", "t-1", "t-3"), vm.tagIds())
+        assertEquals(listOf(0, 1, 2), vm.form().tags.map { it.displayOrder })
+    }
+
+    @Test
+    fun reordenar_subirYBajar_muevenUnaPosicion_yEnLosLimitesNoHacenNada() = runTest {
+        val extra = comida.copy(
+            tags = comida.tags + Tag("t-4", "Verdulería", TagStatus.ACTIVE, 3),
+        )
+        val repo = repoWith(extra)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTagUp("t-1") // ya es el primero
+        advanceUntilIdle()
+        assertTrue(repo.reorders.isEmpty())
+
+        vm.moveTagDown("t-1")
+        advanceUntilIdle()
+        assertEquals(listOf("t-2", "t-1", "t-4"), repo.reorders.last())
+
+        vm.moveTagUp("t-4")
+        advanceUntilIdle()
+        assertEquals(listOf("t-2", "t-4", "t-1"), repo.reorders.last())
+
+        vm.moveTagDown("t-1") // ya es el último de los activos
+        advanceUntilIdle()
+        assertEquals(2, repo.reorders.size)
+    }
+
+    @Test
+    fun reordenar_laPosicionSeAjustaALosLimites_yLaMismaPosicionNoLlamaAlBackend() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-2", 0) // sube de la segunda a la primera posición
+        advanceUntilIdle()
+        assertEquals(listOf(listOf("t-2", "t-1")), repo.reorders)
+
+        vm.moveTag("t-2", -5) // ya es el primero
+        vm.moveTag("t-1", 99) // ya es el último de los activos
+        advanceUntilIdle()
+        assertEquals(1, repo.reorders.size)
+    }
+
+    @Test
+    fun reordenar_esOptimista_yAlConfirmarSeConserva() = runTest {
+        val repo = repoWith(comida).apply { gate = CompletableDeferred() }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        // Aún sin respuesta: ya se ve el nuevo orden y la pantalla está ocupada.
+        assertEquals(listOf("t-2", "t-1", "t-3"), vm.tagIds())
+        assertTrue(vm.form().isBusy)
+
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-2", "t-1", "t-3"), vm.tagIds())
+        assertFalse(vm.form().isBusy)
+        assertNull(vm.form().event)
+    }
+
+    @Test
+    fun reordenar_siElBackendLoRechaza_restauraElOrden_informa_yActualizaLaLista() = runTest {
+        val repo = repoWith(comida).apply { reorderResult = CategoryResult.Failure(CategoryFailure.Unknown) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+        assertEquals(CategoryEditEvent.ReorderFailed, vm.form().event)
+        assertEquals(1, repo.refreshes)
+        assertFalse(vm.form().isBusy)
+    }
+
+    @Test
+    fun reordenar_otrosFallosGenericos_tambienRestauranEInforman() = runTest {
+        listOf(CategoryFailure.Network, CategoryFailure.InvalidData).forEach { failure ->
+            val repo = repoWith(comida).apply { reorderResult = CategoryResult.Failure(failure) }
+            val vm = create(repo, categoryId = "c-1")
+
+            vm.moveTag("t-1", 1)
+            advanceUntilIdle()
+
+            assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+            assertEquals(CategoryEditEvent.ReorderFailed, vm.form().event)
+        }
+    }
+
+    @Test
+    fun reordenar_sinConexion_restaura_avisaDeLaConexion_yNoActualizaLaLista() = runTest {
+        val repo = repoWith(comida).apply { reorderResult = CategoryResult.Failure(CategoryFailure.Offline) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.Offline), vm.form().event)
+        assertEquals(0, repo.refreshes)
+    }
+
+    @Test
+    fun reordenar_rolInsuficiente_restauraAvisaYNotificaAlHeader() = runTest {
+        val repo = repoWith(comida).apply { reorderResult = CategoryResult.Failure(CategoryFailure.InsufficientRole) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.InsufficientRole), vm.form().event)
+        assertEquals(1, roleCalls)
+    }
+
+    @Test
+    fun reordenar_categoriaNoActiva_restauraAvisaYActualizaUnaSolaVez() = runTest {
+        val repo = repoWith(comida).apply { reorderResult = CategoryResult.Failure(CategoryFailure.CategoryNotActive) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.CategoryNotActive), vm.form().event)
+        assertEquals(1, repo.refreshes)
+    }
+
+    @Test
+    fun reordenar_tagInexistente_restauraAvisaDelTagYActualizaUnaSolaVez() = runTest {
+        val repo = repoWith(comida).apply { reorderResult = CategoryResult.Failure(CategoryFailure.NotFound) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+        assertEquals(CategoryEditEvent.TagNotFound, vm.form().event)
+        assertEquals(1, repo.refreshes)
+    }
+
+    @Test
+    fun reordenar_tras_unFallo_sePuedeReintentar() = runTest {
+        val repo = repoWith(comida).apply { reorderResult = CategoryResult.Failure(CategoryFailure.Unknown) }
+        val vm = create(repo, categoryId = "c-1")
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+        vm.consumeEvent()
+
+        repo.reorderResult = CategoryResult.Success(Unit)
+        vm.moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        assertEquals(2, repo.reorders.size)
+        assertEquals(listOf("t-2", "t-1", "t-3"), vm.tagIds())
+        assertNull(vm.form().event)
+    }
+
+    @Test
+    fun reordenar_losArchivadosNoSeMueven_niLosIdsDesconocidos() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-3", 0)
+        vm.moveTagUp("t-3")
+        vm.moveTagDown("t-3")
+        vm.moveTag("t-404", 0)
+        advanceUntilIdle()
+
+        assertTrue(repo.reorders.isEmpty())
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.tagIds())
+    }
+
+    @Test
+    fun reordenar_enSoloLecturaOAlta_noHaceNada() = runTest {
+        val member = repoWith(comida)
+        create(member, categoryId = "c-1", canManage = false).apply {
+            moveTag("t-1", 1)
+            moveTagDown("t-1")
+        }
+        val creating = repoWith(comida)
+        create(creating).moveTag("t-1", 1)
+        advanceUntilIdle()
+
+        assertTrue(member.reorders.isEmpty() && creating.reorders.isEmpty())
+    }
+
+    @Test
+    fun reordenar_mientrasHayUnaOperacionEnCurso_seIgnora_yNoPisaElOrdenPendiente() = runTest {
+        val repo = repoWith(comida).apply { gate = CompletableDeferred() }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.moveTag("t-1", 1)
+        vm.moveTag("t-2", 1)
+        advanceUntilIdle()
+        assertEquals(listOf("t-2", "t-1", "t-3"), vm.tagIds())
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.reorders.size)
+        assertEquals(listOf("t-2", "t-1", "t-3"), vm.tagIds())
+    }
+
+    @Test
+    fun reordenar_unaVezAnadidosOArchivados_usaSoloLosActivosActuales() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+        vm.setNewTagName("Despensa")
+        vm.addTag()
+        advanceUntilIdle()
+        vm.archiveTag("t-1")
+        advanceUntilIdle()
+
+        vm.moveTag("t-new-3", 0)
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-new-3", "t-2"), repo.reorders.last())
+        assertEquals(listOf("t-new-3", "t-2", "t-1", "t-3").toSet(), vm.tagIds().toSet())
+        assertEquals(TagStatus.DEPRECATED, vm.form().tags.last().status)
     }
 }

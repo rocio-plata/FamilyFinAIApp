@@ -93,6 +93,7 @@ fun CategoryEditContent(
     onEventConsumed: () -> Unit,
     onCreated: (String) -> Unit,
     modifier: Modifier = Modifier,
+    tagActions: TagActions = TagActions(),
 ) {
     var showDiscard by rememberSaveable { mutableStateOf(false) }
     // Archivar y eliminar se confirman antes de pedirlos (RF-12, RF-13); se conservan al recrear la pantalla.
@@ -107,6 +108,8 @@ fun CategoryEditContent(
     var message by remember { mutableStateOf<String?>(null) }
     val event = state.event
     val failedText = (event as? CategoryEditEvent.Failed)?.failure?.let { stringResource(it.messageRes()) }
+    val tagNotFoundText = stringResource(R.string.categories_error_tag_not_found)
+    val reorderFailedText = stringResource(R.string.categories_error_reorder_failed)
     LaunchedEffect(event) {
         when (event) {
             is CategoryEditEvent.Created -> {
@@ -117,8 +120,21 @@ fun CategoryEditContent(
                 onEventConsumed()
                 message = failedText
             }
-            // Leave y OfferArchive se resuelven con su diálogo.
-            is CategoryEditEvent.Leave, CategoryEditEvent.OfferArchive, null -> Unit
+            CategoryEditEvent.TagNotFound -> {
+                onEventConsumed()
+                message = tagNotFoundText
+            }
+            CategoryEditEvent.ReorderFailed -> {
+                onEventConsumed()
+                message = reorderFailedText
+            }
+            // Estos eventos se resuelven con su diálogo.
+            is CategoryEditEvent.Leave,
+            CategoryEditEvent.OfferArchive,
+            is CategoryEditEvent.OfferArchiveTag,
+            CategoryEditEvent.TagCannotDelete,
+            null,
+            -> Unit
         }
     }
     // El aviso se muestra aparte de la confirmación del evento: consumirlo no debe cancelarlo.
@@ -166,6 +182,8 @@ fun CategoryEditContent(
             TypeSelector(state, onTypeChange)
             NameField(state, onNameChange, onSubmit)
             IconSelector(state, onIconChange)
+            // Las etiquetas solo existen cuando la categoría ya está creada (RF-09).
+            if (!state.isCreate) TagList(state, tagActions, onEventConsumed)
             if (!state.isCreate && !state.readOnly) {
                 ArchiveAndDeleteActions(
                     enabled = !state.isBusy,

@@ -92,6 +92,19 @@ fun CategoryEditScreen(
             onEventConsumed = viewModel::consumeEvent,
             onCreated = onCreated,
             modifier = modifier,
+            tagActions = TagActions(
+                onNewNameChange = viewModel::setNewTagName,
+                onAdd = viewModel::addTag,
+                onStartRename = viewModel::startRename,
+                onRenameTextChange = viewModel::setRenameText,
+                onConfirmRename = viewModel::confirmRename,
+                onCancelRename = viewModel::cancelRename,
+                onRemove = viewModel::removeTag,
+                onArchive = viewModel::archiveTag,
+                onMove = viewModel::moveTag,
+                onMoveUp = viewModel::moveTagUp,
+                onMoveDown = viewModel::moveTagDown,
+            ),
         )
     }
 }

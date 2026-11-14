@@ -12,6 +12,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryValidation
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.NameError
 import com.rocioplata.familyfinaiapp.domain.categories.NameValidation
+import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -45,6 +47,7 @@ class CategoryEditViewModel(
     private val busy = MutableStateFlow(false)
     private val event = MutableStateFlow<CategoryEditEvent?>(null)
     private val finished = MutableStateFlow(false)
+    private val tagUi = MutableStateFlow(TagUi())
 
     // Mientras se elimina, la categoría desaparece de la lista antes de que llegue la respuesta: no es «no encontrada».
     private val deleting = MutableStateFlow(false)
@@ -59,8 +62,8 @@ class CategoryEditViewModel(
         draft,
         nameError,
         canManage,
-        combine(busy, event, finished, deleting) { isBusy, pending, done, isDeleting ->
-            Ops(isBusy, pending, done, isDeleting)
+        combine(busy, event, finished, deleting, tagUi) { isBusy, pending, done, isDeleting, tags ->
+            Ops(isBusy, pending, done, isDeleting, tags)
         },
     ) { list, draft, nameError, canManage, ops ->
         buildState(list?.firstOrNull { it.id == categoryId }, list != null, draft, nameError, canManage, ops)
@@ -158,19 +161,234 @@ class CategoryEditViewModel(
         )
     }
 
+    // --- Tags (RF-15 a RF-19): cada cambio se guarda al instante ---
+
+    fun setNewTagName(text: String) {
+        if (categoryId == null || isReadOnly()) return
+        tagUi.update { it.copy(newName = text.take(CategoryValidation.MAX_TAG_NAME_LENGTH), error = null) }
+    }
+
+    /** Añade el tag escrito al final de la lista (RF-15). El campo solo se vacía si se guarda. */
+    fun addTag() {
+        val id = categoryId ?: return
+        if (isReadOnly()) return
+        val name = when (val validation = CategoryValidation.validateTagName(tagUi.value.newName)) {
+            is NameValidation.Invalid -> {
+                tagUi.update { it.copy(error = validation.error.toFieldError()) }
+                return
+            }
+            is NameValidation.Valid -> validation.name
+        }
+        run(
+            operation = { repository.addTag(familyId, id, name) },
+            onSuccess = { tagUi.update { it.copy(newName = "") } },
+            onFailure = { failure ->
+                if (failure == CategoryFailure.DuplicateName) {
+                    tagUi.update { it.copy(error = NameFieldError.DUPLICATE) }
+                    true
+                } else {
+                    handleTagNotFound(failure)
+                }
+            },
+        )
+    }
+
+    /** Abre el diálogo de renombrar un tag activo (RF-16); los archivados son de solo lectura (RF-19). */
+    fun startRename(tagId: String) {
+        if (categoryId == null || isReadOnly()) return
+        val tag = currentCategory()?.tags?.firstOrNull { it.id == tagId } ?: return
+        if (tag.status != TagStatus.ACTIVE) return
+        tagUi.update { it.copy(renaming = TagRenameDraft(tagId, tag.name, null)) }
+    }
+
+    fun setRenameText(text: String) {
+        tagUi.update { ui ->
+            ui.renaming?.let { ui.copy(renaming = it.copy(name = text.take(CategoryValidation.MAX_TAG_NAME_LENGTH), error = null)) } ?: ui
+        }
+    }
+
+    fun cancelRename() {
+        tagUi.update { it.copy(renaming = null) }
+    }
+
+    /** Guarda el nuevo nombre (RF-16). Sin cambios reales no llama al backend y cierra el diálogo. */
+    fun confirmRename() {
+        val id = categoryId ?: return
+        val draft = tagUi.value.renaming ?: return
+        if (isReadOnly()) return
+        val name = when (val validation = CategoryValidation.validateTagName(draft.name)) {
+            is NameValidation.Invalid -> {
+                tagUi.update { it.copy(renaming = draft.copy(error = validation.error.toFieldError())) }
+                return
+            }
+            is NameValidation.Valid -> validation.name
+        }
+        if (currentCategory()?.tags?.firstOrNull { it.id == draft.tagId }?.name == name) {
+            tagUi.update { it.copy(renaming = null) }
+            return
+        }
+        run(
+            operation = { repository.renameTag(familyId, id, draft.tagId, name) },
+            onSuccess = { tagUi.update { it.copy(renaming = null) } },
+            onFailure = { failure ->
+                if (failure == CategoryFailure.DuplicateName) {
+                    tagUi.update { ui -> ui.copy(renaming = ui.renaming?.copy(error = NameFieldError.DUPLICATE)) }
+                    true
+                } else {
+                    handleTagNotFound(failure)
+                }
+            },
+        )
+    }
+
+    /**
+     * Quitar un tag, ya confirmado (RF-18, RF-19). Con movimientos asociados: un tag activo ofrece archivarse
+     * y uno archivado solo informa.
+     */
+    fun removeTag(tagId: String) {
+        val id = categoryId ?: return
+        if (isReadOnly()) return
+        val status = currentCategory()?.tags?.firstOrNull { it.id == tagId }?.status ?: return
+        run(
+            operation = { repository.deleteTag(familyId, id, tagId) },
+            onSuccess = {},
+            onFailure = { failure ->
+                if (failure == CategoryFailure.HasAssociatedItems) {
+                    event.value =
+                        if (status == TagStatus.ACTIVE) CategoryEditEvent.OfferArchiveTag(tagId) else CategoryEditEvent.TagCannotDelete
+                    true
+                } else {
+                    handleTagNotFound(failure)
+                }
+            },
+        )
+    }
+
+    /** Archivar un tag activo, ya confirmado (irreversible, BG-01), p. ej. al aceptar la oferta de [removeTag]. */
+    fun archiveTag(tagId: String) {
+        val id = categoryId ?: return
+        if (isReadOnly()) return
+        if (currentCategory()?.tags?.firstOrNull { it.id == tagId }?.status != TagStatus.ACTIVE) return
+        run(
+            operation = { repository.deprecateTag(familyId, id, tagId) },
+            onSuccess = {},
+            onFailure = { handleTagNotFound(it) },
+        )
+    }
+
+    // --- Reordenar tags (RF-17) ---
+
+    /** Sube un tag activo una posición. Es la alternativa sin arrastre, utilizable con lector de pantalla. */
+    fun moveTagUp(tagId: String) {
+        val index = activeTagIds().indexOf(tagId)
+        if (index > 0) moveTag(tagId, index - 1)
+    }
+
+    /** Baja un tag activo una posición (alternativa sin arrastre). */
+    fun moveTagDown(tagId: String) {
+        val index = activeTagIds().indexOf(tagId)
+        if (index in 0 until activeTagIds().lastIndex) moveTag(tagId, index + 1)
+    }
+
+    /**
+     * Mueve un tag activo a [toIndex] entre los activos (se ajusta a los límites) y guarda el orden: es lo que
+     * se llama al soltar el arrastre. Los archivados no se mueven. El nuevo orden se muestra enseguida
+     * (cambio optimista); si el backend lo rechaza se restaura el anterior, se informa y se actualiza la lista,
+     * por si otro miembro cambió los tags.
+     */
+    fun moveTag(tagId: String, toIndex: Int) {
+        val id = categoryId ?: return
+        if (isReadOnly() || busy.value) return
+        val active = activeTagIds()
+        val from = active.indexOf(tagId)
+        if (from < 0) return
+        val target = toIndex.coerceIn(0, active.lastIndex)
+        if (target == from) return
+        val newOrder = active.toMutableList().apply {
+            removeAt(from)
+            add(target, tagId)
+        }
+        tagUi.update { it.copy(pendingOrder = newOrder) }
+        run(
+            operation = {
+                repository.reorderTags(familyId, id, newOrder).also { result ->
+                    // Si falla, se restaura el orden anterior sea cual sea el motivo.
+                    if (result is CategoryResult.Failure) tagUi.update { it.copy(pendingOrder = null) }
+                }
+            },
+            onSuccess = { tagUi.update { it.copy(pendingOrder = null) } },
+            onFailure = { failure ->
+                when (failure) {
+                    CategoryFailure.Offline,
+                    CategoryFailure.InsufficientRole,
+                    CategoryFailure.CategoryNotActive,
+                    CategoryFailure.Unauthorized,
+                    -> false
+                    CategoryFailure.NotFound -> handleTagNotFound(failure)
+                    // Incluye el rechazo del orden (INVALID_TAG_ORDER), que no se distingue (plan). Se actualiza
+                    // la lista por si otro miembro cambió los tags. El resto de casos ya la actualizan o no
+                    // llegaron a enviar nada (sin conexión).
+                    else -> {
+                        event.value = CategoryEditEvent.ReorderFailed
+                        refreshList()
+                        true
+                    }
+                }
+            },
+        )
+    }
+
+    /** Ids de los tags activos en el orden guardado (el que devuelve el repositorio). */
+    private fun activeTagIds(): List<String> =
+        currentCategory()?.tags.orEmpty().filter { it.status == TagStatus.ACTIVE }.sortedBy { it.displayOrder }.map { it.id }
+
+    /** Activos por su posición (o por el orden pendiente, si lo hay) y después los archivados. */
+    private fun orderedTags(category: Category?, pending: List<String>?): List<Tag> {
+        val tags = category?.tags.orEmpty()
+        val active = tags.filter { it.status == TagStatus.ACTIVE }.sortedBy { it.displayOrder }
+        val orderedActive = if (pending == null) {
+            active
+        } else {
+            val byId = active.associateBy { it.id }
+            pending.mapNotNull { byId[it] } + active.filter { it.id !in pending }
+        }
+        return orderedActive + tags.filter { it.status != TagStatus.ACTIVE }.sortedBy { it.displayOrder }
+    }
+
+    /**
+     * El backend responde 404 tanto si falta el tag como si falta la categoría. Se actualiza la lista y se
+     * avisa del tag; si en realidad faltaba la categoría, el estado pasa solo a «no encontrada» (la pantalla
+     * lo muestra y vuelve al listado), sin necesidad de distinguirlo aquí.
+     */
+    private suspend fun handleTagNotFound(failure: CategoryFailure): Boolean {
+        if (failure != CategoryFailure.NotFound) return false
+        repository.refresh(familyId)
+        tagUi.update { it.copy(renaming = null) }
+        event.value = CategoryEditEvent.TagNotFound
+        return true
+    }
+
     /** La pantalla ya mostró o gestionó el evento pendiente. */
     fun consumeEvent() {
         event.value = null
     }
 
-    private fun <T> run(operation: suspend () -> CategoryResult<T>, onSuccess: (T) -> Unit) {
+    /**
+     * Ejecuta una operación de una en una. [onFailure] puede resolver un fallo propio de la operación
+     * (devuelve `true`); si no, se aplica el tratamiento común de [handle].
+     */
+    private fun <T> run(
+        operation: suspend () -> CategoryResult<T>,
+        onSuccess: (T) -> Unit,
+        onFailure: suspend (CategoryFailure) -> Boolean = { false },
+    ) {
         // El control síncrono evita que dos pulsaciones seguidas envíen dos operaciones (CA-21).
         if (!busy.compareAndSet(expect = false, update = true)) return
         viewModelScope.launch {
             try {
                 when (val result = operation()) {
                     is CategoryResult.Success -> onSuccess(result.value)
-                    is CategoryResult.Failure -> handle(result.failure)
+                    is CategoryResult.Failure -> if (!onFailure(result.failure)) handle(result.failure)
                 }
             } finally {
                 busy.value = false
@@ -235,10 +453,13 @@ class CategoryEditViewModel(
             icon = draft.icon,
             readOnly = readOnly,
             archived = archived,
-            tags = category?.tags.orEmpty().sortedWith(compareBy({ it.status != TagStatus.ACTIVE }, { it.displayOrder })),
+            tags = orderedTags(category, ops.tags.pendingOrder),
             hasUnsavedChanges = !readOnly && hasChanges(category, draft),
             isBusy = ops.busy,
             event = ops.event,
+            newTagName = ops.tags.newName,
+            tagError = ops.tags.error,
+            renaming = ops.tags.renaming,
         )
     }
 
@@ -255,7 +476,21 @@ class CategoryEditViewModel(
         NameError.TOO_LONG -> NameFieldError.TOO_LONG
     }
 
-    private data class Ops(val busy: Boolean, val event: CategoryEditEvent?, val finished: Boolean, val deleting: Boolean)
+    /** [pendingOrder] es el orden de los tags activos propuesto y aún sin confirmar por el backend (cambio optimista). */
+    private data class TagUi(
+        val newName: String = "",
+        val error: NameFieldError? = null,
+        val renaming: TagRenameDraft? = null,
+        val pendingOrder: List<String>? = null,
+    )
+
+    private data class Ops(
+        val busy: Boolean,
+        val event: CategoryEditEvent?,
+        val finished: Boolean,
+        val deleting: Boolean,
+        val tags: TagUi,
+    )
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L

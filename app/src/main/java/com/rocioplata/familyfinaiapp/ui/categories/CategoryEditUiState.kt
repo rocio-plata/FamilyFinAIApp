@@ -23,7 +23,25 @@ sealed interface CategoryEditEvent {
      * lugar (RF-13). Aceptar llama a `archive()`; rechazar solo confirma el evento.
      */
     data object OfferArchive : CategoryEditEvent
+
+    /**
+     * Quitar un tag activo falló por movimientos asociados: se ofrece archivarlo en su lugar (RF-18).
+     * Aceptar llama a `archiveTag(tagId)`; rechazar solo confirma el evento.
+     */
+    data class OfferArchiveTag(val tagId: String) : CategoryEditEvent
+
+    /** Quitar un tag archivado falló por movimientos asociados: solo se informa (RF-19). */
+    data object TagCannotDelete : CategoryEditEvent
+
+    /** El tag ya no existe (otro miembro lo quitó): aviso; la lista ya se está actualizando. */
+    data object TagNotFound : CategoryEditEvent
+
+    /** No se pudo guardar el nuevo orden de los tags: se restauró el anterior (RF-17). */
+    data object ReorderFailed : CategoryEditEvent
 }
+
+/** Renombrando un tag (RF-16): el texto y el error del diálogo viven aquí para sobrevivir a la recreación. */
+data class TagRenameDraft(val tagId: String, val name: String, val error: NameFieldError?)
 
 sealed interface CategoryEditUiState {
     /** Edición abierta sin que la lista de la familia esté cargada todavía. */
@@ -54,6 +72,10 @@ sealed interface CategoryEditUiState {
         val hasUnsavedChanges: Boolean,
         val isBusy: Boolean,
         val event: CategoryEditEvent?,
+        /** Lo escrito en el campo para añadir un tag (RF-15); solo se vacía si el alta tiene éxito. */
+        val newTagName: String = "",
+        val tagError: NameFieldError? = null,
+        val renaming: TagRenameDraft? = null,
     ) : CategoryEditUiState {
         val canSubmit: Boolean get() = !readOnly && !isBusy && (isCreate || hasUnsavedChanges)
     }
