@@ -13,19 +13,19 @@ indicación. Los tests JVM van en `app/src/test/…` y los de UI en
 
 ## Dominio
 
-- [ ] **T-01 · Modelos, fallos y contrato del repositorio**
+- [x] **T-01 · Modelos, fallos y contrato del repositorio**
   - **Cubre:** RF-02, RF-03, RF-04, RF-08, RF-13, RF-18, RF-19, RF-21 · **Depende de:** —
   - **Alcance:** `domain/categories/Category.kt` (`Category`, `Tag`, `CategoryType`, `CategoryStatus`, `TagStatus`, `CategoriesData` con lista + `isStale` o sin datos), `CategoryFailure.kt` (`Offline`, `Network`, `InsufficientRole`, `Unauthorized`, `DuplicateName`, `NotFound`, `HasAssociatedItems`, `CategoryNotActive`, `InvalidData`, `Unknown` y el resultado de operación) y `CategoriesRepository.kt` (flujo por familia, `refresh`, las 9 operaciones de cambio y `clear()`). Kotlin puro.
   - **Validación:** `./gradlew :app:assembleDebug` y `grep` de imports `android`/`androidx`/`io.ktor`/`kotlinx.serialization` en `domain/categories`.
   - **Hecho cuando:** compila y el dominio no depende de Android, Compose, DTOs ni datos.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. `grep -rnE "import (android|androidx|io\.ktor|kotlinx\.serialization)" domain/categories` → sin resultados (solo importa `kotlinx.coroutines.flow.Flow`, como `domain/header`). Archivos: `Category.kt` (`Category`, `Tag`, `CategoryType`, `CategoryStatus`, `TagStatus`, `CategoriesData` con `categories` nulo = sin datos e `isStale`), `CategoryFailure.kt` (los 10 fallos y `CategoryResult.Success/Failure`) y `CategoriesRepository.kt` (flujo por familia, `refresh`, las 9 operaciones, `clear()`). Decisión de firma: `IconUpdate` (`Unchanged`/`Remove`/`Set`) distingue omitir el icono de quitarlo con `null` explícito (CA-10); `reorderTags` recibe solo los ids de los tags activos y el repositorio añade los archivados (T-09). Sin tests: tarea de tipos sin lógica.
 
-- [ ] **T-02 · Validación de nombres**
+- [x] **T-02 · Validación de nombres**
   - **Cubre:** RF-09, RF-10, RF-15, RF-16 (CA-09) · **Depende de:** —
   - **Alcance:** `domain/categories/CategoryValidation.kt`: recorte de espacios, vacío y longitud máxima (categoría 50, tag 30). Devuelve el nombre recortado o el error del campo.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.categories.*"` con `CategoryValidationTest` (válido, vacío, solo espacios, recorte, límites 50/51 y 30/31).
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.categories.*"` → BUILD SUCCESSFUL; `CategoryValidationTest`: 10 tests, 0 fallos, 0 errores, 0 omitidos (leído de `app/build/test-results/testDebugUnitTest`, de esta ejecución). `CategoryValidation` (objeto) con `validateCategoryName` y `validateTagName`, que devuelven `NameValidation.Valid(nombre recortado)` o `Invalid(NameError.REQUIRED | TOO_LONG)`; constantes `MAX_CATEGORY_NAME_LENGTH = 50` y `MAX_TAG_NAME_LENGTH = 30` para limitar el campo. Casos: válido, vacío, solo espacios (incluye tab y salto de línea), recorte, límites 50/51 y 30/31, espacios extremos que no cuentan para el límite, límites distintos entre categoría y tag, espacios internos conservados. Longitud en unidades UTF-16 (supuesto como en 003: no verificado en el código del backend). `domain/categories` sigue sin importar Android ni Ktor.
 
 ## Datos
 
