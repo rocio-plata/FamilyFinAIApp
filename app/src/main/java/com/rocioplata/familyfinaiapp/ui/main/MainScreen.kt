@@ -45,6 +45,8 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onRetry = viewModel::retry,
         onSelectFamily = viewModel::selectFamily,
         onDismissSelector = viewModel::dismissSelector,
+        onManageCategories = viewModel::openCategories,
+        onCategoriesBack = viewModel::categoriesBack,
         modifier = modifier,
     )
 }
@@ -59,10 +61,18 @@ fun MainScreen(
     onSelectFamily: (String) -> Unit,
     onDismissSelector: () -> Unit,
     modifier: Modifier = Modifier,
+    onManageCategories: () -> Unit = {},
+    onCategoriesBack: () -> Unit = {},
 ) {
     var selected by remember { mutableStateOf(MainDestination.Home) }
-    BackHandler(enabled = selected != MainDestination.Home) {
+    BackHandler(enabled = selected != MainDestination.Home && uiState.categoriesRoute == null) {
         selected = MainDestination.Home
+    }
+    // La gestión de categorías ocupa toda la pantalla: sin cabecera de familia ni barra de pestañas.
+    if (uiState.categoriesRoute != null) {
+        BackHandler(onBack = onCategoriesBack)
+        CategoriesPlaceholder(onBack = onCategoriesBack, modifier = modifier)
+        return
     }
     MainScreenContent(
         selected = selected,
@@ -74,6 +84,7 @@ fun MainScreen(
         onRetry = onRetry,
         onSelectFamily = onSelectFamily,
         onDismissSelector = onDismissSelector,
+        onManageCategories = onManageCategories,
         modifier = modifier,
     )
 }
@@ -88,6 +99,7 @@ fun MainScreenContent(
     onRetry: () -> Unit = {},
     onSelectFamily: (String) -> Unit = {},
     onDismissSelector: () -> Unit = {},
+    onManageCategories: () -> Unit = {},
 ) {
     val content = uiState.families as? FamiliesState.Content
     Scaffold(
@@ -117,7 +129,11 @@ fun MainScreenContent(
         key(content?.activeFamily?.id) {
             val familyName = content?.activeFamily?.name
             if (selected == MainDestination.Home) {
-                HomeContent(modifier = contentModifier, familyName = familyName)
+                HomeContent(
+                    modifier = contentModifier,
+                    familyName = familyName,
+                    onManageCategories = onManageCategories.takeIf { content != null },
+                )
             } else {
                 TabPlaceholder(destination = selected, modifier = contentModifier, familyName = familyName)
             }

@@ -5,6 +5,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.test.assertTouchWidthIsEqualTo
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.compose.ui.unit.dp
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -173,5 +177,78 @@ class MainScreenTest {
 
         composeTestRule.onNodeWithText("Reportes · Familia Gómez").assertIsDisplayed()
         composeTestRule.onNodeWithText("Reportes").assertIsSelected()
+    }
+
+    // --- Gestión de categorías (005, T-13) ---
+
+    @Test
+    fun homeShowsCategoriesTitleWithManageLinkAndKeepsTheFamilyText() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithText("Categorías").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Gestionar").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+    }
+
+    @Test
+    fun manageIsHiddenWhenThereIsNoActiveFamily() {
+        setHost(MainUiState(families = FamiliesState.Loading))
+
+        composeTestRule.onAllNodesWithText("Gestionar").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Categorías").assertCountEquals(0)
+    }
+
+    @Test
+    fun manageOpensCategoriesFullScreenWithoutHeaderNorTabs() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithText("Gestionar").performClick()
+
+        composeTestRule.onNodeWithTag("categories_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Categorías").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Volver").assertIsDisplayed()
+        composeTestRule.onAllNodesWithContentDescription(OWNER_SELECTOR).assertCountEquals(0)
+        composeTestRule.onAllNodesWithContentDescription("Perfil de usuario, inicial R").assertCountEquals(0)
+        listOf("Inicio", "Movimientos", "Reportes", "Presupuestos", "Asistente").forEach {
+            composeTestRule.onAllNodesWithText(it).assertCountEquals(0)
+        }
+        composeTestRule.onAllNodesWithContentDescription("Agregar").assertCountEquals(0)
+    }
+
+    @Test
+    fun theArrowReturnsToHomeWithHeaderAndTabs() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithText("Gestionar").performClick()
+
+        composeTestRule.onNodeWithContentDescription("Volver").performClick()
+
+        composeTestRule.onAllNodesWithTag("categories_screen").assertCountEquals(0)
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Inicio").assertIsSelected()
+        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+    }
+
+    @Test
+    fun theSystemBackGestureReturnsToHome() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithText("Gestionar").performClick()
+        composeTestRule.onNodeWithTag("categories_screen").assertIsDisplayed()
+
+        pressBack()
+
+        composeTestRule.onAllNodesWithTag("categories_screen").assertCountEquals(0)
+        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
+    }
+
+    @Test
+    fun categoriesBackArrowHasATouchTargetOfAtLeast48dp() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithText("Gestionar").performClick()
+
+        // El área táctil (no el tamaño visual de 40 dp) es la que debe llegar a 48 dp.
+        composeTestRule.onNodeWithTag("categories_back")
+            .assertTouchWidthIsEqualTo(48.dp)
+            .assertTouchHeightIsEqualTo(48.dp)
     }
 }

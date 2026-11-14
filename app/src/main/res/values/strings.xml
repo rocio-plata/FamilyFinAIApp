@@ -72,4 +72,134 @@
     <string name="auth_message_session_expired">Tu sesión expiró. Inicia sesión de nuevo.</string>
     <string name="auth_message_session_security">Cerramos tu sesión por seguridad. Inicia sesión de nuevo.</string>
     <string name="auth_message_logout_needs_connection">Necesitas conexión para cerrar sesión.</string>
+
+    <!-- Categorías y tags (005-categories). En la interfaz los tags se llaman "etiquetas", como en el mockup 006.
+         Los límites (50 y 30) y los 15 iconos los pasa la interfaz desde CategoryValidation y CategoryIcons. -->
+    <string name="categories_home_title">Categorías</string>
+    <string name="categories_home_manage">Gestionar</string>
+
+    <string name="categories_title">Categorías</string>
+    <string name="categories_back_description">Volver</string>
+    <string name="categories_search_description">Buscar</string>
+    <string name="categories_search_placeholder">Buscar por categoría o etiqueta</string>
+    <string name="categories_search_clear_description">Borrar búsqueda</string>
+    <string name="categories_search_close_description">Cerrar búsqueda</string>
+    <string name="categories_retry">Reintentar</string>
+    <string name="categories_loading">Cargando categorías…</string>
+    <string name="categories_saving">Guardando…</string>
+
+    <string name="categories_tab_expenses">Gastos</string>
+    <string name="categories_tab_income">Ingresos</string>
+    <plurals name="categories_active_count">
+        <item quantity="one">%d activa</item>
+        <item quantity="other">%d activas</item>
+    </plurals>
+    <string name="categories_create_new">Crear nueva categoría</string>
+
+    <string name="categories_icon_generic_description">Icono genérico de categoría</string>
+    <string name="categories_status_archived">Archivada</string>
+    <string name="categories_tag_status_archived">Archivado</string>
+
+    <string name="categories_archived_section_title">Categorías archivadas</string>
+    <plurals name="categories_archived_section_description">
+        <item quantity="one">Categorías archivadas, %d</item>
+        <item quantity="other">Categorías archivadas, %d</item>
+    </plurals>
+    <string name="categories_archived_expand_description">Mostrar categorías archivadas</string>
+    <string name="categories_archived_collapse_description">Ocultar categorías archivadas</string>
+    <string name="categories_archived_menu_description">Más acciones de %1$s</string>
+    <string name="categories_archived_menu_delete">Eliminar</string>
+
+    <string name="categories_empty_expense">Aún no hay categorías de gasto.</string>
+    <string name="categories_empty_income">Aún no hay categorías de ingreso.</string>
+    <string name="categories_empty_owner_hint">Crea la primera con «Crear nueva categoría».</string>
+    <string name="categories_search_no_results">No hay categorías ni etiquetas que coincidan con la búsqueda.</string>
+    <string name="categories_tags_empty">Esta categoría aún no tiene etiquetas.</string>
+
+    <string name="categories_error_load">No se pudieron cargar las categorías.</string>
+    <string name="categories_read_only_notice">Solo el Propietario de la familia puede modificar las categorías.</string>
+    <string name="categories_archived_read_only_notice">Esta categoría está archivada y no se puede modificar.</string>
+
+    <string name="categories_create_title">Nueva categoría</string>
+    <string name="categories_edit_title">Editar categoría</string>
+    <string name="categories_create_button">Crear categoría</string>
+    <string name="categories_save_button">Guardar</string>
+    <string name="categories_field_name">Nombre de la categoría</string>
+    <string name="categories_name_counter">%1$d / %2$d</string>
+    <string name="categories_type_label">Tipo</string>
+    <string name="categories_type_expense">Gasto</string>
+    <string name="categories_type_income">Ingreso</string>
+    <string name="categories_type_locked_hint">El tipo no se puede cambiar una vez creada la categoría.</string>
+
+    <string name="categories_icon_section_title">Icono</string>
+    <string name="categories_icon_available_count" tools:ignore="PluralsCandidate">%1$d disponibles</string>
+    <string name="categories_icon_none">Sin icono</string>
+    <string name="categories_icon_selected_description">%1$s, seleccionado</string>
+    <string name="categories_icon_shopping_cart">Carrito de compras</string>
+    <string name="categories_icon_restaurant">Restaurante</string>
+    <string name="categories_icon_local_cafe">Café</string>
+    <string name="categories_icon_medical_services">Salud</string>
+    <string name="categories_icon_home">Casa</string>
+    <string name="categories_icon_directions_car">Auto</string>
+    <string name="categories_icon_local_shipping">Camión de reparto</string>
+    <string name="categories_icon_bolt">Electricidad</string>
+    <string name="categories_icon_flight">Avión</string>
+    <string name="categories_icon_fitness_center">Gimnasio</string>
+    <string name="categories_icon_sports_soccer">Deportes</string>
+    <string name="categories_icon_beach_access">Playa</string>
+    <string name="categories_icon_school">Educación</string>
+    <string name="categories_icon_pets">Mascotas</string>
+    <string name="categories_icon_card_giftcard">Regalo</string>
+
+    <string name="categories_archive_action">Archivar</string>
+    <string name="categories_delete_action">Eliminar</string>
+
+    <string name="categories_tags_title">Etiquetas</string>
+    <plurals name="categories_tags_active_count">
+        <item quantity="one">%d activa</item>
+        <item quantity="other">%d activas</item>
+    </plurals>
+    <string name="categories_tag_field_add">Añadir etiqueta</string>
+    <string name="categories_tag_add_button">Agregar</string>
+    <string name="categories_tag_rename_title">Renombrar etiqueta</string>
+    <string name="categories_tag_field_name">Nombre de la etiqueta</string>
+    <string name="categories_tag_move_up">Subir</string>
+    <string name="categories_tag_move_down">Bajar</string>
+    <string name="categories_tag_drag_handle_description">Arrastrar para reordenar %1$s</string>
+    <string name="categories_tag_remove_description">Quitar %1$s</string>
+
+    <string name="categories_dialog_cancel">Cancelar</string>
+    <string name="categories_dialog_understood">Entendido</string>
+    <string name="categories_dialog_archive_title">¿Archivar la categoría?</string>
+    <string name="categories_dialog_archive_message">Dejará de estar disponible para nuevos movimientos y no podrás reactivarla.</string>
+    <string name="categories_dialog_delete_title">¿Eliminar la categoría?</string>
+    <string name="categories_dialog_delete_message">Se eliminarán la categoría y sus etiquetas. Esta acción no se puede deshacer.</string>
+    <string name="categories_dialog_has_items_title">No se puede eliminar</string>
+    <string name="categories_dialog_has_items_offer_archive_message">Esta categoría tiene movimientos asociados. Puedes archivarla en su lugar; no podrás reactivarla.</string>
+    <string name="categories_dialog_has_items_archived_message">Esta categoría archivada tiene movimientos asociados y no se puede eliminar.</string>
+    <string name="categories_dialog_discard_title">¿Descartar los cambios?</string>
+    <string name="categories_dialog_discard_message">Tienes cambios sin guardar.</string>
+    <string name="categories_dialog_discard_confirm">Descartar</string>
+    <string name="categories_dialog_discard_keep_editing">Seguir editando</string>
+    <string name="categories_dialog_tag_remove_title">¿Quitar la etiqueta?</string>
+    <string name="categories_dialog_tag_remove_message">Se eliminará la etiqueta de esta categoría.</string>
+    <string name="categories_dialog_tag_remove_confirm">Quitar</string>
+    <string name="categories_dialog_tag_has_items_title">No se puede quitar</string>
+    <string name="categories_dialog_tag_has_items_offer_archive_message">Esta etiqueta tiene movimientos asociados. Puedes archivarla en su lugar; no podrás reactivarla.</string>
+    <string name="categories_dialog_tag_has_items_archived_message">Esta etiqueta archivada tiene movimientos asociados y no se puede eliminar.</string>
+    <string name="categories_dialog_tag_archive_confirm">Archivar etiqueta</string>
+
+    <string name="categories_error_name_required">Escribe un nombre.</string>
+    <string name="categories_error_name_too_long" tools:ignore="PluralsCandidate">El nombre no puede superar los %1$d caracteres.</string>
+    <string name="categories_error_duplicate_category">Ya existe una categoría con ese nombre.</string>
+    <string name="categories_error_duplicate_tag">Ya existe una etiqueta con ese nombre.</string>
+    <string name="categories_error_offline">Necesitas conexión para hacer cambios. Lo que escribiste se conserva.</string>
+    <string name="categories_error_network">No pudimos conectar con el servidor. Revisa tu red e inténtalo de nuevo.</string>
+    <string name="categories_error_insufficient_role">No tienes permisos para modificar las categorías de esta familia.</string>
+    <string name="categories_error_category_not_found">Esta categoría ya no existe. Actualizamos la lista.</string>
+    <string name="categories_error_tag_not_found">Esta etiqueta ya no existe. Actualizamos la lista.</string>
+    <string name="categories_error_category_not_active">La categoría está archivada y no admite cambios. Actualizamos la lista.</string>
+    <string name="categories_error_invalid_data">Recibimos datos inesperados. Inténtalo de nuevo.</string>
+    <string name="categories_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
+    <string name="categories_error_reorder_failed">No se pudo guardar el nuevo orden. Se restauró el anterior.</string>
 </resources>
