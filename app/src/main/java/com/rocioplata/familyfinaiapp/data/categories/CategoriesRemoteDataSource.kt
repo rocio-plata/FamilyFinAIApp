@@ -235,7 +235,7 @@ class CategoriesRemoteDataSource(
             code in INSUFFICIENT_ROLE_CODES -> CategoryFailure.InsufficientRole
             code in DUPLICATE_NAME_CODES -> CategoryFailure.DuplicateName
             code in HAS_ASSOCIATED_ITEMS_CODES -> CategoryFailure.HasAssociatedItems
-            code == CATEGORY_NOT_ACTIVE -> CategoryFailure.CategoryNotActive
+            code in CATEGORY_NOT_ACTIVE_CODES -> CategoryFailure.CategoryNotActive
             response.status == HttpStatusCode.Unauthorized -> CategoryFailure.Unauthorized
             else -> CategoryFailure.Unknown
         }
@@ -275,11 +275,16 @@ class CategoriesRemoteDataSource(
     private data class ErrorDto(val error: String? = null)
 
     private companion object {
-        val INSUFFICIENT_ROLE_CODES = setOf("FINANCIAL.INSUFFICIENT_ROLE", "FAMILY.INSUFFICIENT_ROLE")
-        val DUPLICATE_NAME_CODES = setOf("FINANCIAL.DUPLICATE_CATEGORY_NAME", "FINANCIAL.DUPLICATE_TAG_NAME")
+        // El contrato (§4 y §9) documenta los códigos como `FINANCIAL.*`, pero el backend los emite como
+        // `FINANCIAL_TRACKING.*` (comprobado contra el backend local y su código, ver BG-06). Se aceptan
+        // los dos prefijos para no depender de cuándo se alinee la documentación.
+        private fun financial(code: String) = setOf("FINANCIAL_TRACKING.$code", "FINANCIAL.$code")
+
+        val INSUFFICIENT_ROLE_CODES = setOf("FAMILY.INSUFFICIENT_ROLE") + financial("INSUFFICIENT_ROLE")
+        val DUPLICATE_NAME_CODES = financial("DUPLICATE_CATEGORY_NAME") + financial("DUPLICATE_TAG_NAME")
         val HAS_ASSOCIATED_ITEMS_CODES =
-            setOf("FINANCIAL.CATEGORY_HAS_ASSOCIATED_ITEMS", "FINANCIAL.TAG_HAS_ASSOCIATED_ITEMS")
-        const val CATEGORY_NOT_ACTIVE = "FINANCIAL.CATEGORY_NOT_ACTIVE"
+            financial("CATEGORY_HAS_ASSOCIATED_ITEMS") + financial("TAG_HAS_ASSOCIATED_ITEMS")
+        val CATEGORY_NOT_ACTIVE_CODES = financial("CATEGORY_NOT_ACTIVE")
         const val CONNECT_TIMEOUT_MS = 10_000L
         const val REQUEST_TIMEOUT_MS = 15_000L
     }

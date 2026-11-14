@@ -169,6 +169,47 @@ class CategoriesRemoteDataSourceTest {
         )
     }
 
+    // El backend emite `FINANCIAL_TRACKING.*` aunque el contrato documente `FINANCIAL.*` (BG-06): ambos valen.
+    @Test
+    fun errores_conElPrefijoRealDelBackend() = runTest {
+        assertEquals(
+            CategoryFailure.DuplicateName,
+            failureOf(HttpStatusCode.Conflict, errorBody("FINANCIAL_TRACKING.DUPLICATE_CATEGORY_NAME")),
+        )
+        assertEquals(
+            CategoryFailure.DuplicateName,
+            failureOf(HttpStatusCode.Conflict, errorBody("FINANCIAL_TRACKING.DUPLICATE_TAG_NAME")),
+        )
+        assertEquals(
+            CategoryFailure.HasAssociatedItems,
+            failureOf(HttpStatusCode.Conflict, errorBody("FINANCIAL_TRACKING.CATEGORY_HAS_ASSOCIATED_ITEMS")),
+        )
+        assertEquals(
+            CategoryFailure.HasAssociatedItems,
+            failureOf(HttpStatusCode.Conflict, errorBody("FINANCIAL_TRACKING.TAG_HAS_ASSOCIATED_ITEMS")),
+        )
+        assertEquals(
+            CategoryFailure.CategoryNotActive,
+            failureOf(HttpStatusCode.BadRequest, errorBody("FINANCIAL_TRACKING.CATEGORY_NOT_ACTIVE")),
+        )
+        assertEquals(
+            CategoryFailure.InsufficientRole,
+            failureOf(HttpStatusCode.Forbidden, errorBody("FAMILY.INSUFFICIENT_ROLE")),
+        )
+        assertEquals(
+            CategoryFailure.NotFound,
+            failureOf(HttpStatusCode.NotFound, errorBody("FINANCIAL_TRACKING.CATEGORY_NOT_FOUND")),
+        )
+    }
+
+    @Test
+    fun errores_unPrefijoDesconocidoNoSeInterpreta() = runTest {
+        assertEquals(
+            CategoryFailure.Unknown,
+            failureOf(HttpStatusCode.Conflict, errorBody("OTRO.DUPLICATE_CATEGORY_NAME")),
+        )
+    }
+
     @Test
     fun errores_404DeCualquierCodigoEsNoEncontrado() = runTest {
         assertEquals(CategoryFailure.NotFound, failureOf(HttpStatusCode.NotFound, errorBody("FINANCIAL.CATEGORY_NOT_FOUND")))

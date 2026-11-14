@@ -25,7 +25,9 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rocioplata.familyfinaiapp.FamilyFinApp
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
+import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
+import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
 import androidx.compose.ui.tooling.preview.Preview
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
@@ -51,19 +53,30 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onCategoriesBack = viewModel::categoriesBack,
         categoriesContent = { route ->
             val family = (uiState.families as? FamiliesState.Content)?.activeFamily
-            if (route == CategoriesRoute.List && family != null) {
-                CategoriesScreen(
+            val key = "${viewModelKey ?: "main"}-categories-${family?.id}"
+            val canManage = family?.role == FamilyRole.OWNER
+            when {
+                family == null -> CategoriesPlaceholder(onBack = viewModel::categoriesBack, modifier = modifier)
+                route == CategoriesRoute.List -> CategoriesScreen(
                     familyId = family.id,
-                    canManage = family.role == FamilyRole.OWNER,
-                    viewModelKey = "${viewModelKey ?: "main"}-categories-${family.id}",
+                    canManage = canManage,
+                    viewModelKey = key,
                     onBack = viewModel::categoriesBack,
                     onCategoryClick = viewModel::openCategoryEdit,
                     onCreateClick = viewModel::openCategoryCreate,
                     modifier = modifier,
                 )
-            } else {
-                // El alta y la edición se conectan en T-19 y T-20.
-                CategoriesPlaceholder(onBack = viewModel::categoriesBack, modifier = modifier)
+                else -> CategoryEditScreen(
+                    familyId = family.id,
+                    categoryId = (route as? CategoriesRoute.Edit)?.categoryId,
+                    initialType = (route as? CategoriesRoute.Create)?.type ?: CategoryType.EXPENSE,
+                    canManage = canManage,
+                    viewModelKey = key,
+                    onBack = viewModel::categoriesBack,
+                    onCreated = viewModel::openCategoryEdit,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
             }
         },
         modifier = modifier,
