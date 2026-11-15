@@ -24,6 +24,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rocioplata.familyfinaiapp.FamilyFinApp
+import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
+import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
+import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
 import androidx.compose.ui.tooling.preview.Preview
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
@@ -45,6 +49,37 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onRetry = viewModel::retry,
         onSelectFamily = viewModel::selectFamily,
         onDismissSelector = viewModel::dismissSelector,
+        onManageCategories = viewModel::openCategories,
+        onCategoriesBack = viewModel::categoriesBack,
+        categoriesContent = { route ->
+            val family = (uiState.families as? FamiliesState.Content)?.activeFamily
+            val key = "${viewModelKey ?: "main"}-categories-${family?.id}"
+            val canManage = family?.role == FamilyRole.OWNER
+            when {
+                family == null -> CategoriesPlaceholder(onBack = viewModel::categoriesBack, modifier = modifier)
+                route == CategoriesRoute.List -> CategoriesScreen(
+                    familyId = family.id,
+                    canManage = canManage,
+                    viewModelKey = key,
+                    onBack = viewModel::categoriesBack,
+                    onCategoryClick = viewModel::openCategoryEdit,
+                    onCreateClick = viewModel::openCategoryCreate,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
+                else -> CategoryEditScreen(
+                    familyId = family.id,
+                    categoryId = (route as? CategoriesRoute.Edit)?.categoryId,
+                    initialType = (route as? CategoriesRoute.Create)?.type ?: CategoryType.EXPENSE,
+                    canManage = canManage,
+                    viewModelKey = key,
+                    onBack = viewModel::categoriesBack,
+                    onCreated = viewModel::openCategoryEdit,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
+            }
+        },
         modifier = modifier,
     )
 }
@@ -59,10 +94,24 @@ fun MainScreen(
     onSelectFamily: (String) -> Unit,
     onDismissSelector: () -> Unit,
     modifier: Modifier = Modifier,
+    onManageCategories: () -> Unit = {},
+    onCategoriesBack: () -> Unit = {},
+    categoriesContent: (@Composable (CategoriesRoute) -> Unit)? = null,
 ) {
     var selected by remember { mutableStateOf(MainDestination.Home) }
-    BackHandler(enabled = selected != MainDestination.Home) {
+    BackHandler(enabled = selected != MainDestination.Home && uiState.categoriesRoute == null) {
         selected = MainDestination.Home
+    }
+    // La gestión de categorías ocupa toda la pantalla: sin cabecera de familia ni barra de pestañas.
+    val route = uiState.categoriesRoute
+    if (route != null) {
+        BackHandler(onBack = onCategoriesBack)
+        if (categoriesContent != null) {
+            categoriesContent(route)
+        } else {
+            CategoriesPlaceholder(onBack = onCategoriesBack, modifier = modifier)
+        }
+        return
     }
     MainScreenContent(
         selected = selected,
@@ -74,6 +123,7 @@ fun MainScreen(
         onRetry = onRetry,
         onSelectFamily = onSelectFamily,
         onDismissSelector = onDismissSelector,
+        onManageCategories = onManageCategories,
         modifier = modifier,
     )
 }
@@ -88,6 +138,7 @@ fun MainScreenContent(
     onRetry: () -> Unit = {},
     onSelectFamily: (String) -> Unit = {},
     onDismissSelector: () -> Unit = {},
+    onManageCategories: () -> Unit = {},
 ) {
     val content = uiState.families as? FamiliesState.Content
     Scaffold(
@@ -117,7 +168,11 @@ fun MainScreenContent(
         key(content?.activeFamily?.id) {
             val familyName = content?.activeFamily?.name
             if (selected == MainDestination.Home) {
-                HomeContent(modifier = contentModifier, familyName = familyName)
+                HomeContent(
+                    modifier = contentModifier,
+                    familyName = familyName,
+                    onManageCategories = onManageCategories.takeIf { content != null },
+                )
             } else {
                 TabPlaceholder(destination = selected, modifier = contentModifier, familyName = familyName)
             }

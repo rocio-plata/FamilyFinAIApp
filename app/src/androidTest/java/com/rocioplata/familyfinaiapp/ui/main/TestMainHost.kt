@@ -18,7 +18,7 @@ fun contentState(
     isStale: Boolean = false,
 ) = FamiliesState.Content(families, active, isStale)
 
-/** Reproduce lo mínimo del ViewModel (selector y familia activa) sin red ni caché. */
+/** Reproduce lo mínimo del ViewModel (selector, familia activa y ruta de categorías) sin red ni caché. */
 @Composable
 fun TestMainHost(
     initial: MainUiState,
@@ -38,6 +38,8 @@ fun TestMainHost(
             )
         },
         onDismissSelector = { state = state.copy(selectorOpen = false) },
+        onManageCategories = { state = state.copy(categoriesRoute = CategoriesRoute.List) },
+        onCategoriesBack = { state = state.copy(categoriesRoute = null) },
         modifier = modifier,
     )
 }

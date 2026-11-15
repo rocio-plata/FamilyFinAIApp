@@ -223,7 +223,7 @@ No conviertas una preferencia del agente en una restricción. -->
 - La sesión se guarda en el teléfono de forma protegida: no legible por otras
   apps ni incluida en copias de seguridad. El mecanismo se decide en PLAN.md.
 - Referencia visual orientativa, no vinculante:
-  `docs/ui/snapshots/0004-inicio-sesion-cuenta-nueva.png` y el prompt de login
+  `../../ui/snapshots/004-inicio-sesion-cuenta-nueva.png` y el prompt de login
   y registro de `docs/ui/prompts-stitch.md` (logo, nombre y lema "Smarter
   family finances" arriba, pestañas, campos con icono y botón principal).
   Prevalece esta spec: los elementos excluidos en *Fuera de alcance* no se

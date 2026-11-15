@@ -1,5 +1,6 @@
 package com.rocioplata.familyfinaiapp.data.header
 
+import com.rocioplata.familyfinaiapp.data.cache.CachePolicy
 import com.rocioplata.familyfinaiapp.domain.header.Family
 import com.rocioplata.familyfinaiapp.domain.header.HeaderData
 import com.rocioplata.familyfinaiapp.domain.header.HeaderFailure
@@ -17,8 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
 
 /**
  * Reglas de caché (RF-07): se muestra solo la caché del usuario actual y de menos de 7 días;
@@ -68,7 +67,7 @@ class HeaderRepositoryImpl(
         val invitations = local.readPendingInvitations()
         val profile = local.readDisplayName()
         val entries = listOfNotNull(families, invitations, profile)
-        val discard = entries.any { it.userId != userId || now - it.savedAtMillis >= MAX_CACHE_AGE_MS }
+        val discard = entries.any { it.userId != userId || CachePolicy.isExpired(it.savedAtMillis, now) }
         if (discard) {
             local.clear()
             state.value = HeaderData()
@@ -132,7 +131,7 @@ class HeaderRepositoryImpl(
             merged.pendingInvitations?.savedAtMillis,
             merged.displayName?.savedAtMillis,
         ).minOrNull()
-        return merged.copy(isStale = oldest != null && now - oldest > STALE_AFTER_MS)
+        return merged.copy(isStale = oldest != null && CachePolicy.isStale(oldest, now))
     }
 
     private fun failAll(failure: HeaderFailure) = HeaderRefreshResult(failure, failure, failure)
@@ -140,10 +139,5 @@ class HeaderRepositoryImpl(
     private fun SessionFailure.toHeaderFailure(): HeaderFailure = when (this) {
         SessionFailure.NOT_SIGNED_IN -> HeaderFailure.Unauthorized
         SessionFailure.UNKNOWN -> HeaderFailure.Unknown
-    }
-
-    private companion object {
-        val STALE_AFTER_MS = 24.hours.inWholeMilliseconds
-        val MAX_CACHE_AGE_MS = 7.days.inWholeMilliseconds
     }
 }
