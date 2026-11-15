@@ -20,8 +20,9 @@ import com.rocioplata.familyfinaiapp.R
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
 /**
- * Pantalla completa de la gestión de medios de pago (RF-01 de 006), sin cabecera de familia ni barra de
- * pestañas. Provisional: solo la barra con la flecha y el título; el listado real la sustituye en T-11.
+ * Pantalla de respaldo de la gestión de medios de pago: solo la barra con la flecha y el título. La usa
+ * la sobrecarga sin estado de `MainScreen` cuando no recibe el contenido real (sin familia activa y en los
+ * tests de UI), igual que `CategoriesPlaceholder`; el listado real es `PaymentMethodsScreen` (RF-01 de 006).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

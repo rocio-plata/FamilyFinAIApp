@@ -78,6 +78,18 @@
     <string name="payment_methods_home_manage_description">Gestionar medios de pago</string>
     <string name="payment_methods_title">Medios de pago</string>
     <string name="payment_methods_back_description">Volver</string>
+    <string name="payment_methods_loading">Cargando medios de pago…</string>
+    <string name="payment_methods_error_load">No se pudieron cargar los medios de pago.</string>
+    <string name="payment_methods_retry">Reintentar</string>
+    <string name="payment_methods_empty">Aún no hay medios de pago.</string>
+    <string name="payment_methods_status_archived">Archivado</string>
+    <string name="payment_methods_archived_section_title">Medios de pago archivados</string>
+    <plurals name="payment_methods_archived_section_description">
+        <item quantity="one">Medios de pago archivados, %d</item>
+        <item quantity="other">Medios de pago archivados, %d</item>
+    </plurals>
+    <string name="payment_methods_archived_expand_description">Mostrar medios de pago archivados</string>
+    <string name="payment_methods_archived_collapse_description">Ocultar medios de pago archivados</string>
 
     <!-- Categorías y tags (005-categories). En la interfaz los tags se llaman "etiquetas", como en el mockup 006.
          Los límites (50 y 30) y los 15 iconos los pasa la interfaz desde CategoryValidation y CategoryIcons. -->

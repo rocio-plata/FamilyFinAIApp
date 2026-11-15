@@ -28,6 +28,7 @@ import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
+import com.rocioplata.familyfinaiapp.ui.paymentmethods.PaymentMethodsScreen
 import androidx.compose.ui.tooling.preview.Preview
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
@@ -58,9 +59,12 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
             val canManage = family?.role == FamilyRole.OWNER
             when {
                 family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
-                // Pantalla provisional hasta T-11.
-                route == PaymentMethodsRoute ->
-                    PaymentMethodsPlaceholder(onBack = viewModel::managementBack, modifier = modifier)
+                route == PaymentMethodsRoute -> PaymentMethodsScreen(
+                    familyId = family.id,
+                    viewModelKey = "${viewModelKey ?: "main"}-payment-methods-${family.id}",
+                    onBack = viewModel::managementBack,
+                    modifier = modifier,
+                )
                 route == CategoriesRoute.List -> CategoriesScreen(
                     familyId = family.id,
                     canManage = canManage,
