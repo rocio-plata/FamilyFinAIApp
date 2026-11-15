@@ -15,11 +15,15 @@ import com.rocioplata.familyfinaiapp.data.header.HeaderRepositoryImpl
 import com.rocioplata.familyfinaiapp.data.network.AndroidConnectivityObserver
 import com.rocioplata.familyfinaiapp.data.network.ConnectivityObserver
 import com.rocioplata.familyfinaiapp.data.network.SessionAuth
+import com.rocioplata.familyfinaiapp.data.paymentmethods.PaymentMethodsLocalDataSource
+import com.rocioplata.familyfinaiapp.data.paymentmethods.PaymentMethodsRemoteDataSource
+import com.rocioplata.familyfinaiapp.data.paymentmethods.PaymentMethodsRepositoryImpl
 import com.rocioplata.familyfinaiapp.data.session.EncryptedSessionStore
 import com.rocioplata.familyfinaiapp.data.session.KeystoreSessionCipher
 import com.rocioplata.familyfinaiapp.domain.auth.AuthRepository
 import com.rocioplata.familyfinaiapp.domain.categories.CategoriesRepository
 import com.rocioplata.familyfinaiapp.domain.header.HeaderRepository
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodsRepository
 import com.rocioplata.familyfinaiapp.session.SessionManager
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -33,10 +37,13 @@ private val Context.headerCacheStore: DataStore<Preferences> by preferencesDataS
 // Los nombres deben coincidir con las exclusiones de backups (backup_rules.xml, data_extraction_rules.xml).
 private val Context.categoriesCacheStore: DataStore<Preferences> by preferencesDataStore(name = CATEGORIES_CACHE_NAME)
 
+private val Context.paymentMethodsCacheStore: DataStore<Preferences> by preferencesDataStore(name = PAYMENT_METHODS_CACHE_NAME)
+
 private val Context.sessionStore: DataStore<Preferences> by preferencesDataStore(name = SESSION_STORE_NAME)
 
 const val HEADER_CACHE_NAME = "header_cache"
 const val CATEGORIES_CACHE_NAME = "categories_cache"
+const val PAYMENT_METHODS_CACHE_NAME = "payment_methods_cache"
 const val SESSION_STORE_NAME = "session"
 private const val CONNECT_TIMEOUT_MS = 10_000L
 private const val REQUEST_TIMEOUT_MS = 15_000L
@@ -44,6 +51,7 @@ private const val REQUEST_TIMEOUT_MS = 15_000L
 class AppContainer(context: Context) {
     val headerCacheStore: DataStore<Preferences> = context.applicationContext.headerCacheStore
     val categoriesCacheStore: DataStore<Preferences> = context.applicationContext.categoriesCacheStore
+    val paymentMethodsCacheStore: DataStore<Preferences> = context.applicationContext.paymentMethodsCacheStore
 
     /** Cliente sin Bearer, para `/auth/login`, `/auth/register` y `/auth/refresh`. */
     val publicClient: HttpClient = HttpClient(OkHttp) {
@@ -79,6 +87,7 @@ class AppContainer(context: Context) {
             onSessionEnded = {
                 headerRepository.clear()
                 categoriesRepository.clear()
+                paymentMethodsRepository.clear()
             },
         )
     }
@@ -97,6 +106,15 @@ class AppContainer(context: Context) {
         CategoriesRepositoryImpl(
             remote = CategoriesRemoteDataSource(apiClient, BuildConfig.BACKEND_BASE_URL),
             local = CategoriesLocalDataSource(categoriesCacheStore),
+            sessionProvider = sessionManager,
+            connectivity = connectivityObserver,
+        )
+    }
+
+    val paymentMethodsRepository: PaymentMethodsRepository by lazy {
+        PaymentMethodsRepositoryImpl(
+            remote = PaymentMethodsRemoteDataSource(apiClient, BuildConfig.BACKEND_BASE_URL),
+            local = PaymentMethodsLocalDataSource(paymentMethodsCacheStore),
             sessionProvider = sessionManager,
             connectivity = connectivityObserver,
         )
