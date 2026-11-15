@@ -159,7 +159,8 @@ fun TagList(
                     },
                     onDragTo = { dragOffset = it },
                     onDragEnd = {
-                        val target = dragTarget
+                        // Se recalcula al soltar: el último movimiento puede llegar sin recomponer antes.
+                        val target = dragTargetIndex(dragFrom, dragOffset, step, activeCount)
                         val moved = tag.id
                         draggingId = null
                         dragOffset = 0f

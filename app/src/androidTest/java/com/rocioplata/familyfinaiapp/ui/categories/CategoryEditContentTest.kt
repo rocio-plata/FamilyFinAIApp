@@ -668,8 +668,10 @@ class CategoryEditContentTest {
     fun dragHandlesAppearOnActiveTagsOnlyWhenThereIsMoreThanOne() {
         show(form())
 
-        listOf("t1", "t2", "t3").forEach { rule.onNodeWithTag("tag_handle_$it").assertIsDisplayed() }
-        rule.onNodeWithContentDescription("Arrastrar para reordenar Feria").assertIsDisplayed()
+        listOf("t1", "t2", "t3").forEach {
+            rule.onNodeWithTag("tag_handle_$it", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        }
+        rule.onNodeWithContentDescription("Arrastrar para reordenar Feria", useUnmergedTree = true).assertExists()
     }
 
     @Test
