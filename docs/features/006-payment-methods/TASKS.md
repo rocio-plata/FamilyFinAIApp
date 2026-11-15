@@ -13,19 +13,19 @@ indicación. Los tests JVM van en `app/src/test/…` y los de UI en
 
 ## Dominio
 
-- [ ] **T-01 · Modelo, fallos y contrato del repositorio**
+- [x] **T-01 · Modelo, fallos y contrato del repositorio**
   - **Cubre:** RF-02, RF-03, RF-09, RF-10, RF-12 · **Depende de:** —
   - **Alcance:** `domain/paymentmethods/PaymentMethod.kt` (`PaymentMethod` con id, nombre y estado; `PaymentMethodStatus`; `PaymentMethodsData` con lista + `isStale` o sin datos), `PaymentMethodFailure.kt` (`Offline`, `Network`, `InsufficientRole`, `Unauthorized`, `DuplicateName`, `InvalidName`, `IsSomeonesDefault`, `HasAssociatedItems`, `NotFound`, `InvalidData`, `Unknown` y el resultado de operación) y `PaymentMethodsRepository.kt` (flujo por familia, `refresh`, crear, renombrar, archivar, eliminar y `clear()`). Kotlin puro.
   - **Validación:** `./gradlew :app:assembleDebug` y `grep` de imports `android`/`androidx`/`io.ktor`/`kotlinx.serialization` en `domain/paymentmethods`.
   - **Hecho cuando:** compila y el dominio no depende de Android, Compose, DTOs ni datos.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL (leído de esta ejecución). `grep -rnE "import (android|androidx|io\.ktor|kotlinx\.serialization)" domain/paymentmethods` → sin resultados (solo importa `kotlinx.coroutines.flow.Flow`, como `domain/categories`). Archivos: `PaymentMethod.kt` (`PaymentMethod`, `PaymentMethodStatus` `ACTIVE`/`DEPRECATED`, `PaymentMethodsData` con `paymentMethods` nulo = sin datos e `isStale`), `PaymentMethodFailure.kt` (los 11 fallos y `PaymentMethodResult.Success/Failure`) y `PaymentMethodsRepository.kt` (flujo por familia, `refresh`, crear, renombrar, archivar, eliminar y `clear()`). Decisión de firma: renombrar, archivar y eliminar devuelven `Unit` (el repositorio aplica el cambio conocido, T-06); crear devuelve el `PaymentMethod` con su id. Sin tests: tarea de tipos sin lógica.
 
-- [ ] **T-02 · Validación del nombre**
+- [x] **T-02 · Validación del nombre**
   - **Cubre:** RF-06, RF-07, RF-13 (CA-08) · **Depende de:** —
   - **Alcance:** `domain/paymentmethods/PaymentMethodValidation.kt`: recorte de espacios, vacío y longitud máxima 40. Devuelve el nombre recortado o el error del campo; expone la constante del límite para el campo y el contador.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.paymentmethods.*"` con `PaymentMethodValidationTest` (válido, vacío, solo espacios, recorte, límites 40/41, espacios extremos que no cuentan).
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.paymentmethods.*"` → BUILD SUCCESSFUL; `PaymentMethodValidationTest`: 6 tests, 0 fallos, 0 errores, 0 omitidos (leído de `app/build/test-results/testDebugUnitTest`, de esta ejecución). `PaymentMethodValidation` (objeto) con `validateName`, que devuelve `PaymentMethodNameValidation.Valid(nombre recortado)` o `Invalid(PaymentMethodNameError.REQUIRED | TOO_LONG)`; constante `MAX_NAME_LENGTH = 40` para limitar el campo y el contador. Casos: válido, vacío, solo espacios (incluye tab y salto de línea), recorte, límites 40/41, espacios extremos que no cuentan para el límite y espacios internos conservados. Los tipos de resultado son propios (no se reutilizan `NameValidation`/`NameError` de categorías) para que `domain/paymentmethods` no dependa de otra funcionalidad. Longitud en unidades UTF-16 (supuesto como en 005: no verificado en el código del backend).
 
 ## Datos
 
