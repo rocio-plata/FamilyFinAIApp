@@ -27,7 +27,7 @@ las TASKS de cada una.
 | 2 | Cabecera principal | `002-main-header` | Hecha | Ya usa la sesión real de la 003; su caché se vacía al terminar la sesión. Pendientes de verificar: TalkBack y CA-18 con dos cuentas reales |
 | 3 | Autenticación y sesión | `003-auth` | Hecha | BG-01: el registro del backend permite enumerar emails. Sin verificar: CA-03, CA-12 y CA-21 de extremo a extremo y TalkBack con voz |
 | 4 | Identidad visual de la app | `004-brand-identity` | Hecha | CA-06 sin verificar: no se logró ver la pantalla de arranque del sistema |
-| 5 | Categorías y tags | `005-categories` | Tareas | Implementación sin iniciar. BG-01: el backend no permite reactivar lo archivado. BG-02 a BG-04: la categoría no tiene color, fecha de archivado ni orden modificable. BG-05: sin categorías de ingreso por defecto |
+| 5 | Categorías y tags | `005-categories` | Hecha | Listado, alta, edición, archivar, eliminar y tags (con reordenado). BG-01: el backend no permite reactivar lo archivado. BG-02 a BG-04: la categoría no tiene color, fecha de archivado ni orden modificable. BG-05: sin categorías de ingreso por defecto. BG-06: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*`. BG-07: el nombre duplicado se rechaza entre tipos. Sin verificar de extremo a extremo: CA-07, los casos «con movimientos» de CA-12 y CA-17, CA-19 con datos de más de 24 h o sin datos, rol Integrante y TalkBack |
 | 6 | Medios de pago | `payment-methods` | Pendiente | |
 | 7 | Movimientos | `financial-items` | Pendiente | |
 | 8 | Dashboard | `dashboard` | Pendiente | |

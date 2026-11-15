@@ -86,7 +86,6 @@
     <string name="categories_search_close_description">Cerrar búsqueda</string>
     <string name="categories_retry">Reintentar</string>
     <string name="categories_loading">Cargando categorías…</string>
-    <string name="categories_saving">Guardando…</string>
 
     <string name="categories_tab_expenses">Gastos</string>
     <string name="categories_tab_income">Ingresos</string>

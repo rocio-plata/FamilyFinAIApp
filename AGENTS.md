@@ -116,6 +116,16 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
 - **Caché offline** (`HeaderLocalDataSource`): un JSON por recurso en DataStore Preferences con
   `schemaVersion`, `userId` y `savedAt`. El repositorio descarta caché de otro usuario o de
   ≥7 días y marca `isStale` a partir de 24 h. Versión desconocida o JSON ilegible = sin datos.
+- **Categorías** (`domain/categories`, `data/categories`, `ui/categories`): misma separación por
+  capas que la cabecera. `CategoriesRepositoryImpl` expone un `Flow` por familia y `refresh`,
+  y las mutaciones (crear, editar, archivar, eliminar categorías; añadir, renombrar, quitar,
+  archivar y reordenar tags) devuelven un resultado tipado (`CategoryFailure`). La caché es
+  `categories_cache` (DataStore, excluida de las copias de seguridad en `backup_rules.xml` y
+  `data_extraction_rules.xml`) y comparte con la cabecera la regla de `data/cache/CachePolicy`
+  (descarta a los 7 días, `isStale` a partir de 24 h). El backend emite los errores de dominio
+  como `FINANCIAL_TRACKING.*` aunque el contrato documente `FINANCIAL.*`: se aceptan ambos
+  prefijos (`BACKEND_GAPS.md` de la 005, BG-06). Los cambios requieren conexión y no hay cola
+  offline; lo escrito se conserva ante un fallo.
 - **Presentación**: `MainViewModel` combina el flujo del repositorio con estado local
   (familia activa solo en memoria, selector abierto, refresco en curso) en un
   `StateFlow<MainUiState>`; `FamiliesState` es un sealed interface
@@ -126,7 +136,10 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
 - **Navegación**: aún no hay librería. `AppRoot`/`RootViewModel` eligen la pantalla según
   `SessionState`: nada en `Loading`, `AuthScreen` en `SignedOut` y `MainScreen` en `SignedIn`; la
   generación de la sesión reinicia el estado de los ViewModels al cambiar de usuario. Las pestañas
-  inferiores son el enum `MainDestination` (su orden es el de la barra).
+  inferiores son el enum `MainDestination` (su orden es el de la barra). Categorías es una ruta
+  **en memoria** de `MainViewModel` (`CategoriesRoute`: listado, alta o edición de una categoría),
+  no una pestaña ni una librería de navegación: se abre desde «Gestionar» en Inicio, oculta la
+  cabecera y la barra inferior y se pierde si el proceso muere (se vuelve a Inicio).
 - **Tests**: unitarios JVM con `kotlinx-coroutines-test` y `ktor-client-mock`; los de UI
   (`androidTest`) usan `TestMainHost`, que reproduce lo mínimo del ViewModel sobre la
   sobrecarga stateless de `MainScreen`, sin red ni caché; los de acceso (`AuthScreenTest`,
