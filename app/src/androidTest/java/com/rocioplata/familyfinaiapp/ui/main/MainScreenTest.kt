@@ -1,6 +1,7 @@
 package com.rocioplata.familyfinaiapp.ui.main
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -16,9 +17,11 @@ import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -186,7 +189,7 @@ class MainScreenTest {
         setHost(severalFamilies)
 
         composeTestRule.onNodeWithText("Categorías").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Gestionar").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_manage_categories").assertIsDisplayed()
         composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
     }
 
@@ -202,7 +205,7 @@ class MainScreenTest {
     fun manageOpensCategoriesFullScreenWithoutHeaderNorTabs() {
         setHost(severalFamilies)
 
-        composeTestRule.onNodeWithText("Gestionar").performClick()
+        composeTestRule.onNodeWithTag("home_manage_categories").performClick()
 
         composeTestRule.onNodeWithTag("categories_screen").assertIsDisplayed()
         composeTestRule.onNodeWithText("Categorías").assertIsDisplayed()
@@ -218,7 +221,7 @@ class MainScreenTest {
     @Test
     fun theArrowReturnsToHomeWithHeaderAndTabs() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithText("Gestionar").performClick()
+        composeTestRule.onNodeWithTag("home_manage_categories").performClick()
 
         composeTestRule.onNodeWithContentDescription("Volver").performClick()
 
@@ -231,7 +234,7 @@ class MainScreenTest {
     @Test
     fun theSystemBackGestureReturnsToHome() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithText("Gestionar").performClick()
+        composeTestRule.onNodeWithTag("home_manage_categories").performClick()
         composeTestRule.onNodeWithTag("categories_screen").assertIsDisplayed()
 
         pressBack()
@@ -244,11 +247,104 @@ class MainScreenTest {
     @Test
     fun categoriesBackArrowHasATouchTargetOfAtLeast48dp() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithText("Gestionar").performClick()
+        composeTestRule.onNodeWithTag("home_manage_categories").performClick()
 
         // El área táctil (no el tamaño visual de 40 dp) es la que debe llegar a 48 dp.
         composeTestRule.onNodeWithTag("categories_back")
             .assertTouchWidthIsEqualTo(48.dp)
             .assertTouchHeightIsEqualTo(48.dp)
+    }
+
+    // --- Gestión de medios de pago (006, T-09) ---
+
+    @Test
+    fun homeShowsPaymentMethodsSectionRightAboveCategories() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithText("Medios de pago").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").assertIsDisplayed()
+        val paymentTop = composeTestRule.onNodeWithText("Medios de pago").fetchSemanticsNode().positionInRoot.y
+        val categoriesTop = composeTestRule.onNodeWithText("Categorías").fetchSemanticsNode().positionInRoot.y
+        assertTrue("«Medios de pago» debe estar encima de «Categorías»", paymentTop < categoriesTop)
+        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+    }
+
+    @Test
+    fun theTwoManageLinksAreToldApartByTheScreenReader() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithContentDescription("Gestionar medios de pago").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Gestionar categorías").assertIsDisplayed()
+    }
+
+    @Test
+    fun paymentMethodsSectionIsHiddenWhenThereIsNoActiveFamily() {
+        setHost(MainUiState(families = FamiliesState.Loading))
+
+        composeTestRule.onAllNodesWithText("Medios de pago").assertCountEquals(0)
+        composeTestRule.onAllNodesWithTag("home_manage_payment_methods").assertCountEquals(0)
+    }
+
+    @Test
+    fun managePaymentMethodsOpensFullScreenWithoutHeaderNorTabs() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").performClick()
+
+        composeTestRule.onNodeWithTag("payment_methods_screen").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("categories_screen").assertCountEquals(0)
+        composeTestRule.onNodeWithText("Medios de pago").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Volver").assertIsDisplayed()
+        composeTestRule.onAllNodesWithContentDescription(OWNER_SELECTOR).assertCountEquals(0)
+        composeTestRule.onAllNodesWithContentDescription("Perfil de usuario, inicial R").assertCountEquals(0)
+        listOf("Inicio", "Movimientos", "Reportes", "Presupuestos", "Asistente").forEach {
+            composeTestRule.onAllNodesWithText(it).assertCountEquals(0)
+        }
+        composeTestRule.onAllNodesWithContentDescription("Agregar").assertCountEquals(0)
+    }
+
+    @Test
+    fun thePaymentMethodsArrowReturnsToHomeWithHeaderAndTabs() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").performClick()
+
+        composeTestRule.onNodeWithContentDescription("Volver").performClick()
+
+        composeTestRule.onAllNodesWithTag("payment_methods_screen").assertCountEquals(0)
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+    }
+
+    @Test
+    fun theSystemBackGestureReturnsFromPaymentMethodsToHome() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").performClick()
+        composeTestRule.onNodeWithTag("payment_methods_screen").assertIsDisplayed()
+
+        pressBack()
+
+        composeTestRule.onAllNodesWithTag("payment_methods_screen").assertCountEquals(0)
+        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
+    }
+
+    @Test
+    fun paymentMethodsBackArrowHasATouchTargetOfAtLeast48dp() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").performClick()
+
+        composeTestRule.onNodeWithTag("payment_methods_back")
+            .assertTouchWidthIsEqualTo(48.dp)
+            .assertTouchHeightIsEqualTo(48.dp)
+    }
+
+    @Test
+    fun manageLinksHaveATouchTargetOfAtLeast48dp() {
+        setHost(severalFamilies)
+
+        // El área táctil (no el tamaño visual de 40 dp del botón) es la que debe llegar a 48 dp.
+        listOf("home_manage_payment_methods", "home_manage_categories").forEach {
+            composeTestRule.onNodeWithTag(it).assertTouchHeightIsEqualTo(48.dp).assertWidthIsAtLeast(48.dp)
+        }
     }
 }

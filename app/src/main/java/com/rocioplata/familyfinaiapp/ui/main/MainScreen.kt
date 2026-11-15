@@ -50,18 +50,22 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onSelectFamily = viewModel::selectFamily,
         onDismissSelector = viewModel::dismissSelector,
         onManageCategories = viewModel::openCategories,
-        onCategoriesBack = viewModel::categoriesBack,
-        categoriesContent = { route ->
+        onManagePaymentMethods = viewModel::openPaymentMethods,
+        onManagementBack = viewModel::managementBack,
+        managementContent = { route ->
             val family = (uiState.families as? FamiliesState.Content)?.activeFamily
             val key = "${viewModelKey ?: "main"}-categories-${family?.id}"
             val canManage = family?.role == FamilyRole.OWNER
             when {
-                family == null -> CategoriesPlaceholder(onBack = viewModel::categoriesBack, modifier = modifier)
+                family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
+                // Pantalla provisional hasta T-11.
+                route == PaymentMethodsRoute ->
+                    PaymentMethodsPlaceholder(onBack = viewModel::managementBack, modifier = modifier)
                 route == CategoriesRoute.List -> CategoriesScreen(
                     familyId = family.id,
                     canManage = canManage,
                     viewModelKey = key,
-                    onBack = viewModel::categoriesBack,
+                    onBack = viewModel::managementBack,
                     onCategoryClick = viewModel::openCategoryEdit,
                     onCreateClick = viewModel::openCategoryCreate,
                     onInsufficientRole = viewModel::onInsufficientRole,
@@ -73,7 +77,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     initialType = (route as? CategoriesRoute.Create)?.type ?: CategoryType.EXPENSE,
                     canManage = canManage,
                     viewModelKey = key,
-                    onBack = viewModel::categoriesBack,
+                    onBack = viewModel::managementBack,
                     onCreated = viewModel::openCategoryEdit,
                     onInsufficientRole = viewModel::onInsufficientRole,
                     modifier = modifier,
@@ -95,21 +99,22 @@ fun MainScreen(
     onDismissSelector: () -> Unit,
     modifier: Modifier = Modifier,
     onManageCategories: () -> Unit = {},
-    onCategoriesBack: () -> Unit = {},
-    categoriesContent: (@Composable (CategoriesRoute) -> Unit)? = null,
+    onManagePaymentMethods: () -> Unit = {},
+    onManagementBack: () -> Unit = {},
+    managementContent: (@Composable (ManagementRoute) -> Unit)? = null,
 ) {
     var selected by remember { mutableStateOf(MainDestination.Home) }
-    BackHandler(enabled = selected != MainDestination.Home && uiState.categoriesRoute == null) {
+    BackHandler(enabled = selected != MainDestination.Home && uiState.managementRoute == null) {
         selected = MainDestination.Home
     }
-    // La gestión de categorías ocupa toda la pantalla: sin cabecera de familia ni barra de pestañas.
-    val route = uiState.categoriesRoute
+    // Una gestión ocupa toda la pantalla: sin cabecera de familia ni barra de pestañas.
+    val route = uiState.managementRoute
     if (route != null) {
-        BackHandler(onBack = onCategoriesBack)
-        if (categoriesContent != null) {
-            categoriesContent(route)
+        BackHandler(onBack = onManagementBack)
+        if (managementContent != null) {
+            managementContent(route)
         } else {
-            CategoriesPlaceholder(onBack = onCategoriesBack, modifier = modifier)
+            ManagementPlaceholder(route, onBack = onManagementBack, modifier = modifier)
         }
         return
     }
@@ -124,8 +129,18 @@ fun MainScreen(
         onSelectFamily = onSelectFamily,
         onDismissSelector = onDismissSelector,
         onManageCategories = onManageCategories,
+        onManagePaymentMethods = onManagePaymentMethods,
         modifier = modifier,
     )
+}
+
+/** Pantalla provisional de la gestión abierta cuando no hay contenido real (sin familia o en tests). */
+@Composable
+private fun ManagementPlaceholder(route: ManagementRoute, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    when (route) {
+        PaymentMethodsRoute -> PaymentMethodsPlaceholder(onBack = onBack, modifier = modifier)
+        is CategoriesRoute -> CategoriesPlaceholder(onBack = onBack, modifier = modifier)
+    }
 }
 
 @Composable
@@ -139,6 +154,7 @@ fun MainScreenContent(
     onSelectFamily: (String) -> Unit = {},
     onDismissSelector: () -> Unit = {},
     onManageCategories: () -> Unit = {},
+    onManagePaymentMethods: () -> Unit = {},
 ) {
     val content = uiState.families as? FamiliesState.Content
     Scaffold(
@@ -172,6 +188,7 @@ fun MainScreenContent(
                     modifier = contentModifier,
                     familyName = familyName,
                     onManageCategories = onManageCategories.takeIf { content != null },
+                    onManagePaymentMethods = onManagePaymentMethods.takeIf { content != null },
                 )
             } else {
                 TabPlaceholder(destination = selected, modifier = contentModifier, familyName = familyName)

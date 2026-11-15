@@ -27,7 +27,7 @@ class MainViewModel(
     private val refreshState = MutableStateFlow(RefreshState())
 
     // Ligada a la familia con la que se abrió: si esa familia deja de ser la activa, se descarta.
-    private val categoriesRoute = MutableStateFlow<OpenRoute?>(null)
+    private val managementRoute = MutableStateFlow<OpenRoute?>(null)
     private var refreshJob: Job? = null
 
     val uiState: StateFlow<MainUiState> = combine(
@@ -35,7 +35,7 @@ class MainViewModel(
         activeFamilyId,
         selectorOpen,
         refreshState,
-        categoriesRoute,
+        managementRoute,
     ) { data, activeId, selectorOpen, refresh, route -> buildState(data, activeId, selectorOpen, refresh, route) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), MainUiState())
 
@@ -45,8 +45,8 @@ class MainViewModel(
             // Si la familia con la que se abrió la gestión ya no existe (o se pierden los datos), se vuelve a las pestañas.
             repository.header.collect { data ->
                 val ids = data.families?.value?.map { it.id }
-                if (categoriesRoute.value?.let { ids == null || it.familyId !in ids } == true) {
-                    categoriesRoute.value = null
+                if (managementRoute.value?.let { ids == null || it.familyId !in ids } == true) {
+                    managementRoute.value = null
                 }
             }
         }
@@ -61,8 +61,8 @@ class MainViewModel(
     fun retry() = refresh()
 
     fun openSelector() {
-        // La familia no puede cambiarse dentro de la gestión de categorías (RF-01).
-        if (categoriesRoute.value != null) return
+        // La familia no puede cambiarse dentro de una gestión (RF-01).
+        if (managementRoute.value != null) return
         if (uiState.value.families.let { it is FamiliesState.Content && it.hasSelector }) selectorOpen.value = true
     }
 
@@ -71,7 +71,7 @@ class MainViewModel(
     }
 
     fun selectFamily(familyId: String) {
-        if (categoriesRoute.value != null) return
+        if (managementRoute.value != null) return
         val content = uiState.value.families as? FamiliesState.Content
         if (content != null && content.families.any { it.id == familyId }) activeFamilyId.value = familyId
         selectorOpen.value = false
@@ -80,28 +80,40 @@ class MainViewModel(
     /** "Gestionar" en Inicio (RF-01): abre el listado de la familia activa. Ignorado sin familia activa. */
     fun openCategories() = openRoute(CategoriesRoute.List)
 
+    /** "Gestionar" en la sección de medios de pago de Inicio (RF-01 de 006). Ignorado sin familia activa. */
+    fun openPaymentMethods() = openRoute(PaymentMethodsRoute)
+
     fun openCategoryCreate(type: CategoryType) = openRoute(CategoriesRoute.Create(type))
 
     /** Tocar una categoría (RF-06) o, tras crearla, pasar a editar la recién creada (RF-09). */
     fun openCategoryEdit(categoryId: String) = openRoute(CategoriesRoute.Edit(categoryId))
 
-    /** Un nivel atrás: edición o alta → listado → pestañas. Sin gestión abierta no hace nada. */
-    fun categoriesBack() {
-        val open = categoriesRoute.value ?: return
-        categoriesRoute.value = when (open.route) {
-            CategoriesRoute.List -> null
+    /**
+     * Un nivel atrás: en categorías, edición o alta → listado → pestañas; en medios de pago, directamente
+     * a las pestañas. Sin gestión abierta no hace nada.
+     */
+    fun managementBack() {
+        val open = managementRoute.value ?: return
+        managementRoute.value = when (open.route) {
+            CategoriesRoute.List, PaymentMethodsRoute -> null
             is CategoriesRoute.Create, is CategoriesRoute.Edit -> open.copy(route = CategoriesRoute.List)
         }
     }
 
-    private fun openRoute(route: CategoriesRoute) {
+    private fun openRoute(route: ManagementRoute) {
         val content = uiState.value.families as? FamiliesState.Content ?: return
-        // Desde el listado se puede abrir alta o edición; desde las pestañas solo el listado.
-        val current = categoriesRoute.value
-        if (route != CategoriesRoute.List && current == null) return
+        // Desde las pestañas solo se abre un listado; el alta y la edición de categorías solo desde su gestión,
+        // y una gestión nunca se abre sobre la otra.
+        val current = managementRoute.value?.route
+        val allowed = when (route) {
+            CategoriesRoute.List -> current == null || current is CategoriesRoute
+            is CategoriesRoute.Create, is CategoriesRoute.Edit -> current is CategoriesRoute
+            PaymentMethodsRoute -> current == null || current == PaymentMethodsRoute
+        }
+        if (!allowed) return
         // `uiState` se recalcula de forma asíncrona: la elección más reciente está en `activeFamilyId`.
         val active = content.families.firstOrNull { it.id == activeFamilyId.value } ?: content.activeFamily
-        categoriesRoute.value = OpenRoute(active.id, route)
+        managementRoute.value = OpenRoute(active.id, route)
     }
 
     /** El backend rechazó una acción por rol: se vuelve a consultar el cargo sin cambiar la familia activa. */
@@ -155,13 +167,13 @@ class MainViewModel(
             displayName = data.displayName?.value,
             selectorOpen = selectorOpen && familiesState is FamiliesState.Content && familiesState.hasSelector,
             isRefreshing = refresh.inFlight,
-            categoriesRoute = route?.route.takeIf {
+            managementRoute = route?.route.takeIf {
                 familiesState is FamiliesState.Content && familiesState.activeFamily.id == route?.familyId
             },
         )
     }
 
-    private data class OpenRoute(val familyId: String, val route: CategoriesRoute)
+    private data class OpenRoute(val familyId: String, val route: ManagementRoute)
 
     private data class RefreshState(
         val inFlight: Boolean = false,
