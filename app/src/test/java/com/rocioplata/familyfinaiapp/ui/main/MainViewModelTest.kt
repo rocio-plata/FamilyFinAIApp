@@ -273,7 +273,7 @@ class MainViewModelTest {
         return repo to create(repo)
     }
 
-    private fun MainViewModel.route() = uiState.value.categoriesRoute
+    private fun MainViewModel.route() = uiState.value.managementRoute
 
     @Test
     fun alIniciar_noHayGestionDeCategoriasAbierta() = runTest {
@@ -335,11 +335,11 @@ class MainViewModelTest {
         vm.openCategoryEdit("c-1")
         advanceUntilIdle()
 
-        vm.categoriesBack()
+        vm.managementBack()
         advanceUntilIdle()
         assertEquals(CategoriesRoute.List, vm.route())
 
-        vm.categoriesBack()
+        vm.managementBack()
         advanceUntilIdle()
         assertNull(vm.route())
     }
@@ -351,7 +351,7 @@ class MainViewModelTest {
         vm.openCategoryCreate(CategoryType.EXPENSE)
         advanceUntilIdle()
 
-        vm.categoriesBack()
+        vm.managementBack()
         advanceUntilIdle()
 
         assertEquals(CategoriesRoute.List, vm.route())
@@ -361,7 +361,7 @@ class MainViewModelTest {
     fun atrasSinGestionAbierta_noHaceNada() = runTest {
         val (_, vm) = createWithFamilies(plata)
 
-        vm.categoriesBack()
+        vm.managementBack()
         advanceUntilIdle()
 
         assertNull(vm.route())
@@ -377,7 +377,7 @@ class MainViewModelTest {
         advanceUntilIdle()
         assertEquals(CategoriesRoute.Edit("c-nueva"), vm.route())
 
-        vm.categoriesBack()
+        vm.managementBack()
         advanceUntilIdle()
         assertEquals(CategoriesRoute.List, vm.route())
     }
@@ -401,7 +401,7 @@ class MainViewModelTest {
     fun alVolverAInicio_sePuedeElegirOtraFamiliaYGestionarLaNueva() = runTest {
         val (_, vm) = createWithFamilies(plata, depto)
         vm.openCategories()
-        vm.categoriesBack()
+        vm.managementBack()
         advanceUntilIdle()
 
         vm.selectFamily("f-2")
@@ -466,5 +466,125 @@ class MainViewModelTest {
 
         assertEquals(2, repo.calls)
         assertEquals(CategoriesRoute.List, vm.route())
+    }
+
+    // --- Gestión de medios de pago (006, T-08) ---
+
+    @Test
+    fun medioDePago_gestionarAbreElListadoDeLaFamiliaActiva() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        vm.selectFamily("f-2")
+
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+
+        assertEquals(PaymentMethodsRoute, vm.route())
+    }
+
+    @Test
+    fun medioDePago_sinFamiliaActiva_seIgnora() = runTest {
+        val repo = FakeRepository().apply { onRefresh = { HeaderRefreshResult(families = HeaderFailure.Network) } }
+        val vm = create(repo)
+
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+    }
+
+    @Test
+    fun medioDePago_atrasVuelveDirectamenteALasPestanas() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+
+        vm.managementBack()
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        // Sin gestión abierta, atrás no hace nada.
+        vm.managementBack()
+        assertNull(vm.route())
+    }
+
+    @Test
+    fun medioDePago_noSePuedeCambiarDeFamiliaConLaGestionAbierta() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+
+        vm.openSelector()
+        vm.selectFamily("f-2")
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.selectorOpen)
+        assertEquals(plata, vm.content().activeFamily)
+        assertEquals(PaymentMethodsRoute, vm.route())
+    }
+
+    @Test
+    fun medioDePago_alVolverAInicioSePuedeElegirOtraFamiliaYGestionarLaNueva() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        vm.openPaymentMethods()
+        vm.managementBack()
+        advanceUntilIdle()
+
+        vm.selectFamily("f-2")
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+
+        assertEquals(depto, vm.content().activeFamily)
+        assertEquals(PaymentMethodsRoute, vm.route())
+    }
+
+    @Test
+    fun medioDePago_siLaFamiliaDeLaGestionDesaparece_vuelveALasPestanasYNoReaparece() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.selectFamily("f-2")
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+        assertEquals(PaymentMethodsRoute, vm.route())
+
+        repo.data.value = families(plata)
+        advanceUntilIdle()
+        assertNull(vm.route())
+
+        repo.data.value = families(plata, depto)
+        advanceUntilIdle()
+        assertNull(vm.route())
+    }
+
+    @Test
+    fun medioDePago_noSeAbreSobreLaGestionDeCategorias_niAlReves() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openCategories()
+        advanceUntilIdle()
+
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+        assertEquals(CategoriesRoute.List, vm.route())
+
+        vm.managementBack()
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+
+        vm.openCategories()
+        vm.openCategoryCreate(CategoryType.EXPENSE)
+        vm.openCategoryEdit("c-1")
+        advanceUntilIdle()
+        assertEquals(PaymentMethodsRoute, vm.route())
+    }
+
+    @Test
+    fun medioDePago_refrescarElCargoPorRolInsuficiente_noCierraLaGestion() = runTest {
+        val (repo, vm) = createWithFamilies(plata)
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+
+        vm.onInsufficientRole()
+        advanceUntilIdle()
+
+        assertEquals(2, repo.calls)
+        assertEquals(PaymentMethodsRoute, vm.route())
     }
 }

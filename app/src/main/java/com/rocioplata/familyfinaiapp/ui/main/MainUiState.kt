@@ -25,8 +25,8 @@ data class MainUiState(
     val displayName: String? = null,
     val selectorOpen: Boolean = false,
     val isRefreshing: Boolean = false,
-    /** Gestión de categorías de la familia activa a pantalla completa; `null` muestra las pestañas. */
-    val categoriesRoute: CategoriesRoute? = null,
+    /** Gestión de la familia activa (categorías o medios de pago) a pantalla completa; `null` muestra las pestañas. */
+    val managementRoute: ManagementRoute? = null,
     // Esta spec no genera cambios locales (RF-09); la sincronización posterior lo activará.
     val hasLocalChanges: Boolean = false,
 )

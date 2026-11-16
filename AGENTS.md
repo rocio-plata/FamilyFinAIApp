@@ -126,6 +126,25 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   como `FINANCIAL_TRACKING.*` aunque el contrato documente `FINANCIAL.*`: se aceptan ambos
   prefijos (`BACKEND_GAPS.md` de la 005, BG-06). Los cambios requieren conexión y no hay cola
   offline; lo escrito se conserva ante un fallo.
+- **Medios de pago** (`domain/paymentmethods`, `data/paymentmethods`, `ui/paymentmethods`): misma
+  separación por capas que categorías, sin código compartido con ella (los fallos son tipos
+  distintos por funcionalidad). `PaymentMethodsRepositoryImpl` expone un `Flow` por familia
+  (`paymentMethods`) y `refresh`, y las mutaciones (crear, renombrar, archivar y eliminar) devuelven
+  `PaymentMethodResult` con un `PaymentMethodFailure` tipado; sin conexión devuelven `Offline` sin
+  llamar al backend (los cambios no tienen cola offline). Un solo `GET …?includeDeprecated=true`
+  trae activos y archivados y el orden es el del backend. La caché es `payment_methods_cache`
+  (DataStore, una clave por familia, `schemaVersion = 1`, excluida de las copias de seguridad en
+  `backup_rules.xml` y `data_extraction_rules.xml`) y sigue `data/cache/CachePolicy`. Los errores
+  de dominio se aceptan con el prefijo `FINANCIAL_TRACKING.*` que emite el backend y con
+  `FINANCIAL.*` del contrato (BG-04 de la 006, confirmado en ejecución). `PaymentMethodsViewModel`
+  (clave `sesión-familia`) combina el repositorio con la sección de archivados, el refresco, el
+  formulario de alta y renombrado (`PaymentMethodFormState`; nombre recortado, tope de 40, descarte
+  con confirmación), la acción pendiente (`PaymentMethodPendingAction`: confirmar archivar o
+  eliminar, y la oferta de archivar si eliminar falla por movimientos asociados) y un evento de
+  aviso (`PaymentMethodsEvent`) en un `StateFlow<PaymentMethodsUiState>`. Una sola operación de
+  cambio a la vez (`isBusy`); recibe `onInsufficientRole`. `PaymentMethodsContent` es stateless
+  (`PaymentMethodFormDialog` y el menú ⋮ por fila); `PaymentMethodTexts` traduce los fallos y
+  distingue el aviso sin conexión de una acción del menú del del formulario.
 - **Presentación**: `MainViewModel` combina el flujo del repositorio con estado local
   (familia activa solo en memoria, selector abierto, refresco en curso) en un
   `StateFlow<MainUiState>`; `FamiliesState` es un sealed interface
@@ -136,10 +155,14 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
 - **Navegación**: aún no hay librería. `AppRoot`/`RootViewModel` eligen la pantalla según
   `SessionState`: nada en `Loading`, `AuthScreen` en `SignedOut` y `MainScreen` en `SignedIn`; la
   generación de la sesión reinicia el estado de los ViewModels al cambiar de usuario. Las pestañas
-  inferiores son el enum `MainDestination` (su orden es el de la barra). Categorías es una ruta
-  **en memoria** de `MainViewModel` (`CategoriesRoute`: listado, alta o edición de una categoría),
-  no una pestaña ni una librería de navegación: se abre desde «Gestionar» en Inicio, oculta la
-  cabecera y la barra inferior y se pierde si el proceso muere (se vuelve a Inicio).
+  inferiores son el enum `MainDestination` (su orden es el de la barra). La gestión de categorías
+  (`CategoriesRoute`: listado, alta o edición) y la de medios de pago (`PaymentMethodsRoute`) son
+  rutas **en memoria** de `MainViewModel` (`managementRoute`, ligada a la familia con la que se
+  abrió), no pestañas ni una librería de navegación: se abren desde «Gestionar» en Inicio, ocultan
+  la cabecera y la barra inferior, impiden cambiar de familia mientras están abiertas, se cierran
+  si esa familia desaparece de la cabecera y se pierden si el proceso muere (se vuelve a Inicio).
+  `MainViewModel.onInsufficientRole()` vuelve a consultar la cabecera cuando el backend rechaza una
+  acción por rol: si el usuario ya no es miembro, la familia desaparece y la ruta se cierra sola.
 - **Tests**: unitarios JVM con `kotlinx-coroutines-test` y `ktor-client-mock`; los de UI
   (`androidTest`) usan `TestMainHost`, que reproduce lo mínimo del ViewModel sobre la
   sobrecarga stateless de `MainScreen`, sin red ni caché; los de acceso (`AuthScreenTest`,
