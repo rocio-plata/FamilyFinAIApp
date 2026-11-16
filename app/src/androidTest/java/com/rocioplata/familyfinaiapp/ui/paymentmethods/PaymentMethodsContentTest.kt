@@ -654,6 +654,17 @@ class PaymentMethodsContentTest {
     }
 
     @Test
+    fun theOfflineNoticeOfAMenuActionDoesNotMentionWhatWasTyped() {
+        val holder = State(content(active = listOf(efectivo)))
+        showWithState(holder)
+        holder.ui = holder.content().copy(event = PaymentMethodsEvent.Failed(PaymentMethodFailure.Offline))
+        rule.waitForIdle()
+
+        rule.onNodeWithText("Necesitas conexión para hacer cambios. No se aplicó ningún cambio.").assertIsDisplayed()
+        rule.onAllNodesWithText("Lo que escribiste", substring = true).assertCountEquals(0)
+    }
+
+    @Test
     fun theNoticeForAnArchivedMethodWithItemsIsShown() {
         val holder = State(content(active = listOf(efectivo), archived = listOf(cheque), expanded = true))
         showWithState(holder)

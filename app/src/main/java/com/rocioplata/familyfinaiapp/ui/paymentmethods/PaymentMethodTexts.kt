@@ -33,3 +33,14 @@ fun PaymentMethodFormError.messageRes(): Int = when (this) {
     PaymentMethodFormError.Duplicate -> PaymentMethodFailure.DuplicateName.messageRes()
     is PaymentMethodFormError.Failure -> failure.messageRes()
 }
+
+/**
+ * Texto del aviso de una acción del menú (archivar o eliminar). Se distingue el de sin conexión porque
+ * no hay nada escrito que conservar: el del formulario ([messageRes]) sí lo menciona (RF-12).
+ */
+@StringRes
+fun PaymentMethodsEvent.messageRes(): Int = when (this) {
+    is PaymentMethodsEvent.Failed ->
+        if (failure == PaymentMethodFailure.Offline) R.string.payment_methods_error_offline_action
+        else failure.messageRes()
+}

@@ -117,6 +117,7 @@
     <string name="payment_methods_error_duplicate">Ya existe un medio de pago con ese nombre.</string>
     <string name="payment_methods_error_invalid_name">El nombre no es válido.</string>
     <string name="payment_methods_error_offline">Necesitas conexión para hacer cambios. Lo que escribiste se conserva.</string>
+    <string name="payment_methods_error_offline_action">Necesitas conexión para hacer cambios. No se aplicó ningún cambio.</string>
     <string name="payment_methods_error_network">No pudimos conectar con el servidor. Revisa tu red e inténtalo de nuevo.</string>
     <string name="payment_methods_error_insufficient_role">No tienes permisos para modificar los medios de pago de esta familia.</string>
     <string name="payment_methods_error_is_someones_default">Este medio de pago es el predeterminado de un miembro de la familia. Esa persona debe elegir antes otro.</string>

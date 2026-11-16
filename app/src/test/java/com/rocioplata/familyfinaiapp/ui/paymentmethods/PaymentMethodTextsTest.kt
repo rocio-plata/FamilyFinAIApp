@@ -36,4 +36,24 @@ class PaymentMethodTextsTest {
             PaymentMethodFormError.Failure(PaymentMethodFailure.Offline).messageRes(),
         )
     }
+
+    @Test
+    fun elAvisoDeUnaAccionSinConexionNoMencionaLoEscrito() {
+        assertEquals(
+            R.string.payment_methods_error_offline_action,
+            PaymentMethodsEvent.Failed(PaymentMethodFailure.Offline).messageRes(),
+        )
+        // El del formulario sí lo menciona y no cambia.
+        assertEquals(R.string.payment_methods_error_offline, PaymentMethodFailure.Offline.messageRes())
+    }
+
+    @Test
+    fun losDemasAvisosDeAccionUsanElTextoDelFallo() {
+        listOf(
+            PaymentMethodFailure.Network, PaymentMethodFailure.IsSomeonesDefault,
+            PaymentMethodFailure.HasAssociatedItems, PaymentMethodFailure.NotFound,
+        ).forEach {
+            assertEquals(it.toString(), it.messageRes(), PaymentMethodsEvent.Failed(it).messageRes())
+        }
+    }
 }

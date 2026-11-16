@@ -94,7 +94,7 @@ fun PaymentMethodsContent(
     val snackbar = remember { SnackbarHostState() }
     var message by remember { mutableStateOf<String?>(null) }
     val event = (state as? PaymentMethodsUiState.Content)?.event
-    val failedText = (event as? PaymentMethodsEvent.Failed)?.failure?.let { stringResource(it.messageRes()) }
+    val failedText = event?.let { stringResource(it.messageRes()) }
     LaunchedEffect(event) {
         if (event is PaymentMethodsEvent.Failed) {
             onEventConsumed()
