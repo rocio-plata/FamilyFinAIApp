@@ -27,6 +27,14 @@ data class Money(val amountMinor: Long, val currency: String) {
     companion object {
         fun zero(currency: String) = Money(0L, currency)
 
+        /** Si [currency] es un código de moneda ISO 4217 que la plataforma conoce. */
+        fun isKnown(currency: String): Boolean = try {
+            Currency.getInstance(currency)
+            true
+        } catch (_: IllegalArgumentException) {
+            false
+        }
+
         /** Decimales de una moneda; lanza `IllegalArgumentException` si el código no es una moneda ISO 4217. */
         fun fractionDigitsOf(currency: String): Int = Currency.getInstance(currency).defaultFractionDigits
     }

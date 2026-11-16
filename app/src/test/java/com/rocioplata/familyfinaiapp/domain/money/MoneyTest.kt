@@ -13,6 +13,16 @@ class MoneyTest {
     }
 
     @Test
+    fun monedasConocidas() {
+        assertEquals(true, Money.isKnown("CLP"))
+        assertEquals(true, Money.isKnown("USD"))
+        assertEquals(true, Money.isKnown("EUR"))
+        assertEquals(false, Money.isKnown("ZZZZ"))
+        assertEquals(false, Money.isKnown(""))
+        assertEquals(false, Money.isKnown("clp"))
+    }
+
+    @Test
     fun monedaInvalida_noTieneDecimales() {
         assertThrows(IllegalArgumentException::class.java) { Money.fractionDigitsOf("XXXX") }
     }

@@ -3,6 +3,7 @@ package com.rocioplata.familyfinaiapp.data.header
 import com.rocioplata.familyfinaiapp.domain.header.Family
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.header.HeaderFailure
+import com.rocioplata.familyfinaiapp.domain.money.Money
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.timeout
@@ -32,7 +33,9 @@ class HeaderRemoteDataSource(
             val families = dtos.map { dto ->
                 val role = FamilyRole.entries.firstOrNull { it.name == dto.role }
                     ?: return@get RemoteResult.Failure(HeaderFailure.InvalidData)
-                Family(dto.familyId, dto.name, role)
+                // Una moneda desconocida se trata como ausente: la app no puede registrar movimientos sin ella.
+                val currency = dto.defaultCurrency?.takeIf { Money.isKnown(it) }
+                Family(dto.familyId, dto.name, role, currency)
             }
             RemoteResult.Success(families)
         }
@@ -88,7 +91,12 @@ class HeaderRemoteDataSource(
     }
 
     @Serializable
-    private data class FamilyDto(val familyId: String, val name: String, val role: String)
+    private data class FamilyDto(
+        val familyId: String,
+        val name: String,
+        val role: String,
+        val defaultCurrency: String? = null,
+    )
 
     @Serializable
     private data class ProfileDto(val displayName: String)
