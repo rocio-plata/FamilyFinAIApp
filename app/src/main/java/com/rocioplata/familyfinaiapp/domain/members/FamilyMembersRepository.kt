@@ -3,7 +3,6 @@ package com.rocioplata.familyfinaiapp.domain.members
 import kotlinx.coroutines.flow.Flow
 
 sealed interface FamilyMembersFailure {
-    data object Offline : FamilyMembersFailure
     data object Network : FamilyMembersFailure
 
     /** El backend respondió `403`: el usuario ya no es miembro de la familia. */
