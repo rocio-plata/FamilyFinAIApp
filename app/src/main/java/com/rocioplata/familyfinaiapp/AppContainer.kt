@@ -12,6 +12,12 @@ import com.rocioplata.familyfinaiapp.data.categories.CategoriesRepositoryImpl
 import com.rocioplata.familyfinaiapp.data.header.HeaderLocalDataSource
 import com.rocioplata.familyfinaiapp.data.header.HeaderRemoteDataSource
 import com.rocioplata.familyfinaiapp.data.header.HeaderRepositoryImpl
+import com.rocioplata.familyfinaiapp.data.members.FamilyMembersLocalDataSource
+import com.rocioplata.familyfinaiapp.data.members.FamilyMembersRemoteDataSource
+import com.rocioplata.familyfinaiapp.data.members.FamilyMembersRepositoryImpl
+import com.rocioplata.familyfinaiapp.data.movements.MovementsLocalDataSource
+import com.rocioplata.familyfinaiapp.data.movements.MovementsRemoteDataSource
+import com.rocioplata.familyfinaiapp.data.movements.MovementsRepositoryImpl
 import com.rocioplata.familyfinaiapp.data.network.AndroidConnectivityObserver
 import com.rocioplata.familyfinaiapp.data.network.ConnectivityObserver
 import com.rocioplata.familyfinaiapp.data.network.SessionAuth
@@ -23,6 +29,9 @@ import com.rocioplata.familyfinaiapp.data.session.KeystoreSessionCipher
 import com.rocioplata.familyfinaiapp.domain.auth.AuthRepository
 import com.rocioplata.familyfinaiapp.domain.categories.CategoriesRepository
 import com.rocioplata.familyfinaiapp.domain.header.HeaderRepository
+import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersRepository
+import com.rocioplata.familyfinaiapp.domain.movements.MovementDates
+import com.rocioplata.familyfinaiapp.domain.movements.MovementsRepository
 import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodsRepository
 import com.rocioplata.familyfinaiapp.session.SessionManager
 import io.ktor.client.HttpClient
@@ -39,11 +48,17 @@ private val Context.categoriesCacheStore: DataStore<Preferences> by preferencesD
 
 private val Context.paymentMethodsCacheStore: DataStore<Preferences> by preferencesDataStore(name = PAYMENT_METHODS_CACHE_NAME)
 
+private val Context.movementsCacheStore: DataStore<Preferences> by preferencesDataStore(name = MOVEMENTS_CACHE_NAME)
+
+private val Context.membersCacheStore: DataStore<Preferences> by preferencesDataStore(name = MEMBERS_CACHE_NAME)
+
 private val Context.sessionStore: DataStore<Preferences> by preferencesDataStore(name = SESSION_STORE_NAME)
 
 const val HEADER_CACHE_NAME = "header_cache"
 const val CATEGORIES_CACHE_NAME = "categories_cache"
 const val PAYMENT_METHODS_CACHE_NAME = "payment_methods_cache"
+const val MOVEMENTS_CACHE_NAME = "movements_cache"
+const val MEMBERS_CACHE_NAME = "members_cache"
 const val SESSION_STORE_NAME = "session"
 private const val CONNECT_TIMEOUT_MS = 10_000L
 private const val REQUEST_TIMEOUT_MS = 15_000L
@@ -52,6 +67,8 @@ class AppContainer(context: Context) {
     val headerCacheStore: DataStore<Preferences> = context.applicationContext.headerCacheStore
     val categoriesCacheStore: DataStore<Preferences> = context.applicationContext.categoriesCacheStore
     val paymentMethodsCacheStore: DataStore<Preferences> = context.applicationContext.paymentMethodsCacheStore
+    val movementsCacheStore: DataStore<Preferences> = context.applicationContext.movementsCacheStore
+    val membersCacheStore: DataStore<Preferences> = context.applicationContext.membersCacheStore
 
     /** Cliente sin Bearer, para `/auth/login`, `/auth/register` y `/auth/refresh`. */
     val publicClient: HttpClient = HttpClient(OkHttp) {
@@ -88,6 +105,8 @@ class AppContainer(context: Context) {
                 headerRepository.clear()
                 categoriesRepository.clear()
                 paymentMethodsRepository.clear()
+                movementsRepository.clear()
+                membersRepository.clear()
             },
         )
     }
@@ -117,6 +136,27 @@ class AppContainer(context: Context) {
             local = PaymentMethodsLocalDataSource(paymentMethodsCacheStore),
             sessionProvider = sessionManager,
             connectivity = connectivityObserver,
+        )
+    }
+
+    /** Fechas de los movimientos en la zona del dispositivo (RF-16). */
+    val movementDates = MovementDates()
+
+    val movementsRepository: MovementsRepository by lazy {
+        MovementsRepositoryImpl(
+            remote = MovementsRemoteDataSource(apiClient, BuildConfig.BACKEND_BASE_URL, movementDates),
+            local = MovementsLocalDataSource(movementsCacheStore),
+            sessionProvider = sessionManager,
+            connectivity = connectivityObserver,
+            dates = movementDates,
+        )
+    }
+
+    val membersRepository: FamilyMembersRepository by lazy {
+        FamilyMembersRepositoryImpl(
+            remote = FamilyMembersRemoteDataSource(apiClient, BuildConfig.BACKEND_BASE_URL),
+            local = FamilyMembersLocalDataSource(membersCacheStore),
+            sessionProvider = sessionManager,
         )
     }
 }
