@@ -44,6 +44,12 @@ fun PaymentMethodsScreen(
         onBack = onBack,
         onRetry = viewModel::retry,
         onToggleArchived = viewModel::toggleArchived,
+        onCreate = viewModel::openCreate,
+        onNameChange = viewModel::onNameChange,
+        onSave = viewModel::save,
+        onCloseForm = viewModel::requestClose,
+        onConfirmDiscard = viewModel::confirmDiscard,
+        onDismissDiscard = viewModel::dismissDiscard,
         modifier = modifier,
     )
 }

@@ -81,7 +81,7 @@
     <string name="payment_methods_loading">Cargando medios de pago…</string>
     <string name="payment_methods_error_load">No se pudieron cargar los medios de pago.</string>
     <string name="payment_methods_retry">Reintentar</string>
-    <string name="payment_methods_empty">Aún no hay medios de pago.</string>
+    <string name="payment_methods_empty">Aún no hay medios de pago. Crea el primero.</string>
     <string name="payment_methods_status_archived">Archivado</string>
     <string name="payment_methods_archived_section_title">Medios de pago archivados</string>
     <plurals name="payment_methods_archived_section_description">
@@ -90,6 +90,30 @@
     </plurals>
     <string name="payment_methods_archived_expand_description">Mostrar medios de pago archivados</string>
     <string name="payment_methods_archived_collapse_description">Ocultar medios de pago archivados</string>
+    <string name="payment_methods_create_action">Crear medio de pago</string>
+    <string name="payment_methods_form_title_create">Nuevo medio de pago</string>
+    <string name="payment_methods_form_title_rename">Renombrar medio de pago</string>
+    <string name="payment_methods_form_name_label">Nombre</string>
+    <string name="payment_methods_form_counter">%1$d / %2$d</string>
+    <string name="payment_methods_form_save">Guardar</string>
+    <string name="payment_methods_form_cancel">Cancelar</string>
+    <string name="payment_methods_form_saving">Guardando…</string>
+    <string name="payment_methods_discard_title">¿Descartar los cambios?</string>
+    <string name="payment_methods_discard_message">Tienes cambios sin guardar.</string>
+    <string name="payment_methods_discard_confirm">Descartar</string>
+    <string name="payment_methods_discard_keep_editing">Seguir editando</string>
+    <string name="payment_methods_error_name_required">El nombre es obligatorio.</string>
+    <string name="payment_methods_error_name_too_long">El nombre es demasiado largo.</string>
+    <string name="payment_methods_error_duplicate">Ya existe un medio de pago con ese nombre.</string>
+    <string name="payment_methods_error_invalid_name">El nombre no es válido.</string>
+    <string name="payment_methods_error_offline">Necesitas conexión para hacer cambios. Lo que escribiste se conserva.</string>
+    <string name="payment_methods_error_network">No pudimos conectar con el servidor. Revisa tu red e inténtalo de nuevo.</string>
+    <string name="payment_methods_error_insufficient_role">No tienes permisos para modificar los medios de pago de esta familia.</string>
+    <string name="payment_methods_error_is_someones_default">Este medio de pago es el predeterminado de un miembro de la familia. Esa persona debe elegir antes otro.</string>
+    <string name="payment_methods_error_has_associated_items">Este medio de pago tiene movimientos asociados y no se puede eliminar.</string>
+    <string name="payment_methods_error_not_found">Este medio de pago ya no existe. Actualizamos la lista.</string>
+    <string name="payment_methods_error_invalid_data">Recibimos datos inesperados. Inténtalo de nuevo.</string>
+    <string name="payment_methods_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
 
     <!-- Categorías y tags (005-categories). En la interfaz los tags se llaman "etiquetas", como en el mockup 006.
          Los límites (50 y 30) y los 15 iconos los pasa la interfaz desde CategoryValidation y CategoryIcons. -->

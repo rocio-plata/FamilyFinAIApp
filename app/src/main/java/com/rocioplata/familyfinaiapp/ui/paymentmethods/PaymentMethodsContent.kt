@@ -16,9 +16,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -51,7 +53,7 @@ import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 /**
  * Listado de medios de pago de la familia activa (RF-01 a RF-03, RF-11): barra con flecha y título, filas
  * de los activos con su nombre, la sección plegable de archivados con su cantidad y los estados de carga,
- * error y vacío. Sin estado: recibe [state] y callbacks. No depende del rol: todos los miembros ven lo
+ * error y vacío, y el formulario de alta y renombrado (RF-06, RF-07). Sin estado: recibe [state] y callbacks. No depende del rol: todos los miembros ven lo
  * mismo (RF-05).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,6 +63,12 @@ fun PaymentMethodsContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onToggleArchived: () -> Unit,
+    onCreate: () -> Unit,
+    onNameChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onCloseForm: () -> Unit,
+    onConfirmDiscard: () -> Unit,
+    onDismissDiscard: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -86,9 +94,19 @@ fun PaymentMethodsContent(
             when (state) {
                 PaymentMethodsUiState.Loading -> LoadingState()
                 PaymentMethodsUiState.Error -> ErrorState(onRetry)
-                is PaymentMethodsUiState.Content -> ContentState(state, onToggleArchived)
+                is PaymentMethodsUiState.Content -> ContentState(state, onToggleArchived, onCreate)
             }
         }
+    }
+    (state as? PaymentMethodsUiState.Content)?.form?.let { form ->
+        PaymentMethodFormDialog(
+            form = form,
+            onNameChange = onNameChange,
+            onSave = onSave,
+            onCloseRequest = onCloseForm,
+            onConfirmDiscard = onConfirmDiscard,
+            onDismissDiscard = onDismissDiscard,
+        )
     }
 }
 
@@ -127,12 +145,25 @@ private fun ErrorState(onRetry: () -> Unit) {
 }
 
 @Composable
-private fun ContentState(state: PaymentMethodsUiState.Content, onToggleArchived: () -> Unit) {
+private fun ContentState(
+    state: PaymentMethodsUiState.Content,
+    onToggleArchived: () -> Unit,
+    onCreate: () -> Unit,
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("payment_methods_list"),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        item(key = "create") {
+            Button(
+                onClick = onCreate,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("payment_methods_create"),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Text(stringResource(R.string.payment_methods_create_action), modifier = Modifier.padding(start = 8.dp))
+            }
+        }
         if (state.isEmpty) item(key = "empty") { EmptyState() }
         items(state.active, key = { it.id }) { method -> PaymentMethodRow(method) }
         if (state.archived.isNotEmpty()) {
@@ -274,7 +305,10 @@ private fun previewContent(
 @Composable
 private fun PreviewHost(state: PaymentMethodsUiState) {
     FamilyFinAIAppTheme {
-        PaymentMethodsContent(state = state, onBack = {}, onRetry = {}, onToggleArchived = {})
+        PaymentMethodsContent(
+            state = state, onBack = {}, onRetry = {}, onToggleArchived = {}, onCreate = {}, onNameChange = {},
+            onSave = {}, onCloseForm = {}, onConfirmDiscard = {}, onDismissDiscard = {},
+        )
     }
 }
 
@@ -289,6 +323,17 @@ private val previewArchived = listOf(PaymentMethod("m4", "Cheque", PaymentMethod
 @Composable
 private fun PaymentMethodsContentPreview() =
     PreviewHost(previewContent(previewActive, previewArchived, expanded = true, isStale = true))
+
+@Preview(showBackground = true, name = "Formulario con error")
+@Composable
+private fun PaymentMethodFormPreview() = PreviewHost(
+    previewContent(previewActive).copy(
+        form = PaymentMethodFormState(
+            target = PaymentMethodFormTarget.Create, initialName = "", text = "Efectivo",
+            error = PaymentMethodFormError.Duplicate,
+        ),
+    ),
+)
 
 @Preview(showBackground = true, name = "Vacío")
 @Composable
