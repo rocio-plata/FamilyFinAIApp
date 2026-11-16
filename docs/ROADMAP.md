@@ -28,7 +28,7 @@ las TASKS de cada una.
 | 3 | Autenticación y sesión | `003-auth` | Hecha | BG-01: el registro del backend permite enumerar emails. Sin verificar: CA-03, CA-12 y CA-21 de extremo a extremo y TalkBack con voz |
 | 4 | Identidad visual de la app | `004-brand-identity` | Hecha | CA-06 sin verificar: no se logró ver la pantalla de arranque del sistema |
 | 5 | Categorías y tags | `005-categories` | Hecha | Listado, alta, edición, archivar, eliminar y tags (con reordenado). BG-01: el backend no permite reactivar lo archivado. BG-02 a BG-04: la categoría no tiene color, fecha de archivado ni orden modificable. BG-05: sin categorías de ingreso por defecto. BG-06: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*`. BG-07: el nombre duplicado se rechaza entre tipos. Sin verificar de extremo a extremo: CA-07, los casos «con movimientos» de CA-12 y CA-17, CA-19 con datos de más de 24 h o sin datos, rol Integrante y TalkBack |
-| 6 | Medios de pago | `006-payment-methods` | Tareas | SPEC y PLAN aprobados; TASKS derivadas, sin implementar. El medio predeterminado pasa a «Perfil y ajustes» (BG-01: el backend no permite leerlo) |
+| 6 | Medios de pago | `006-payment-methods` | Hecha | Listado, alta, renombrado, archivar y eliminar. BG-01: el backend no permite leer el medio predeterminado, que pasa a «Perfil y ajustes». BG-02: no se puede reactivar lo archivado. BG-04: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*` (confirmado en ejecución). BG-07: el backend permite renombrar un archivado, que la app no ofrece. Sin verificar de extremo a extremo: CA-14 («Efectivo» es predeterminado), CA-06 (Integrante), el caso «con movimientos» de CA-13 y CA-15 sin copia o con datos de más de 24 h. Sin verificar manualmente: TalkBack, fuente máxima con teclado, foco automático del campo y atrás o tocar fuera con el formulario abierto |
 | 7 | Movimientos | `financial-items` | Pendiente | |
 | 8 | Dashboard | `dashboard` | Pendiente | |
 | 9 | Gestión de familias | `family-management` | Pendiente | |
@@ -85,7 +85,7 @@ el sistema muestre el icono nuevo (CA-06).
 
 - **Alcance orientativo:** listado, alta, renombrado, archivado y eliminación.
   El medio predeterminado es una preferencia del usuario y pasa a «Perfil y
-  ajustes».
+  ajustes». Se abre desde «Gestionar» en Inicio, como categorías.
 - **Depende de:** auth. Puede hacerse en paralelo con categorías.
 - **Backend:** Financial Tracking.
 
