@@ -12,7 +12,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.hasAnyDescendant
@@ -28,6 +30,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethod
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodFailure
 import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodStatus
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 import org.junit.Assert.assertEquals
@@ -47,6 +50,9 @@ class PaymentMethodsContentTest {
         var retries = 0
         var toggles = 0
         var creates = 0
+        val archives = mutableListOf<String>()
+        val deletes = mutableListOf<String>()
+        var eventsConsumed = 0
         val saves = mutableListOf<String>()
     }
 
@@ -125,6 +131,26 @@ class PaymentMethodsContentTest {
             },
             onConfirmDiscard = { holder.ui = holder.content().copy(form = null) },
             onDismissDiscard = { holder.updateForm { it.copy(confirmingDiscard = false) } },
+            onRename = { method ->
+                holder.ui = holder.content().copy(
+                    form = PaymentMethodFormState(
+                        PaymentMethodFormTarget.Rename(method.id), initialName = method.name, text = method.name,
+                    ),
+                )
+            },
+            onArchive = { holder.ui = holder.content().copy(pendingAction = PaymentMethodPendingAction.ConfirmArchive(it)) },
+            onDelete = { holder.ui = holder.content().copy(pendingAction = PaymentMethodPendingAction.ConfirmDelete(it)) },
+            onConfirmAction = {
+                val action = holder.content().pendingAction!!
+                if (action is PaymentMethodPendingAction.ConfirmDelete) events.deletes += action.method.id
+                else events.archives += action.method.id
+                holder.ui = holder.content().copy(pendingAction = null)
+            },
+            onDismissAction = { holder.ui = holder.content().copy(pendingAction = null) },
+            onEventConsumed = {
+                events.eventsConsumed++
+                holder.ui = holder.content().copy(event = null)
+            },
         )
     }
 
@@ -496,5 +522,190 @@ class PaymentMethodsContentTest {
 
         rule.onNodeWithText("Nuevo medio de pago").assertIsDisplayed()
         rule.onNodeWithTag("payment_method_form_name").assertTextContains("Bizum")
+    }
+
+    // --- Menú ⋮ y diálogos (CA-05, CA-11, CA-13, CA-14, CA-17) ---
+
+    private fun menu(id: String) = rule.onNodeWithTag("payment_method_menu_$id")
+
+    private fun item(name: String) = rule.onNodeWithTag("payment_method_menu_item_$name")
+
+    private fun hasItem(name: String) =
+        rule.onAllNodesWithTag("payment_method_menu_item_$name").fetchSemanticsNodes().isNotEmpty()
+
+    @Test
+    fun anActiveRowMenuOffersRenameArchiveAndDelete() {
+        show(content(active = listOf(efectivo)))
+
+        menu("m1").performClick()
+
+        assertTrue(hasItem("rename") && hasItem("archive") && hasItem("delete"))
+        rule.onNodeWithText("Renombrar").assertIsDisplayed()
+        rule.onNodeWithText("Archivar").assertIsDisplayed()
+        rule.onNodeWithText("Eliminar").assertIsDisplayed()
+    }
+
+    @Test
+    fun anArchivedRowMenuOffersOnlyDelete() {
+        show(content(active = listOf(efectivo), archived = listOf(cheque), expanded = true))
+
+        menu("m4").performClick()
+
+        assertTrue(hasItem("delete"))
+        assertTrue(!hasItem("rename") && !hasItem("archive"))
+    }
+
+    @Test
+    fun theMenuButtonNamesTheMethod_andHasATouchTargetOf48dp() {
+        show(content(active = listOf(efectivo, transferencia), archived = listOf(cheque), expanded = true))
+
+        rule.onNodeWithContentDescription("Opciones de Efectivo").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Opciones de Transferencia").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Opciones de Cheque").assertIsDisplayed()
+        menu("m1").assertTouchHeightIsEqualTo(48.dp).assertWidthIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun renameFromTheMenuOpensTheFormWithTheCurrentName() {
+        show(content(active = listOf(efectivo)))
+
+        menu("m1").performClick()
+        item("rename").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithText("Renombrar medio de pago").assertIsDisplayed()
+        rule.onNodeWithTag("payment_method_form_name").assertTextContains("Efectivo")
+    }
+
+    @Test
+    fun archiveWarnsItIsIrreversible_confirmArchives_andCancelDoesNothing() {
+        val events = show(content(active = listOf(efectivo)))
+
+        menu("m1").performClick()
+        item("archive").performClick()
+        rule.onNodeWithText("¿Archivar el medio de pago?").assertIsDisplayed()
+        rule.onNodeWithText("Esta acción no se puede deshacer", substring = true).assertIsDisplayed()
+        rule.onNodeWithTag("payment_method_action_cancel").performClick()
+
+        assertTrue(events.archives.isEmpty())
+        rule.onAllNodesWithText("¿Archivar el medio de pago?").assertCountEquals(0)
+
+        menu("m1").performClick()
+        item("archive").performClick()
+        rule.onNodeWithTag("payment_method_action_confirm").performClick()
+
+        assertEquals(listOf("m1"), events.archives)
+        rule.onAllNodesWithText("¿Archivar el medio de pago?").assertCountEquals(0)
+    }
+
+    @Test
+    fun deleteAsksForConfirmation_confirmDeletes_andCancelDoesNothing() {
+        val events = show(content(active = listOf(efectivo)))
+
+        menu("m1").performClick()
+        item("delete").performClick()
+        rule.onNodeWithText("¿Eliminar el medio de pago?").assertIsDisplayed()
+        rule.onNodeWithTag("payment_method_action_cancel").performClick()
+        assertTrue(events.deletes.isEmpty())
+
+        menu("m1").performClick()
+        item("delete").performClick()
+        rule.onNodeWithTag("payment_method_action_confirm").performClick()
+
+        assertEquals(listOf("m1"), events.deletes)
+    }
+
+    @Test
+    fun anArchivedMethodCanBeDeletedFromItsMenu() {
+        val events = show(content(active = listOf(efectivo), archived = listOf(cheque), expanded = true))
+
+        menu("m4").performClick()
+        item("delete").performClick()
+        rule.onNodeWithTag("payment_method_action_confirm").performClick()
+
+        assertEquals(listOf("m4"), events.deletes)
+    }
+
+    @Test
+    fun theOfferToArchiveExplainsAndArchivesOnConfirm() {
+        val holder = State(content(active = listOf(efectivo)))
+        val events = Events()
+        showWithState(holder, events)
+        holder.ui = holder.content().copy(pendingAction = PaymentMethodPendingAction.OfferArchive(efectivo))
+        rule.waitForIdle()
+
+        rule.onNodeWithText("No se puede eliminar").assertIsDisplayed()
+        rule.onNodeWithText("Este medio de pago tiene movimientos asociados.", substring = true).assertIsDisplayed()
+        rule.onNodeWithTag("payment_method_action_confirm").performClick()
+
+        assertEquals(listOf("m1"), events.archives)
+    }
+
+    @Test
+    fun aFailureNoticeIsShownAndTheEventConsumed() {
+        val holder = State(content(active = listOf(efectivo)))
+        val events = Events()
+        showWithState(holder, events)
+        holder.ui = holder.content().copy(event = PaymentMethodsEvent.Failed(PaymentMethodFailure.IsSomeonesDefault))
+        rule.waitForIdle()
+
+        rule.onNodeWithText("Este medio de pago es el predeterminado de un miembro", substring = true).assertIsDisplayed()
+        assertEquals(1, events.eventsConsumed)
+    }
+
+    @Test
+    fun theNoticeForAnArchivedMethodWithItemsIsShown() {
+        val holder = State(content(active = listOf(efectivo), archived = listOf(cheque), expanded = true))
+        showWithState(holder)
+        holder.ui = holder.content().copy(event = PaymentMethodsEvent.Failed(PaymentMethodFailure.HasAssociatedItems))
+        rule.waitForIdle()
+
+        rule.onNodeWithText("Este medio de pago tiene movimientos asociados y no se puede eliminar.").assertIsDisplayed()
+    }
+
+    @Test
+    fun whileAnOperationRuns_progressShows_andTheMenusAndCreateAreDisabled() {
+        val holder = State(content(active = listOf(efectivo), archived = listOf(cheque), expanded = true))
+        showWithState(holder)
+        rule.onAllNodesWithTag("payment_methods_busy").assertCountEquals(0)
+
+        holder.ui = holder.content().copy(isBusy = true)
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("payment_methods_busy").assertIsDisplayed()
+        menu("m1").assertIsNotEnabled()
+        menu("m4").assertIsNotEnabled()
+    }
+
+    @Test
+    fun whenNotBusyTheMenusAreEnabled() {
+        show(content(active = listOf(efectivo)))
+
+        menu("m1").assertIsEnabled()
+    }
+
+    @Test
+    fun theConfirmationButtonIsDisabledWhileBusy() {
+        val holder = State(content(active = listOf(efectivo)))
+        showWithState(holder)
+        holder.ui = holder.content().copy(
+            pendingAction = PaymentMethodPendingAction.ConfirmDelete(efectivo), isBusy = true,
+        )
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("payment_method_action_confirm").assertIsNotEnabled()
+    }
+
+    @Test
+    fun aPendingConfirmationSurvivesRecreation() {
+        val holder = State(content(active = listOf(efectivo)))
+        val restoration = StateRestorationTester(rule)
+        restoration.setContent { FamilyFinAIAppTheme { Host(holder, Events()) } }
+        menu("m1").performClick()
+        item("archive").performClick()
+
+        restoration.emulateSavedInstanceStateRestore()
+
+        rule.onNodeWithText("¿Archivar el medio de pago?").assertIsDisplayed()
     }
 }

@@ -102,6 +102,16 @@
     <string name="payment_methods_discard_message">Tienes cambios sin guardar.</string>
     <string name="payment_methods_discard_confirm">Descartar</string>
     <string name="payment_methods_discard_keep_editing">Seguir editando</string>
+    <string name="payment_methods_menu_description">Opciones de %1$s</string>
+    <string name="payment_methods_action_rename">Renombrar</string>
+    <string name="payment_methods_action_archive">Archivar</string>
+    <string name="payment_methods_action_delete">Eliminar</string>
+    <string name="payment_methods_dialog_archive_title">¿Archivar el medio de pago?</string>
+    <string name="payment_methods_dialog_archive_message">Dejará de estar disponible para nuevos movimientos. Esta acción no se puede deshacer: no podrás reactivarlo.</string>
+    <string name="payment_methods_dialog_delete_title">¿Eliminar el medio de pago?</string>
+    <string name="payment_methods_dialog_delete_message">Se eliminará este medio de pago. Esta acción no se puede deshacer.</string>
+    <string name="payment_methods_dialog_offer_archive_title">No se puede eliminar</string>
+    <string name="payment_methods_dialog_offer_archive_message">Este medio de pago tiene movimientos asociados. Puedes archivarlo en su lugar; no podrás reactivarlo.</string>
     <string name="payment_methods_error_name_required">El nombre es obligatorio.</string>
     <string name="payment_methods_error_name_too_long">El nombre es demasiado largo.</string>
     <string name="payment_methods_error_duplicate">Ya existe un medio de pago con ese nombre.</string>

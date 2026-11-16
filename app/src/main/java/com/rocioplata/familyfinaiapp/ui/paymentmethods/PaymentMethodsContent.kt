@@ -1,5 +1,19 @@
 package com.rocioplata.familyfinaiapp.ui.paymentmethods
 
+import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,10 +83,35 @@ fun PaymentMethodsContent(
     onCloseForm: () -> Unit,
     onConfirmDiscard: () -> Unit,
     onDismissDiscard: () -> Unit,
+    onRename: (PaymentMethod) -> Unit,
+    onArchive: (PaymentMethod) -> Unit,
+    onDelete: (PaymentMethod) -> Unit,
+    onConfirmAction: () -> Unit,
+    onDismissAction: () -> Unit,
+    onEventConsumed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val snackbar = remember { SnackbarHostState() }
+    var message by remember { mutableStateOf<String?>(null) }
+    val event = (state as? PaymentMethodsUiState.Content)?.event
+    val failedText = (event as? PaymentMethodsEvent.Failed)?.failure?.let { stringResource(it.messageRes()) }
+    LaunchedEffect(event) {
+        if (event is PaymentMethodsEvent.Failed) {
+            onEventConsumed()
+            message = failedText
+        }
+    }
+    // El aviso se muestra aparte de la confirmación del evento: consumirlo no debe cancelarlo.
+    LaunchedEffect(message) {
+        message?.let {
+            snackbar.showSnackbar(it)
+            message = null
+        }
+    }
+
     Scaffold(
         modifier = modifier.testTag("payment_methods_screen"),
+        snackbarHost = { SnackbarHost(snackbar, modifier = Modifier.imePadding()) },
         topBar = {
             Column {
                 TopAppBar(
@@ -87,6 +126,9 @@ fun PaymentMethodsContent(
                     },
                 )
                 if ((state as? PaymentMethodsUiState.Content)?.isStale == true) StaleDataBanner()
+                if ((state as? PaymentMethodsUiState.Content)?.isBusy == true) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().testTag("payment_methods_busy"))
+                }
             }
         },
     ) { innerPadding ->
@@ -94,7 +136,8 @@ fun PaymentMethodsContent(
             when (state) {
                 PaymentMethodsUiState.Loading -> LoadingState()
                 PaymentMethodsUiState.Error -> ErrorState(onRetry)
-                is PaymentMethodsUiState.Content -> ContentState(state, onToggleArchived, onCreate)
+                is PaymentMethodsUiState.Content ->
+                    ContentState(state, onToggleArchived, onCreate, MethodActions(onRename, onArchive, onDelete))
             }
         }
     }
@@ -108,6 +151,109 @@ fun PaymentMethodsContent(
             onDismissDiscard = onDismissDiscard,
         )
     }
+    (state as? PaymentMethodsUiState.Content)?.let { content ->
+        content.pendingAction?.let { action ->
+            PendingActionDialog(action, enabled = !content.isBusy, onConfirm = onConfirmAction, onDismiss = onDismissAction)
+        }
+    }
+}
+
+/** Las acciones del menú ⋮ de una fila. */
+private class MethodActions(
+    val onRename: (PaymentMethod) -> Unit,
+    val onArchive: (PaymentMethod) -> Unit,
+    val onDelete: (PaymentMethod) -> Unit,
+)
+
+/**
+ * Confirmar archivar (advierte de que no se puede deshacer, RF-08), confirmar eliminar y la oferta de
+ * archivar cuando eliminar falla por movimientos asociados (RF-09).
+ */
+@Composable
+private fun PendingActionDialog(
+    action: PaymentMethodPendingAction,
+    enabled: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val (titleRes, messageRes, confirmRes) = when (action) {
+        is PaymentMethodPendingAction.ConfirmArchive -> Triple(
+            R.string.payment_methods_dialog_archive_title,
+            R.string.payment_methods_dialog_archive_message,
+            R.string.payment_methods_action_archive,
+        )
+        is PaymentMethodPendingAction.ConfirmDelete -> Triple(
+            R.string.payment_methods_dialog_delete_title,
+            R.string.payment_methods_dialog_delete_message,
+            R.string.payment_methods_action_delete,
+        )
+        is PaymentMethodPendingAction.OfferArchive -> Triple(
+            R.string.payment_methods_dialog_offer_archive_title,
+            R.string.payment_methods_dialog_offer_archive_message,
+            R.string.payment_methods_action_archive,
+        )
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(titleRes)) },
+        text = { Text(stringResource(messageRes)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = enabled, modifier = Modifier.testTag("payment_method_action_confirm")) {
+                Text(stringResource(confirmRes))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("payment_method_action_cancel")) {
+                Text(stringResource(R.string.payment_methods_form_cancel))
+            }
+        },
+    )
+}
+
+/**
+ * Menú ⋮ de una fila (RF-04): en un activo, Renombrar, Archivar y Eliminar; en un archivado, solo
+ * Eliminar. La descripción incluye el nombre para que el lector de pantalla distinga las filas.
+ */
+@Composable
+private fun MethodMenu(method: PaymentMethod, enabled: Boolean, actions: MethodActions) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { open = true },
+            enabled = enabled,
+            modifier = Modifier.size(48.dp).testTag("payment_method_menu_${method.id}"),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = stringResource(R.string.payment_methods_menu_description, method.name),
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (method.status == PaymentMethodStatus.ACTIVE) {
+                MethodMenuItem(R.string.payment_methods_action_rename, "rename") {
+                    open = false
+                    actions.onRename(method)
+                }
+                MethodMenuItem(R.string.payment_methods_action_archive, "archive") {
+                    open = false
+                    actions.onArchive(method)
+                }
+            }
+            MethodMenuItem(R.string.payment_methods_action_delete, "delete") {
+                open = false
+                actions.onDelete(method)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MethodMenuItem(@StringRes labelRes: Int, tag: String, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(stringResource(labelRes)) },
+        onClick = onClick,
+        modifier = Modifier.heightIn(min = 48.dp).testTag("payment_method_menu_item_$tag"),
+    )
 }
 
 @Composable
@@ -149,6 +295,7 @@ private fun ContentState(
     state: PaymentMethodsUiState.Content,
     onToggleArchived: () -> Unit,
     onCreate: () -> Unit,
+    actions: MethodActions,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("payment_methods_list"),
@@ -165,13 +312,13 @@ private fun ContentState(
             }
         }
         if (state.isEmpty) item(key = "empty") { EmptyState() }
-        items(state.active, key = { it.id }) { method -> PaymentMethodRow(method) }
+        items(state.active, key = { it.id }) { method -> PaymentMethodRow(method, !state.isBusy, actions) }
         if (state.archived.isNotEmpty()) {
             item(key = "archived_header") {
                 ArchivedHeader(count = state.archived.size, expanded = state.archivedExpanded, onClick = onToggleArchived)
             }
             if (state.archivedExpanded) {
-                items(state.archived, key = { "archived_${it.id}" }) { method -> ArchivedRow(method) }
+                items(state.archived, key = { "archived_${it.id}" }) { method -> ArchivedRow(method, !state.isBusy, actions) }
             }
         }
     }
@@ -188,14 +335,14 @@ private fun EmptyState() {
 }
 
 @Composable
-private fun PaymentMethodRow(method: PaymentMethod) {
+private fun PaymentMethodRow(method: PaymentMethod, menuEnabled: Boolean, actions: MethodActions) {
     Surface(
         modifier = Modifier.fillMaxWidth().testTag("payment_method_row_${method.id}"),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
     ) {
         Row(
-            modifier = Modifier.heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.heightIn(min = 72.dp).padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -207,6 +354,7 @@ private fun PaymentMethodRow(method: PaymentMethod) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            MethodMenu(method, menuEnabled, actions)
         }
     }
 }
@@ -245,14 +393,14 @@ private fun ArchivedHeader(count: Int, expanded: Boolean, onClick: () -> Unit) {
 
 /** Fila de un medio archivado: atenuada y con el texto «Archivado» (no solo el color). */
 @Composable
-private fun ArchivedRow(method: PaymentMethod) {
+private fun ArchivedRow(method: PaymentMethod, menuEnabled: Boolean, actions: MethodActions) {
     Surface(
         modifier = Modifier.fillMaxWidth().testTag("payment_method_row_${method.id}"),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Row(
-            modifier = Modifier.heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.heightIn(min = 72.dp).padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -272,6 +420,7 @@ private fun ArchivedRow(method: PaymentMethod) {
                     maxLines = 1,
                 )
             }
+            MethodMenu(method, menuEnabled, actions)
         }
     }
 }
@@ -307,7 +456,8 @@ private fun PreviewHost(state: PaymentMethodsUiState) {
     FamilyFinAIAppTheme {
         PaymentMethodsContent(
             state = state, onBack = {}, onRetry = {}, onToggleArchived = {}, onCreate = {}, onNameChange = {},
-            onSave = {}, onCloseForm = {}, onConfirmDiscard = {}, onDismissDiscard = {},
+            onSave = {}, onCloseForm = {}, onConfirmDiscard = {}, onDismissDiscard = {}, onRename = {},
+            onArchive = {}, onDelete = {}, onConfirmAction = {}, onDismissAction = {}, onEventConsumed = {},
         )
     }
 }

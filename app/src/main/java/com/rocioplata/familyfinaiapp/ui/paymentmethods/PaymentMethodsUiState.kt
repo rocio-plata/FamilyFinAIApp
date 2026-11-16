@@ -32,6 +32,19 @@ data class PaymentMethodFormState(
     val confirmingDiscard: Boolean = false,
 )
 
+/** Confirmación o diálogo pendiente sobre un medio concreto (RF-08, RF-09). */
+sealed interface PaymentMethodPendingAction {
+    val method: PaymentMethod
+
+    /** Archivar un activo: advierte de que no se puede deshacer (RF-08). */
+    data class ConfirmArchive(override val method: PaymentMethod) : PaymentMethodPendingAction
+
+    data class ConfirmDelete(override val method: PaymentMethod) : PaymentMethodPendingAction
+
+    /** Eliminar un activo con movimientos falló: se ofrece archivarlo en su lugar (RF-09). */
+    data class OfferArchive(override val method: PaymentMethod) : PaymentMethodPendingAction
+}
+
 /** Algo que el listado debe mostrar una sola vez y luego confirmar con `consumeEvent()`. */
 sealed interface PaymentMethodsEvent {
     /** Una operación falló sin poder mostrarse junto al campo: aviso (RF-12). */
@@ -55,6 +68,9 @@ sealed interface PaymentMethodsUiState {
         val isStale: Boolean,
         val isRefreshing: Boolean,
         val form: PaymentMethodFormState? = null,
+        val pendingAction: PaymentMethodPendingAction? = null,
+        /** Hay un cambio en curso (guardar, archivar o eliminar): las acciones quedan deshabilitadas (CA-17). */
+        val isBusy: Boolean = false,
         val event: PaymentMethodsEvent? = null,
     ) : PaymentMethodsUiState {
         /** No hay ningún medio activo (excepcional: el backend crea algunos al crear la familia). */

@@ -23,6 +23,7 @@ fun PaymentMethodsScreen(
     familyId: String,
     viewModelKey: String,
     onBack: () -> Unit,
+    onInsufficientRole: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val container = (LocalContext.current.applicationContext as FamilyFinApp).container
@@ -30,7 +31,9 @@ fun PaymentMethodsScreen(
         key = viewModelKey,
         factory = viewModelFactory {
             initializer {
-                PaymentMethodsViewModel(container.paymentMethodsRepository, familyId, container.connectivityObserver)
+                PaymentMethodsViewModel(
+                    container.paymentMethodsRepository, familyId, container.connectivityObserver, onInsufficientRole,
+                )
             }
         },
     )
@@ -50,6 +53,12 @@ fun PaymentMethodsScreen(
         onCloseForm = viewModel::requestClose,
         onConfirmDiscard = viewModel::confirmDiscard,
         onDismissDiscard = viewModel::dismissDiscard,
+        onRename = viewModel::openRename,
+        onArchive = viewModel::requestArchive,
+        onDelete = viewModel::requestDelete,
+        onConfirmAction = viewModel::confirmPendingAction,
+        onDismissAction = viewModel::dismissPendingAction,
+        onEventConsumed = viewModel::consumeEvent,
         modifier = modifier,
     )
 }

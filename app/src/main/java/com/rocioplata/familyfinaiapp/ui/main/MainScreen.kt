@@ -63,6 +63,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     familyId = family.id,
                     viewModelKey = "${viewModelKey ?: "main"}-payment-methods-${family.id}",
                     onBack = viewModel::managementBack,
+                    onInsufficientRole = viewModel::onInsufficientRole,
                     modifier = modifier,
                 )
                 route == CategoriesRoute.List -> CategoriesScreen(

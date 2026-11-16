@@ -72,10 +72,28 @@ class PaymentMethodsViewModelTest {
             return saveFailure?.let { PaymentMethodResult.Failure(it) } ?: PaymentMethodResult.Success(Unit)
         }
 
-        override suspend fun deprecatePaymentMethod(familyId: String, paymentMethodId: String) = unused()
-        override suspend fun deletePaymentMethod(familyId: String, paymentMethodId: String) = unused()
 
-        private fun unused(): Nothing = error("No lo usa el listado")
+        val deprecated = mutableListOf<String>()
+        val deleted = mutableListOf<String>()
+        var actionGate: CompletableDeferred<Unit>? = null
+
+        /** Fallo por id de medio; sin entrada, la operación tiene éxito. */
+        val actionFailures = mutableMapOf<String, PaymentMethodFailure>()
+
+        override suspend fun deprecatePaymentMethod(familyId: String, paymentMethodId: String): PaymentMethodResult<Unit> {
+            deprecated += paymentMethodId
+            return action(paymentMethodId)
+        }
+
+        override suspend fun deletePaymentMethod(familyId: String, paymentMethodId: String): PaymentMethodResult<Unit> {
+            deleted += paymentMethodId
+            return action(paymentMethodId)
+        }
+
+        private suspend fun action(id: String): PaymentMethodResult<Unit> {
+            actionGate?.await()
+            return actionFailures[id]?.let { PaymentMethodResult.Failure(it) } ?: PaymentMethodResult.Success(Unit)
+        }
     }
 
     private class FakeConnectivity : ConnectivityObserver {
@@ -103,8 +121,9 @@ class PaymentMethodsViewModelTest {
         repo: FakeRepository,
         connectivity: FakeConnectivity = FakeConnectivity(),
         familyId: String = "f-1",
+        onInsufficientRole: () -> Unit = {},
     ): PaymentMethodsViewModel {
-        val vm = PaymentMethodsViewModel(repo, familyId, connectivity)
+        val vm = PaymentMethodsViewModel(repo, familyId, connectivity, onInsufficientRole)
         backgroundScope.launch { vm.uiState.collect {} }
         advanceUntilIdle()
         return vm
@@ -600,5 +619,274 @@ class PaymentMethodsViewModelTest {
         advanceUntilIdle()
 
         assertNull(vm.content().event)
+    }
+
+    // --- Archivar y eliminar (RF-08, RF-09, RF-10, RF-12) ---
+
+    private fun PaymentMethodsViewModel.pending() = content().pendingAction
+
+    @Test
+    fun pedirArchivar_abreLaConfirmacion_sinLlamarAlBackend() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+
+        vm.requestArchive(efectivo)
+        advanceUntilIdle()
+
+        assertEquals(PaymentMethodPendingAction.ConfirmArchive(efectivo), vm.pending())
+        assertTrue(repo.deprecated.isEmpty())
+    }
+
+    @Test
+    fun unArchivadoNoSePuedeArchivar() = runTest {
+        val vm = create(repoWith())
+
+        vm.requestArchive(vieja)
+        advanceUntilIdle()
+
+        assertNull(vm.pending())
+    }
+
+    @Test
+    fun confirmarArchivar_llamaUnaVez_ySeCierraElDialogo() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+        vm.requestArchive(efectivo)
+
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        assertEquals(listOf("m-1"), repo.deprecated)
+        assertNull(vm.pending())
+        assertNull(vm.content().event)
+        assertFalse(vm.content().isBusy)
+    }
+
+    @Test
+    fun cancelarArchivar_noLlamaAlBackend() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+        vm.requestArchive(efectivo)
+
+        vm.dismissPendingAction()
+        advanceUntilIdle()
+
+        assertNull(vm.pending())
+        assertTrue(repo.deprecated.isEmpty())
+    }
+
+    @Test
+    fun confirmarEliminar_llamaUnaVez() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+        vm.requestDelete(vieja)
+        advanceUntilIdle()
+        assertEquals(PaymentMethodPendingAction.ConfirmDelete(vieja), vm.pending())
+
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        assertEquals(listOf("m-3"), repo.deleted)
+        assertNull(vm.pending())
+        assertNull(vm.content().event)
+    }
+
+    @Test
+    fun cancelarEliminar_noLlamaAlBackend() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+        vm.requestDelete(efectivo)
+
+        vm.dismissPendingAction()
+        advanceUntilIdle()
+
+        assertTrue(repo.deleted.isEmpty())
+        assertNull(vm.pending())
+    }
+
+    @Test
+    fun eliminarUnActivoConMovimientos_ofreceArchivarlo_yAceptarArchiva() = runTest {
+        val repo = repoWith().apply { actionFailures["m-1"] = PaymentMethodFailure.HasAssociatedItems }
+        val vm = create(repo)
+        vm.requestDelete(efectivo)
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        assertEquals(PaymentMethodPendingAction.OfferArchive(efectivo), vm.pending())
+        assertNull(vm.content().event)
+
+        repo.actionFailures.clear()
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        assertEquals(listOf("m-1"), repo.deprecated)
+        assertNull(vm.pending())
+    }
+
+    @Test
+    fun rechazarLaOfertaDeArchivar_noArchiva() = runTest {
+        val repo = repoWith().apply { actionFailures["m-1"] = PaymentMethodFailure.HasAssociatedItems }
+        val vm = create(repo)
+        vm.requestDelete(efectivo)
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        vm.dismissPendingAction()
+        advanceUntilIdle()
+
+        assertNull(vm.pending())
+        assertTrue(repo.deprecated.isEmpty())
+    }
+
+    @Test
+    fun eliminarUnArchivadoConMovimientos_soloInforma() = runTest {
+        val repo = repoWith().apply { actionFailures["m-3"] = PaymentMethodFailure.HasAssociatedItems }
+        val vm = create(repo)
+        vm.requestDelete(vieja)
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        assertNull(vm.pending())
+        assertEquals(PaymentMethodsEvent.Failed(PaymentMethodFailure.HasAssociatedItems), vm.content().event)
+    }
+
+    @Test
+    fun medioPredeterminadoDeAlguien_avisaSinCambios_alArchivarYAlEliminar() = runTest {
+        val repo = repoWith().apply { actionFailures["m-1"] = PaymentMethodFailure.IsSomeonesDefault }
+        val vm = create(repo)
+
+        vm.requestArchive(efectivo)
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+        assertEquals(PaymentMethodsEvent.Failed(PaymentMethodFailure.IsSomeonesDefault), vm.content().event)
+        vm.consumeEvent()
+        advanceUntilIdle()
+
+        vm.requestDelete(efectivo)
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+        assertEquals(PaymentMethodsEvent.Failed(PaymentMethodFailure.IsSomeonesDefault), vm.content().event)
+        assertNull(vm.pending())
+        assertTrue(vm.content().active.contains(efectivo))
+    }
+
+    @Test
+    fun medioInexistente_avisaYRefresca() = runTest {
+        val repo = repoWith().apply { actionFailures["m-1"] = PaymentMethodFailure.NotFound }
+        val vm = create(repo)
+        val before = repo.refreshed.size
+        vm.requestArchive(efectivo)
+
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        assertEquals(PaymentMethodsEvent.Failed(PaymentMethodFailure.NotFound), vm.content().event)
+        assertEquals(before + 1, repo.refreshed.size)
+    }
+
+    @Test
+    fun rolInsuficiente_avisaYNotificaAlContenedor() = runTest {
+        val repo = repoWith().apply { actionFailures["m-1"] = PaymentMethodFailure.InsufficientRole }
+        var notified = 0
+        val vm = create(repo, onInsufficientRole = { notified++ })
+        vm.requestDelete(efectivo)
+
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        assertEquals(PaymentMethodsEvent.Failed(PaymentMethodFailure.InsufficientRole), vm.content().event)
+        assertEquals(1, notified)
+    }
+
+    @Test
+    fun rolInsuficienteAlGuardarElFormulario_tambienNotifica() = runTest {
+        val repo = repoWith().apply { saveFailure = PaymentMethodFailure.InsufficientRole }
+        var notified = 0
+        val vm = create(repo, onInsufficientRole = { notified++ })
+        vm.openCreate()
+        typed(vm, "Bizum")
+
+        vm.save()
+        advanceUntilIdle()
+
+        assertEquals(1, notified)
+        assertEquals("Bizum", vm.form()!!.text)
+    }
+
+    @Test
+    fun sinConexionOConFalloDeRed_avisaYElMedioNoCambia() = runTest {
+        listOf(PaymentMethodFailure.Offline, PaymentMethodFailure.Network, PaymentMethodFailure.Unknown).forEach { f ->
+            val repo = repoWith().apply { actionFailures["m-1"] = f }
+            val vm = create(repo)
+            vm.requestArchive(efectivo)
+
+            vm.confirmPendingAction()
+            advanceUntilIdle()
+
+            assertEquals(f.toString(), PaymentMethodsEvent.Failed(f), vm.content().event)
+            assertNull(vm.pending())
+            assertFalse(vm.content().isBusy)
+        }
+    }
+
+    @Test
+    fun dosConfirmaciones_haceUnaSolaLlamada_yDuranteLaOperacionHayProgreso() = runTest {
+        val repo = repoWith().apply { actionGate = CompletableDeferred() }
+        val vm = create(repo)
+        vm.requestDelete(efectivo)
+
+        vm.confirmPendingAction()
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+        assertTrue(vm.content().isBusy)
+
+        repo.actionGate!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf("m-1"), repo.deleted)
+        assertFalse(vm.content().isBusy)
+    }
+
+    @Test
+    fun conUnaOperacionEnCurso_noSePidenOtrasAcciones() = runTest {
+        val repo = repoWith().apply { actionGate = CompletableDeferred() }
+        val vm = create(repo)
+        vm.requestDelete(efectivo)
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+
+        vm.requestArchive(transferencia)
+        vm.requestDelete(transferencia)
+        advanceUntilIdle()
+
+        assertNull(vm.pending())
+    }
+
+    @Test
+    fun conElFormularioAbierto_noSePidenAcciones() = runTest {
+        val vm = create(repoWith())
+        vm.openCreate()
+
+        vm.requestDelete(efectivo)
+        vm.requestArchive(efectivo)
+        advanceUntilIdle()
+
+        assertNull(vm.pending())
+    }
+
+    @Test
+    fun guardarElFormularioMientrasHayUnaOperacion_noLlamaAlBackend() = runTest {
+        val repo = repoWith().apply { actionGate = CompletableDeferred() }
+        val vm = create(repo)
+        vm.requestDelete(efectivo)
+        vm.confirmPendingAction()
+        advanceUntilIdle()
+        vm.openCreate()
+        typed(vm, "Bizum")
+
+        vm.save()
+        advanceUntilIdle()
+
+        assertTrue(repo.created.isEmpty())
+        assertFalse(vm.form()!!.isSaving)
     }
 }

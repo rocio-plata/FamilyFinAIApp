@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -34,11 +35,13 @@ class PaymentMethodsViewModel(
     private val repository: PaymentMethodsRepository,
     private val familyId: String,
     connectivity: ConnectivityObserver,
+    /** El backend dijo que el usuario ya no puede gestionar esta familia: que la pantalla la reevalúe. */
+    private val onInsufficientRole: () -> Unit = {},
 ) : ViewModel() {
     private val archivedExpanded = MutableStateFlow(false)
     private val refreshState = MutableStateFlow(RefreshState())
     private val formState = MutableStateFlow<PaymentMethodFormState?>(null)
-    private val eventState = MutableStateFlow<PaymentMethodsEvent?>(null)
+    private val opState = MutableStateFlow(OpState())
     private var refreshJob: Job? = null
 
     val uiState: StateFlow<PaymentMethodsUiState> = combine(
@@ -46,8 +49,8 @@ class PaymentMethodsViewModel(
         archivedExpanded,
         refreshState,
         formState,
-        eventState,
-    ) { data, expanded, refresh, form, event -> buildState(data, expanded, refresh, form, event) }
+        opState,
+    ) { data, expanded, refresh, form, op -> buildState(data, expanded, refresh, form, op) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PaymentMethodsUiState.Loading)
 
     init {
@@ -100,6 +103,7 @@ class PaymentMethodsViewModel(
             formState.value = null
             return
         }
+        if (!startOperation()) return
         formState.value = form.copy(isSaving = true, error = null)
         viewModelScope.launch {
             val result = try {
@@ -107,6 +111,8 @@ class PaymentMethodsViewModel(
             } catch (e: CancellationException) {
                 formState.update { it?.copy(isSaving = false) }
                 throw e
+            } finally {
+                finishOperation()
             }
             onSaveResult(result)
         }
@@ -128,8 +134,70 @@ class PaymentMethodsViewModel(
         formState.update { it?.copy(confirmingDiscard = false) }
     }
 
+    /** Pide confirmación para archivar un activo (RF-08). */
+    fun requestArchive(method: PaymentMethod) {
+        if (method.status == PaymentMethodStatus.ACTIVE) requestAction(PaymentMethodPendingAction.ConfirmArchive(method))
+    }
+
+    /** Pide confirmación para eliminar un medio, activo o archivado (RF-09). */
+    fun requestDelete(method: PaymentMethod) = requestAction(PaymentMethodPendingAction.ConfirmDelete(method))
+
+    /** Acepta el diálogo pendiente (confirmar archivar, confirmar eliminar u ofrecer archivar). */
+    fun confirmPendingAction() {
+        val action = opState.value.pending ?: return
+        if (!startOperation()) return
+        opState.update { it.copy(pending = null) }
+        viewModelScope.launch {
+            val result = try {
+                when (action) {
+                    is PaymentMethodPendingAction.ConfirmDelete ->
+                        repository.deletePaymentMethod(familyId, action.method.id)
+                    is PaymentMethodPendingAction.ConfirmArchive,
+                    is PaymentMethodPendingAction.OfferArchive,
+                    -> repository.deprecatePaymentMethod(familyId, action.method.id)
+                }
+            } finally {
+                finishOperation()
+            }
+            if (result is PaymentMethodResult.Failure) onActionFailed(action, result.failure)
+        }
+    }
+
+    fun dismissPendingAction() {
+        opState.update { if (it.busy) it else it.copy(pending = null) }
+    }
+
     fun consumeEvent() {
-        eventState.value = null
+        opState.update { it.copy(event = null) }
+    }
+
+    private fun requestAction(action: PaymentMethodPendingAction) {
+        opState.update { if (it.busy || it.pending != null || formState.value != null) it else it.copy(pending = action) }
+    }
+
+    /** Una sola operación a la vez: devuelve false si ya hay una en curso (CA-17). */
+    private fun startOperation(): Boolean = !opState.getAndUpdate { it.copy(busy = true) }.busy
+
+    private fun finishOperation() = opState.update { it.copy(busy = false) }
+
+    private fun onActionFailed(action: PaymentMethodPendingAction, failure: PaymentMethodFailure) {
+        when {
+            // Eliminar un activo con movimientos: se ofrece archivarlo; en un archivado solo se informa (RF-09).
+            failure == PaymentMethodFailure.HasAssociatedItems &&
+                action is PaymentMethodPendingAction.ConfirmDelete &&
+                action.method.status == PaymentMethodStatus.ACTIVE ->
+                opState.update { it.copy(pending = PaymentMethodPendingAction.OfferArchive(action.method)) }
+            else -> notifyFailure(failure)
+        }
+    }
+
+    private fun notifyFailure(failure: PaymentMethodFailure) {
+        opState.update { it.copy(event = PaymentMethodsEvent.Failed(failure)) }
+        when (failure) {
+            PaymentMethodFailure.NotFound -> refresh()
+            PaymentMethodFailure.InsufficientRole -> onInsufficientRole()
+            else -> Unit
+        }
     }
 
     private fun openForm(target: PaymentMethodFormTarget, initialName: String) {
@@ -153,11 +221,13 @@ class PaymentMethodsViewModel(
             is PaymentMethodResult.Failure -> when (result.failure) {
                 PaymentMethodFailure.NotFound -> {
                     formState.value = null
-                    eventState.value = PaymentMethodsEvent.Failed(PaymentMethodFailure.NotFound)
-                    refresh()
+                    notifyFailure(PaymentMethodFailure.NotFound)
                 }
                 PaymentMethodFailure.DuplicateName -> showFormError(PaymentMethodFormError.Duplicate)
-                else -> showFormError(PaymentMethodFormError.Failure(result.failure))
+                else -> {
+                    showFormError(PaymentMethodFormError.Failure(result.failure))
+                    if (result.failure == PaymentMethodFailure.InsufficientRole) onInsufficientRole()
+                }
             }
         }
     }
@@ -189,7 +259,7 @@ class PaymentMethodsViewModel(
         archivedExpanded: Boolean,
         refresh: RefreshState,
         form: PaymentMethodFormState?,
-        event: PaymentMethodsEvent?,
+        op: OpState,
     ): PaymentMethodsUiState {
         val methods = data.paymentMethods ?: return when {
             refresh.inFlight || refresh.lastResult == null -> PaymentMethodsUiState.Loading
@@ -203,9 +273,17 @@ class PaymentMethodsViewModel(
             isStale = data.isStale,
             isRefreshing = refresh.inFlight,
             form = form,
-            event = event,
+            pendingAction = op.pending,
+            isBusy = op.busy,
+            event = op.event,
         )
     }
+
+    private data class OpState(
+        val busy: Boolean = false,
+        val pending: PaymentMethodPendingAction? = null,
+        val event: PaymentMethodsEvent? = null,
+    )
 
     private data class RefreshState(
         val inFlight: Boolean = false,
