@@ -41,7 +41,7 @@ criterios, decisiones del plan y tareas. -->
   nombre de la sección.
 - **RF-07:** Atrás desde otra pestaña vuelve a Inicio; Atrás desde Inicio sale
   de la app.
-- **RF-08:** Al recrear la pantalla o reabrir tras terminarse el proceso, la app inicia en Inicio. Al volver desde segundo plano o desde otra app se mantiene la pestaña en que estaba.
+- **RF-08:** Al reabrir tras terminarse el proceso, la app inicia en Inicio. Al recrear la pantalla, o al volver desde segundo plano o desde otra app, se mantiene la pestaña en que estaba. (Modificado por la 007: antes, recrear la pantalla volvía a Inicio.)
 - **RF-09:** La app solo admite orientación vertical.
 - **RF-11:** En teléfonos, con navegación por gestos y por 3 botones, la
   cabecera queda bajo la barra de estado y los recortes de pantalla, y la barra
@@ -100,7 +100,7 @@ ni conservación de todo el estado. Expresa resultados, no mecanismos técnicos.
 | Sin conexión o conexión interrumpida | No aplica: no hay entradas, operaciones ni red. |
 | Cancelar o volver atrás | Ver RF-07. |
 | Pasar a segundo plano y regresar (incluye volver desde otra app) | Se mantiene la pestaña en que estaba. |
-| Recrear la pantalla | Inicia en Inicio (RF-08). |
+| Recrear la pantalla | Se mantiene la pestaña en que estaba (RF-08). |
 | Reabrir después de terminarse el proceso | Inicia en Inicio (RF-08). |
 | Otros puntos aplicables de la guía | Orientación vertical (RF-09); accesibilidad (RF-10); áreas del sistema y tamaños de teléfono (RF-11); idioma (RF-12); pulsaciones repetidas (RF-13). |
 
@@ -126,7 +126,7 @@ Repite el formato según sea necesario. -->
 - **CA-02 · RF-01, RF-04:** Dado Inicio, cuando se tocan el selector, las notificaciones, el avatar o el FAB, entonces no ocurre ninguna acción.
 - **CA-03 · RF-02, RF-04, RF-06:** Dado Inicio, cuando se toca otra pestaña, entonces se ve su nombre, la cabecera y ningún FAB.
 - **CA-04 · RF-07:** Dada otra pestaña, cuando se pulsa Atrás, entonces se muestra Inicio; y desde Inicio, Atrás sale de la app.
-- **CA-05 · RF-08:** Dada otra pestaña seleccionada, cuando se recrea la pantalla o se reabre la app tras terminar el proceso, entonces se muestra Inicio.
+- **CA-05 · RF-08:** Dada otra pestaña seleccionada, cuando se recrea la pantalla, entonces se mantiene esa pestaña; cuando se reabre la app tras terminar el proceso, entonces se muestra Inicio.
 - **CA-06 · RF-09:** Dado el dispositivo girado, cuando se abre la app, entonces permanece en vertical.
 - **CA-08 · RF-11:** Dado un teléfono pequeño y uno grande, con navegación por gestos y por 3 botones, cuando se abre la app, entonces la cabecera y las 5 pestañas se ven completas y sin quedar bajo las áreas del sistema.
 - **CA-09 · RF-13:** Dado Inicio, cuando se pulsa repetidamente una pestaña o el FAB, entonces no hay efectos duplicados ni errores.
@@ -144,7 +144,7 @@ No marques los criterios como superados durante la especificación. -->
 | CA-02 | Tocar cada elemento de la cabecera y el FAB | Sin efecto |
 | CA-03 | Tocar cada pestaña | Nombre, cabecera, sin FAB |
 | CA-04 | Atrás desde otra pestaña y desde Inicio | Vuelve a Inicio / sale |
-| CA-05 | Recrear y matar el proceso en otra pestaña | Inicia en Inicio |
+| CA-05 | Recrear y matar el proceso en otra pestaña | Al recrear se mantiene la pestaña; tras matar el proceso inicia en Inicio |
 | CA-06 | Girar el dispositivo | Sigue en vertical |
 | CA-08 | Abrir en emulador de teléfono pequeño y grande, con gestos y con 3 botones | Cabecera y 5 pestañas completas y visibles |
 | CA-09 | Pulsar varias veces rápido pestañas y FAB; usar gesto Atrás | Sin duplicados ni errores; RF-07 se cumple |
