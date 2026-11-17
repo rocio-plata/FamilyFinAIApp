@@ -40,6 +40,42 @@
     <string name="movement_edit_title">Editar movimiento</string>
     <string name="movement_back_description">Volver</string>
 
+    <string name="movements_recorded_by_you">Tú</string>
+    <string name="movements_recorded_by_former">Ex-miembro</string>
+    <string name="movements_recorded_by_generic">Miembro de la familia</string>
+    <string name="movements_recorded_by_unavailable">No disponible</string>
+
+    <string name="movements_loading">Cargando movimientos…</string>
+    <string name="movements_error_load">No se pudieron cargar los movimientos</string>
+    <string name="movements_retry">Reintentar</string>
+    <string name="movements_empty_month">No hay movimientos en este mes</string>
+    <string name="movements_empty_filter">Ningún movimiento coincide con el filtro</string>
+    <string name="movements_filter_all">Todos</string>
+    <string name="movements_filter_expenses">Gastos</string>
+    <string name="movements_filter_incomes">Ingresos</string>
+    <string name="movements_month_previous">Mes anterior</string>
+    <string name="movements_month_next">Mes siguiente</string>
+    <string name="movements_summary_balance">Balance del mes</string>
+    <string name="movements_summary_income">Ingresos</string>
+    <string name="movements_summary_expenses">Gastos</string>
+    <string name="movements_type_expense">Gasto</string>
+    <string name="movements_type_income">Ingreso</string>
+    <string name="movements_category_unknown">Sin categoría</string>
+    <string name="movements_row_description">%1$s, %2$s, %3$s</string>
+
+    <string name="movements_error_offline">Necesitas conexión para hacer cambios. Lo que escribiste se conserva.</string>
+    <string name="movements_error_network">No pudimos conectar con el servidor. Inténtalo de nuevo.</string>
+    <string name="movements_error_future_date">La fecha no puede ser futura.</string>
+    <string name="movements_error_category_unavailable">La categoría elegida ya no está disponible. Elige otra.</string>
+    <string name="movements_error_tag_unavailable">La etiqueta elegida ya no está disponible. Elige otra o ninguna.</string>
+    <string name="movements_error_payment_method_unavailable">El medio de pago elegido ya no está disponible. Elige otro.</string>
+    <string name="movements_error_type_mismatch">La categoría debe ser del mismo tipo que el movimiento.</string>
+    <string name="movements_error_currency_mismatch">La moneda de la familia cambió. Actualiza e inténtalo de nuevo.</string>
+    <string name="movements_error_not_found">El movimiento ya no existe.</string>
+    <string name="movements_error_invalid_data">Revisa los datos del movimiento.</string>
+    <string name="movements_error_not_allowed">Ya no tienes acceso a esta familia.</string>
+    <string name="movements_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
+
     <!-- Acceso (003-auth). Los límites son 8 y 60, nunca 1: no hacen falta plurales (PluralsCandidate).
          Los %1$d de longitud mínima y máxima los pasa la interfaz desde
          AuthValidation.MIN_PASSWORD_LENGTH y MAX_DISPLAY_NAME_LENGTH. -->
