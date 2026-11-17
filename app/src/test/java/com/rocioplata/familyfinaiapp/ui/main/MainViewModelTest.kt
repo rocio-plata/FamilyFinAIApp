@@ -587,4 +587,223 @@ class MainViewModelTest {
         assertEquals(2, repo.calls)
         assertEquals(PaymentMethodsRoute, vm.route())
     }
+
+    // --- Pestaña seleccionada (T-11) ---
+
+    @Test
+    fun alIniciar_laPestanaEsInicio() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        assertEquals(MainDestination.Home, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun seleccionarPestana_laConservaElEstado() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        vm.selectTab(MainDestination.Reports)
+        advanceUntilIdle()
+
+        assertEquals(MainDestination.Reports, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun laPestana_sobrevivePorqueVivenEnElViewModel_yNoDependeDeLaFamilia() = runTest {
+        val repo = FakeRepository().apply { onRefresh = { it.data.value = families(plata, depto); HeaderRefreshResult() } }
+        val vm = create(repo)
+        vm.selectTab(MainDestination.Movements)
+        advanceUntilIdle()
+
+        vm.selectFamily("f-2")
+        advanceUntilIdle()
+
+        assertEquals(MainDestination.Movements, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun viewModelNuevo_empiezaEnInicio() = runTest {
+        val repo = FakeRepository().apply { onRefresh = { it.data.value = families(plata); HeaderRefreshResult() } }
+        val first = create(repo)
+        first.selectTab(MainDestination.Budgets)
+        advanceUntilIdle()
+
+        val second = create(repo)
+
+        assertEquals(MainDestination.Home, second.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun conUnaGestionAbierta_seIgnoraElCambioDePestana() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.selectTab(MainDestination.Assistant)
+        vm.openCategories()
+        advanceUntilIdle()
+
+        vm.selectTab(MainDestination.Reports)
+        advanceUntilIdle()
+        vm.managementBack()
+        advanceUntilIdle()
+
+        assertEquals(MainDestination.Assistant, vm.uiState.value.selectedTab)
+    }
+
+    // --- Rutas de movimientos (T-12) ---
+
+    @Test
+    fun movimiento_nuevoAbreElAltaDeLaFamiliaActiva() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        vm.openMovementCreate()
+        advanceUntilIdle()
+
+        assertEquals(MovementRoute.Create, vm.route())
+    }
+
+    @Test
+    fun movimiento_detalleSeAbreDesdeLasPestanas() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        vm.openMovementDetail("m-1")
+        advanceUntilIdle()
+
+        assertEquals(MovementRoute.Detail("m-1"), vm.route())
+    }
+
+    @Test
+    fun movimiento_sinFamiliaActiva_seIgnora() = runTest {
+        val vm = create(FakeRepository())
+
+        vm.openMovementCreate()
+        vm.openMovementDetail("m-1")
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+    }
+
+    @Test
+    fun movimiento_edicionSoloDesdeSuDetalle() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        vm.openMovementEdit("m-1")
+        advanceUntilIdle()
+        assertNull(vm.route())
+
+        vm.openMovementDetail("m-1")
+        vm.openMovementEdit("m-2")
+        advanceUntilIdle()
+        assertEquals(MovementRoute.Detail("m-1"), vm.route())
+
+        vm.openMovementEdit("m-1")
+        advanceUntilIdle()
+        assertEquals(MovementRoute.Edit("m-1"), vm.route())
+    }
+
+    @Test
+    fun movimiento_edicionNoSeAbreDesdeElAlta() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openMovementCreate()
+
+        vm.openMovementEdit("m-1")
+        advanceUntilIdle()
+
+        assertEquals(MovementRoute.Create, vm.route())
+    }
+
+    @Test
+    fun movimiento_atrasDesdeEdicionVuelveAlDetalle_yDesdeElDetalleALasPestanas() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openMovementDetail("m-1")
+        vm.openMovementEdit("m-1")
+        advanceUntilIdle()
+
+        vm.managementBack()
+        advanceUntilIdle()
+        assertEquals(MovementRoute.Detail("m-1"), vm.route())
+
+        vm.managementBack()
+        advanceUntilIdle()
+        assertNull(vm.route())
+    }
+
+    @Test
+    fun movimiento_atrasDesdeElAltaVuelveALasPestanas() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openMovementCreate()
+        advanceUntilIdle()
+
+        vm.managementBack()
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+    }
+
+    @Test
+    fun movimiento_alCerrarSeVuelveALaPestanaDeOrigen() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.selectTab(MainDestination.Movements)
+        vm.openMovementCreate()
+        advanceUntilIdle()
+        assertEquals(MainDestination.Movements, vm.uiState.value.selectedTab)
+
+        vm.managementBack()
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        assertEquals(MainDestination.Movements, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun movimiento_noSeAbreSobreOtraGestion_niAlReves() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openCategories()
+        advanceUntilIdle()
+        vm.openMovementCreate()
+        vm.openMovementDetail("m-1")
+        advanceUntilIdle()
+        assertEquals(CategoriesRoute.List, vm.route())
+
+        vm.managementBack()
+        vm.openMovementCreate()
+        advanceUntilIdle()
+        vm.openCategories()
+        vm.openPaymentMethods()
+        vm.openMovementDetail("m-1")
+        advanceUntilIdle()
+
+        assertEquals(MovementRoute.Create, vm.route())
+    }
+
+    @Test
+    fun movimiento_noSePuedeCambiarDeFamiliaConLaRutaAbierta() = runTest {
+        val repo = FakeRepository().apply { onRefresh = { it.data.value = families(plata, depto); HeaderRefreshResult() } }
+        val vm = create(repo)
+        advanceUntilIdle()
+        vm.openMovementCreate()
+        advanceUntilIdle()
+
+        vm.openSelector()
+        vm.selectFamily("f-2")
+        advanceUntilIdle()
+
+        assertEquals("f-1", vm.content().activeFamily.id)
+        assertFalse(vm.uiState.value.selectorOpen)
+        assertEquals(MovementRoute.Create, vm.route())
+    }
+
+    @Test
+    fun movimiento_siLaFamiliaDeLaRutaDesaparece_vuelveALasPestanasYNoReaparece() = runTest {
+        val repo = FakeRepository().apply { onRefresh = { it.data.value = families(plata, depto); HeaderRefreshResult() } }
+        val vm = create(repo)
+        advanceUntilIdle()
+        vm.openMovementDetail("m-1")
+        advanceUntilIdle()
+
+        repo.data.value = families(depto)
+        advanceUntilIdle()
+        assertNull(vm.route())
+
+        repo.data.value = families(plata, depto)
+        advanceUntilIdle()
+        assertNull(vm.route())
+    }
 }

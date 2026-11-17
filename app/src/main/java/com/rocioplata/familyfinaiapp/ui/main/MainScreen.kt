@@ -12,9 +12,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -50,8 +47,10 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onRetry = viewModel::retry,
         onSelectFamily = viewModel::selectFamily,
         onDismissSelector = viewModel::dismissSelector,
+        onSelectTab = viewModel::selectTab,
         onManageCategories = viewModel::openCategories,
         onManagePaymentMethods = viewModel::openPaymentMethods,
+        onAddMovement = viewModel::openMovementCreate,
         onManagementBack = viewModel::managementBack,
         managementContent = { route ->
             val family = (uiState.families as? FamiliesState.Content)?.activeFamily
@@ -59,6 +58,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
             val canManage = family?.role == FamilyRole.OWNER
             when {
                 family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
+                route is MovementRoute -> MovementRoutePlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
                 route == PaymentMethodsRoute -> PaymentMethodsScreen(
                     familyId = family.id,
                     viewModelKey = "${viewModelKey ?: "main"}-payment-methods-${family.id}",
@@ -93,8 +93,8 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
     )
 }
 
-// La pestaña seleccionada vive solo en memoria: se conserva al pasar a segundo
-// plano y se reinicia a Inicio al recrear la Activity (RF-08).
+// La pestaña seleccionada está en `uiState` (la guarda el ViewModel): se conserva al recrear la pantalla y
+// al pasar a segundo plano, y se reinicia a Inicio al terminar el proceso (RF-08 de la 001).
 @Composable
 fun MainScreen(
     uiState: MainUiState,
@@ -103,14 +103,16 @@ fun MainScreen(
     onSelectFamily: (String) -> Unit,
     onDismissSelector: () -> Unit,
     modifier: Modifier = Modifier,
+    onSelectTab: (MainDestination) -> Unit = {},
     onManageCategories: () -> Unit = {},
     onManagePaymentMethods: () -> Unit = {},
+    onAddMovement: () -> Unit = {},
     onManagementBack: () -> Unit = {},
     managementContent: (@Composable (ManagementRoute) -> Unit)? = null,
 ) {
-    var selected by remember { mutableStateOf(MainDestination.Home) }
+    val selected = uiState.selectedTab
     BackHandler(enabled = selected != MainDestination.Home && uiState.managementRoute == null) {
-        selected = MainDestination.Home
+        onSelectTab(MainDestination.Home)
     }
     // Una gestión ocupa toda la pantalla: sin cabecera de familia ni barra de pestañas.
     val route = uiState.managementRoute
@@ -126,7 +128,7 @@ fun MainScreen(
     MainScreenContent(
         selected = selected,
         onSelect = { destination ->
-            if (destination != selected) selected = destination
+            if (destination != selected) onSelectTab(destination)
         },
         uiState = uiState,
         onFamilyClick = onFamilyClick,
@@ -135,6 +137,7 @@ fun MainScreen(
         onDismissSelector = onDismissSelector,
         onManageCategories = onManageCategories,
         onManagePaymentMethods = onManagePaymentMethods,
+        onAddMovement = onAddMovement,
         modifier = modifier,
     )
 }
@@ -145,6 +148,7 @@ private fun ManagementPlaceholder(route: ManagementRoute, onBack: () -> Unit, mo
     when (route) {
         PaymentMethodsRoute -> PaymentMethodsPlaceholder(onBack = onBack, modifier = modifier)
         is CategoriesRoute -> CategoriesPlaceholder(onBack = onBack, modifier = modifier)
+        is MovementRoute -> MovementRoutePlaceholder(route, onBack = onBack, modifier = modifier)
     }
 }
 
@@ -160,6 +164,7 @@ fun MainScreenContent(
     onDismissSelector: () -> Unit = {},
     onManageCategories: () -> Unit = {},
     onManagePaymentMethods: () -> Unit = {},
+    onAddMovement: () -> Unit = {},
 ) {
     val content = uiState.families as? FamiliesState.Content
     Scaffold(
@@ -181,7 +186,9 @@ fun MainScreenContent(
         },
         bottomBar = { MainBottomBar(selected = selected, onSelect = onSelect) },
         floatingActionButton = {
-            if (selected == MainDestination.Home) HomeFab()
+            if (selected == MainDestination.Home || selected == MainDestination.Movements) {
+                HomeFab(onClick = onAddMovement)
+            }
         },
     ) { innerPadding ->
         val contentModifier = Modifier.padding(innerPadding)

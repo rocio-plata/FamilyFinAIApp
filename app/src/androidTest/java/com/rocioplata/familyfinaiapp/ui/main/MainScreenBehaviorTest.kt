@@ -5,10 +5,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assertCountEquals
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
@@ -37,6 +39,35 @@ class MainScreenBehaviorTest {
     }
 
     @Test
+    fun selectedTabIsKeptWhenTheScreenIsRecreated() {
+        val restoration = StateRestorationTester(composeTestRule)
+        restoration.setContent {
+            FamilyFinAIAppTheme { TestMainHost(initial = MainUiState(families = contentState(), displayName = "rocío")) }
+        }
+        composeTestRule.onNodeWithText("Reportes").performClick()
+        composeTestRule.onNodeWithTag("tab_placeholder_Reports").assertIsDisplayed()
+
+        restoration.emulateSavedInstanceStateRestore()
+
+        composeTestRule.onNodeWithText("Reportes").assertIsSelected()
+        composeTestRule.onNodeWithTag("tab_placeholder_Reports").assertIsDisplayed()
+    }
+
+    @Test
+    fun backAfterRecreationStillReturnsToHome() {
+        val restoration = StateRestorationTester(composeTestRule)
+        restoration.setContent {
+            FamilyFinAIAppTheme { TestMainHost(initial = MainUiState(families = contentState(), displayName = "rocío")) }
+        }
+        composeTestRule.onNodeWithText("Presupuestos").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+
+        composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+
+        composeTestRule.onNodeWithText("Inicio").assertIsSelected()
+    }
+
+    @Test
     fun interactiveElementsHaveAccessibleLabels() {
         composeTestRule.setContent {
             FamilyFinAIAppTheme { TestMainHost(initial = MainUiState(families = contentState(), displayName = "rocío")) }
@@ -57,20 +88,21 @@ class MainScreenBehaviorTest {
     }
 
     @Test
-    fun repeatedTabAndFabClicksDoNotDuplicateEffects() {
+    fun repeatedTabClicksDoNotDuplicateEffectsAndFabOpensNewMovementOnce() {
         composeTestRule.setContent {
             FamilyFinAIAppTheme { TestMainHost(initial = MainUiState(families = contentState(), displayName = "rocío")) }
         }
 
-        repeat(5) {
-            composeTestRule.onNodeWithText("Inicio").performClick()
-            composeTestRule.onNodeWithContentDescription("Agregar").performClick()
-        }
-
+        repeat(5) { composeTestRule.onNodeWithText("Inicio").performClick() }
         composeTestRule.onNodeWithText("Inicio").assertIsSelected()
         composeTestRule.onAllNodesWithContentDescription("Agregar").assertCountEquals(1)
         composeTestRule.onNodeWithContentDescription(
             "Selector de familia: Familia Plata, Propietario",
         ).assertIsDisplayed()
+
+        composeTestRule.onNodeWithContentDescription("Agregar").performClick()
+
+        composeTestRule.onAllNodesWithTag("movement_create_screen").assertCountEquals(1)
+        composeTestRule.onAllNodesWithContentDescription("Agregar").assertCountEquals(0)
     }
 }

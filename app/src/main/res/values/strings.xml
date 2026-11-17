@@ -34,6 +34,12 @@
 
     <string name="fab_add_description">Agregar</string>
 
+    <!-- Movimientos (007-financial-items): títulos de las pantallas provisionales de T-12. -->
+    <string name="movement_create_title">Nuevo movimiento</string>
+    <string name="movement_detail_title">Movimiento</string>
+    <string name="movement_edit_title">Editar movimiento</string>
+    <string name="movement_back_description">Volver</string>
+
     <!-- Acceso (003-auth). Los límites son 8 y 60, nunca 1: no hacen falta plurales (PluralsCandidate).
          Los %1$d de longitud mínima y máxima los pasa la interfaz desde
          AuthValidation.MIN_PASSWORD_LENGTH y MAX_DISPLAY_NAME_LENGTH. -->

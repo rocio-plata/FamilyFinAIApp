@@ -28,6 +28,9 @@ class MainViewModel(
 
     // Ligada a la familia con la que se abrió: si esa familia deja de ser la activa, se descarta.
     private val managementRoute = MutableStateFlow<OpenRoute?>(null)
+
+    // Solo en memoria: tras terminar el proceso se vuelve a Inicio (RF-08 de la 001).
+    private val selectedTab = MutableStateFlow(MainDestination.Home)
     private var refreshJob: Job? = null
 
     val uiState: StateFlow<MainUiState> = combine(
@@ -35,8 +38,10 @@ class MainViewModel(
         activeFamilyId,
         selectorOpen,
         refreshState,
-        managementRoute,
-    ) { data, activeId, selectorOpen, refresh, route -> buildState(data, activeId, selectorOpen, refresh, route) }
+        combine(managementRoute, selectedTab, ::Navigation),
+    ) { data, activeId, selectorOpen, refresh, navigation ->
+        buildState(data, activeId, selectorOpen, refresh, navigation.route, navigation.tab)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), MainUiState())
 
     init {
@@ -66,6 +71,12 @@ class MainViewModel(
         if (uiState.value.families.let { it is FamiliesState.Content && it.hasSelector }) selectorOpen.value = true
     }
 
+    /** Elige una pestaña de la barra inferior. Ignorado mientras hay una gestión abierta (la barra está oculta). */
+    fun selectTab(destination: MainDestination) {
+        if (managementRoute.value != null) return
+        selectedTab.value = destination
+    }
+
     fun dismissSelector() {
         selectorOpen.value = false
     }
@@ -83,6 +94,15 @@ class MainViewModel(
     /** "Gestionar" en la sección de medios de pago de Inicio (RF-01 de 006). Ignorado sin familia activa. */
     fun openPaymentMethods() = openRoute(PaymentMethodsRoute)
 
+    /** "+" en Inicio y en Movimientos (RF-04): abre "Nuevo movimiento" de la familia activa. */
+    fun openMovementCreate() = openRoute(MovementRoute.Create)
+
+    /** Tocar un movimiento del listado (RF-08). */
+    fun openMovementDetail(movementId: String) = openRoute(MovementRoute.Detail(movementId))
+
+    /** "Editar" en el detalle (RF-09); solo del movimiento cuyo detalle está abierto. */
+    fun openMovementEdit(movementId: String) = openRoute(MovementRoute.Edit(movementId))
+
     fun openCategoryCreate(type: CategoryType) = openRoute(CategoriesRoute.Create(type))
 
     /** Tocar una categoría (RF-06) o, tras crearla, pasar a editar la recién creada (RF-09). */
@@ -90,25 +110,31 @@ class MainViewModel(
 
     /**
      * Un nivel atrás: en categorías, edición o alta → listado → pestañas; en medios de pago, directamente
-     * a las pestañas. Sin gestión abierta no hace nada.
+     * a las pestañas; en un movimiento, la edición vuelve a su detalle y el alta y el detalle a las pestañas
+     * (la pestaña seleccionada no cambia). Sin gestión abierta no hace nada.
      */
     fun managementBack() {
         val open = managementRoute.value ?: return
         managementRoute.value = when (open.route) {
             CategoriesRoute.List, PaymentMethodsRoute -> null
             is CategoriesRoute.Create, is CategoriesRoute.Edit -> open.copy(route = CategoriesRoute.List)
+            MovementRoute.Create, is MovementRoute.Detail -> null
+            is MovementRoute.Edit -> open.copy(route = MovementRoute.Detail(open.route.movementId))
         }
     }
 
     private fun openRoute(route: ManagementRoute) {
         val content = uiState.value.families as? FamiliesState.Content ?: return
-        // Desde las pestañas solo se abre un listado; el alta y la edición de categorías solo desde su gestión,
-        // y una gestión nunca se abre sobre la otra.
+        // Desde las pestañas solo se abre un listado, el alta o el detalle de un movimiento; el alta y la edición de
+        // categorías solo desde su gestión, la edición de un movimiento solo desde su detalle, y una gestión nunca
+        // se abre sobre otra.
         val current = managementRoute.value?.route
         val allowed = when (route) {
             CategoriesRoute.List -> current == null || current is CategoriesRoute
             is CategoriesRoute.Create, is CategoriesRoute.Edit -> current is CategoriesRoute
             PaymentMethodsRoute -> current == null || current == PaymentMethodsRoute
+            MovementRoute.Create, is MovementRoute.Detail -> current == null
+            is MovementRoute.Edit -> current == MovementRoute.Detail(route.movementId)
         }
         if (!allowed) return
         // `uiState` se recalcula de forma asíncrona: la elección más reciente está en `activeFamilyId`.
@@ -146,6 +172,7 @@ class MainViewModel(
         selectorOpen: Boolean,
         refresh: RefreshState,
         route: OpenRoute?,
+        tab: MainDestination,
     ): MainUiState {
         val families = data.families?.value
         val familiesState = when {
@@ -167,11 +194,14 @@ class MainViewModel(
             displayName = data.displayName?.value,
             selectorOpen = selectorOpen && familiesState is FamiliesState.Content && familiesState.hasSelector,
             isRefreshing = refresh.inFlight,
+            selectedTab = tab,
             managementRoute = route?.route.takeIf {
                 familiesState is FamiliesState.Content && familiesState.activeFamily.id == route?.familyId
             },
         )
     }
+
+    private data class Navigation(val route: OpenRoute?, val tab: MainDestination)
 
     private data class OpenRoute(val familyId: String, val route: ManagementRoute)
 

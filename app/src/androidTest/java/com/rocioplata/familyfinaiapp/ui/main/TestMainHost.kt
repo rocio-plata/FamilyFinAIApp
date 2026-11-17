@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.rocioplata.familyfinaiapp.domain.header.Family
@@ -18,7 +19,10 @@ fun contentState(
     isStale: Boolean = false,
 ) = FamiliesState.Content(families, active, isStale)
 
-/** Reproduce lo mínimo del ViewModel (selector, familia activa y ruta de gestión) sin red ni caché. */
+/**
+ * Reproduce lo mínimo del ViewModel (selector, familia activa, pestaña y ruta de gestión) sin red ni caché.
+ * La pestaña se guarda con `rememberSaveable` para emular que el ViewModel sobrevive a recrear la pantalla.
+ */
 @Composable
 fun TestMainHost(
     initial: MainUiState,
@@ -26,8 +30,10 @@ fun TestMainHost(
     onRetry: () -> Unit = {},
 ) {
     var state by remember { mutableStateOf(initial) }
+    var tab by rememberSaveable { mutableStateOf(initial.selectedTab) }
     MainScreen(
-        uiState = state,
+        uiState = state.copy(selectedTab = tab),
+        onSelectTab = { tab = it },
         onFamilyClick = { state = state.copy(selectorOpen = true) },
         onRetry = onRetry,
         onSelectFamily = { id ->
@@ -40,6 +46,7 @@ fun TestMainHost(
         onDismissSelector = { state = state.copy(selectorOpen = false) },
         onManageCategories = { state = state.copy(managementRoute = CategoriesRoute.List) },
         onManagePaymentMethods = { state = state.copy(managementRoute = PaymentMethodsRoute) },
+        onAddMovement = { state = state.copy(managementRoute = MovementRoute.Create) },
         onManagementBack = { state = state.copy(managementRoute = null) },
         modifier = modifier,
     )
