@@ -33,7 +33,9 @@ Este repositorio contiene el cliente móvil. Se construye con **Spec-Driven Deve
   - insights y recomendaciones.
 - **Seguridad:** la app nunca tiene credenciales de base de datos ni API keys de IA. Todo pasa por el backend, que decide a qué familia accede cada usuario.
 
-La moneda por defecto es **CLP**, con apertura a más monedas desde los ajustes en el futuro.
+La moneda es la de cada familia (**CLP** por defecto). El dinero se maneja siempre como un entero en la unidad menor de la moneda, nunca como `Double`.
+
+> Hoy la app ya permite registrarse e iniciar sesión, cambiar de familia, gestionar categorías, tags y medios de pago, y llevar los movimientos de cada mes (alta, listado con resumen y filtro, detalle, edición y eliminación). El resto (dashboard, presupuestos, reportes, IA, etc.) está por construir: ver la sección *Features y estado*.
 
 ----------
 
@@ -45,7 +47,7 @@ El problema de programar con IA no es que escriba mal el código, sino que **rel
 | :--: | --- | --- |
 | **1️⃣** | **SPEC.md** | Qué se construye, qué queda fuera, reglas de negocio, casos de error y **criterios de aceptación verificables**. Sin código. |
 | **2️⃣** | **PLAN.md** | Cómo se construye: capas, contratos con la API, estado, navegación, errores y estrategia de validación. Sin implementar. |
-| **3️⃣** | **TASKS.md** | Tareas pequeñas y ordenadas, con dependencias, ligadas a los criterios que resuelven. |
+| **3️⃣** | **TASKS.md** | Tareas pequeñas y ordenadas, con dependencias, ligadas a los criterios que resuelven. Cada una registra su **evidencia**. |
 | **4️⃣** | Implementación | Solo lo que está en el alcance, demostrando cada criterio con evidencia real. |
 
 > [!IMPORTANT]
@@ -54,21 +56,29 @@ El problema de programar con IA no es que escriba mal el código, sino que **rel
 ### Organización de los documentos
 
 ```
+AGENTS.md                           # instrucciones del proyecto para el agente (única fuente)
+CLAUDE.md                           # solo enlaza a AGENTS.md
 docs/
-├── SPEC_TEMPLATE.md            # plantillas compartidas (no se editan por feature)
+├── ROADMAP.md                      # orden de implementación y estado de cada feature
+├── SPEC_TEMPLATE.md                # plantillas compartidas (no se editan por feature)
 ├── PLAN_TEMPLATE.md
-├── MOBILE_GUIDELINES.md        # checklist específico de móvil
-├── GENERIC_RULES.md            # reglas de trabajo del agente
-├── PROMPTS.md                  # prompt inicial
-├── api-contract.md             # resumen del contrato con el backend (endpoints, errores)
+├── MOBILE_GUIDELINES.md            # checklist específico de móvil
+├── GENERIC_RULES.md                # reglas de trabajo del agente (y su versión en español)
+├── DESIGN.md                       # sistema visual: colores, tipografía, componentes
+├── backend/
+│   ├── api-contract.md             # contrato con el backend: endpoints, errores, brechas
+│   └── openapi.yaml
 ├── ui/
-│   └── prompts-stitch.md       # prompts de diseño (Google Stitch) por pantalla
+│   ├── prompts-stitch.md           # prompts de diseño (Google Stitch) por pantalla
+│   └── snapshots/                  # referencias visuales de las pantallas
 └── features/
-    └── <nombre-de-la-feature>/
-        ├── SPEC.md             # copia de SPEC_TEMPLATE.md, completada
-        ├── PLAN.md             # tras aprobar la spec
-        └── TASKS.md            # derivado del plan aprobado
-AGENTS.md                       # instrucciones del proyecto para el agente
+    └── NNN-<nombre-de-la-feature>/
+        ├── SPEC.md                 # copia de SPEC_TEMPLATE.md, completada
+        ├── PLAN.md                 # tras aprobar la spec
+        ├── TASKS.md                # derivado del plan aprobado, con la evidencia de cada tarea
+        └── BACKEND_GAPS.md         # brechas del backend detectadas (si las hay)
+scripts/
+└── dev-reverse.sh                  # expone el backend local en un dispositivo o emulador (adb reverse)
 ```
 
 `TASKS.md` no tiene plantilla a propósito: **se deriva del plan aprobado**, porque las tareas dependen de las decisiones técnicas del plan.
@@ -77,46 +87,52 @@ AGENTS.md                       # instrucciones del proyecto para el agente
 
 ## 🧱 Stack y arquitectura
 
-### Decidido
+### Decidido y en uso
 
-- **Kotlin** + **Jetpack Compose** (Material Design 3)
-- **MVVM** con flujo de datos unidireccional (`StateFlow<UiState>`)
-- **Ktor Client** como cliente HTTP
-- **Clean Architecture** por capas: `presentation → domain ← data`. El dominio no conoce Android, Ktor ni los DTO.
+- **Kotlin 2.2** + **Jetpack Compose** (BOM 2026.02.01, Material Design 3). `minSdk 34`, `targetSdk` y `compileSdk 36`.
+- **MVVM** con flujo de datos unidireccional: cada pantalla expone un `StateFlow<UiState>` y su contenido es una función *stateless* que recibe estado y callbacks.
+- **Ktor Client 3** (motor OkHttp) con **kotlinx.serialization** como cliente HTTP.
+- **Clean Architecture** por capas: `ui → domain ← data`. El dominio no conoce Android, Compose, Ktor ni los DTO.
+- **Corrutinas** estructuradas y `viewModelScope`; la cancelación nunca se oculta.
+- **Inyección de dependencias manual:** `FamilyFinApp` crea un `AppContainer` con el cliente HTTP, el almacenamiento, el observador de conectividad, la sesión y los repositorios. No hay librería de DI.
+- **Sin librería de navegación:** las pestañas y las pantallas a pantalla completa (gestiones, formulario y detalle de un movimiento) son estado en memoria de `MainViewModel`. Se vuelve a Inicio si el proceso muere.
+- **Sesión:** `SessionManager` es la única fuente de verdad (`SignedOut`, `Loading` o `SignedIn`). Guarda la sesión cifrada con AES-GCM y clave del Keystore (excluida de las copias de seguridad) y hace una sola renovación del token ante varios `401`.
+- **Caché offline:** DataStore Preferences, un JSON por recurso con `schemaVersion`, usuario y fecha. Se descarta a los 7 días o si es de otro usuario y se avisa de "datos desactualizados" a partir de 24 h. Todas las cachés se vacían al terminar la sesión y están excluidas de las copias de seguridad.
+- **Dinero:** `Money` es un entero en la unidad menor con su moneda; el formato de salida usa la configuración regional del dispositivo.
 - Principio de diseño: **minimizar dependencias externas** para controlar mejor la seguridad.
 
-### Por decidir (se resuelve en el PLAN de cada feature)
+### Por decidir (se resuelve en el PLAN de la feature que lo necesite)
 
 | Tema | Notas |
 | --- | --- |
-| Inyección de dependencias | Hilt, Koin o manual |
-| Serialización | kotlinx.serialization es lo natural con Ktor |
-| Navegación | Navigation Compose o Navigation 3 con rutas tipadas |
-| Almacenamiento seguro de tokens | Debe cubrir access token (15 min) y refresh token (30 días, con rotación) |
-| Caché / modo sin conexión | Qué se guarda localmente y qué no |
 | Imágenes y cámara | Captura de recibos, permisos y compresión previa al envío |
 | Gráficos | Donut y barras para Dashboard y Reportes |
+| Librería de navegación | Solo si la navegación en memoria deja de bastar; no se introducen dos stacks sin una decisión documentada |
+| Moneda configurable | Hoy cada familia usa la moneda que devuelve el backend; elegirla vendrá con los ajustes |
 
-### Estructura propuesta
+### Estructura actual
+
+Por capa y, dentro de cada una, por feature:
 
 ```
-app/src/main/java/<paquete>/
-├── core/
-│   ├── network/        # cliente Ktor, interceptor de auth, refresh de token, mapeo de errores
-│   ├── navigation/
-│   ├── session/        # usuario, tokens y familia activa
-│   └── di/
-├── features/
-│   └── <feature>/
-│       ├── data/           # API, DTOs @Serializable, mappers, repositorio
-│       ├── domain/         # modelos, contrato del repositorio, casos de uso
-│       └── presentation/   # Screen + ViewModel + UiState
+app/src/main/java/com/rocioplata/familyfinaiapp/
+├── FamilyFinApp.kt, AppContainer.kt, MainActivity.kt
+├── session/             # SessionManager: sesión, renovación, cierre
+├── domain/              # modelos, contratos de repositorio y reglas, sin Android
+│   ├── auth/  header/  categories/  paymentmethods/
+│   ├── members/  money/  movements/
+├── data/                # remoto (Ktor), local (DataStore) y repositorios
+│   ├── network/         # clientes HTTP y plugin SessionAuth (Bearer + renovación)
+│   ├── cache/           # CachePolicy (7 días / 24 h)
+│   ├── session/  auth/  header/  categories/  paymentmethods/
+│   └── members/  movements/
 └── ui/
-    ├── theme/
-    └── components/     # componentes reutilizables (selector de familia, tile de categoría, etc.)
+    ├── theme/           # colores y tipografía (sin hexadecimales en las pantallas)
+    ├── root/            # AppRoot: login o pantalla principal según la sesión
+    └── auth/  main/  categories/  paymentmethods/  movements/
 ```
 
-> La estructura es una propuesta inicial: se confirma o ajusta en el `PLAN.md` de la primera feature.
+Los tests JVM están en `app/src/test/…` (corrutinas, `ktor-client-mock`) y los de interfaz en `app/src/androidTest/…`, en el mismo paquete que lo que prueban.
 
 ### Reglas que afectan a todas las features
 
@@ -124,33 +140,34 @@ app/src/main/java/<paquete>/
 2. **Autenticación:** access token de corta duración y refresh token con rotación. Si el refresh falla o se detecta reuso, la sesión se cierra y se vuelve al login.
 3. **Los roles (Owner / Member) se respetan en la UI**, pero la autorización real siempre la hace el backend.
 4. **Lo que propone la IA nunca se guarda solo:** se muestra editable con badge "Sugerido por IA" y botón "Confirmar".
-5. **Categorías deprecadas** siguen visibles en el histórico, marcadas como "Archivada".
-6. Los **íconos de categoría** llegan de la API como una clave de texto. El catálogo se define más adelante, y la app debe tolerar una categoría sin ícono.
-7. Los errores del backend llegan con un `code` de dominio: la app los traduce a mensajes comprensibles, sin mostrar errores técnicos.
+5. **Categorías, tags y medios de pago archivados** siguen visibles en lo que ya los usa, marcados como "Archivada" o "Archivado". El backend no permite reactivarlos.
+6. Los **íconos de categoría** llegan de la API como una clave de texto. Hay un catálogo de 15 y la app tolera una categoría sin ícono o con uno desconocido (ícono genérico).
+7. Los errores del backend llegan con un `code` de dominio: la app los traduce a mensajes comprensibles, sin mostrar errores técnicos. Hoy el backend emite `FINANCIAL_TRACKING.*` aunque el contrato documente `FINANCIAL.*`: la app acepta ambos prefijos.
+8. **Los cambios requieren conexión:** sin red se avisa y se conserva lo escrito; no hay cola offline.
 
 ----------
 
-## 🗺️ Features y orden sugerido
+## 🗺️ Features y estado
 
-Cada feature tiene su carpeta en `docs/features/` y recorre SPEC → PLAN → TASKS.
+Cada feature tiene su carpeta en `docs/features/` y recorre SPEC → PLAN → TASKS. El orden vigente, las brechas del backend y lo que queda sin verificar de cada una están en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-> El orden vigente y el estado de cada feature se siguen en [`docs/ROADMAP.md`](docs/ROADMAP.md); la tabla de abajo es la propuesta inicial.
-
-| # | Feature | Contexto del backend |
-| :--: | --- | --- |
-| 1 | `auth` — registro, login, sesión y refresh | Identity |
-| 2 | `family-selector` — familia activa, reordenar, crear, aceptar invitación | Family & Access |
-| 3 | `dashboard` — balance, categorías con monto, período | Financial Tracking |
-| 4 | `categories` — categorías de gasto/ingreso, íconos, tags | Financial Tracking |
-| 5 | `payment-methods` — medios de pago y predeterminado | Financial Tracking |
-| 6 | `financial-items` — registro manual, listado, detalle, edición | Financial Tracking |
-| 7 | `family-management` — miembros, roles, invitaciones | Family & Access |
-| 8 | `ai-text-entry` — registro por texto | AI Assistance |
-| 9 | `ai-receipt-entry` — registro por foto de recibo | AI Assistance |
-| 10 | `reports` — gráficos, comparativas, drill-down | Reporting |
-| 11 | `budgets` — presupuestos mensuales | Budgeting |
-| 12 | `assistant` — chat e insights | AI Assistance |
-| 13 | `profile` — perfil, ajustes, cierre de sesión | Identity |
+| # | Feature | Carpeta | Estado | Contexto del backend |
+| :--: | --- | --- | :--: | --- |
+| 1 | Andamiaje de la app | `001-scaffold` | ✅ | — |
+| 2 | Cabecera principal: familia activa, invitaciones, caché | `002-main-header` | ✅ | Family & Access |
+| 3 | Autenticación y sesión: registro, login, renovación, cierre | `003-auth` | ✅ | Identity |
+| 4 | Identidad visual: icono y nombre de la app | `004-brand-identity` | ✅ | — |
+| 5 | Categorías y tags | `005-categories` | ✅ | Financial Tracking |
+| 6 | Medios de pago | `006-payment-methods` | ✅ | Financial Tracking |
+| 7 | Movimientos: alta, listado, detalle, edición y eliminación | `007-financial-items` | ✅ | Financial Tracking |
+| 8 | Dashboard | `dashboard` | ⏳ | Financial Tracking |
+| 9 | Gestión de familias: miembros, roles, invitaciones | `family-management` | ⏳ | Family & Access |
+| 10 | Presupuestos | `budgets` | ⏳ | Budgeting |
+| 11 | Reportes | `reports` | ⏳ | Reporting |
+| 12 | Registro por texto con IA | `ai-text-entry` | ⏳ | AI Assistance |
+| 13 | Registro por recibo con IA | `ai-receipt-entry` | ⏳ | AI Assistance |
+| 14 | Asistente: chat e insights | `assistant` | ⏳ | AI Assistance |
+| 15 | Perfil y ajustes | `profile` | ⏳ | Identity |
 
 > [!NOTE]
 > El orden depende del avance del backend: una feature de la app se especifica cuando los endpoints que necesita existen o su contrato está acordado. Reportes, Presupuestos y la IA real se abordan al final. La IA empieza con un adaptador *fake* determinista en el backend.
@@ -161,36 +178,39 @@ Cada feature tiene su carpeta en `docs/features/` y recorre SPEC → PLAN → TA
 
 ### Requisitos
 
-- **Android Studio** (versión estable reciente)
-- **JDK 17+**
-- **Kotlin** y **compileSdk / minSdk**: _por definir al crear el proyecto_
-- Un **agente de IA con acceso al repo** (Claude Code, etc.)
-- El **backend en ejecución** (local con Docker + Postgres, o desplegado)
+- **Android Studio** (versión estable reciente).
+- **JDK 17 o superior** (el Gradle Wrapper usa Gradle 9.5 y el plugin de Android 9.3; el código compila a Java 11).
+- Un **emulador o dispositivo con Android 14 (API 34) o superior**.
+- El **backend en ejecución** (local con Docker + Postgres, o desplegado).
+- Un **agente de IA con acceso al repo** (Claude Code, etc.) si vas a trabajar una feature con SDD.
 
 ### Puesta en marcha
 
 1. Clona el repositorio:
 
     ```bash
-    git clone https://github.com/rocio-plata/<repo-mobile>.git
+    git clone https://github.com/rocio-plata/FamilyFinAIApp.git
     ```
 
-2. Levanta el backend siguiendo su README (Postgres con Docker y `npm run dev`).
-3. Configura la URL base de la API (ver *Configuración*).
+2. Levanta el backend siguiendo su README (Postgres con Docker y `npm run dev`; escucha en el puerto 3000).
+3. Configura el destino del backend en `local.properties` (ver *Configuración*).
 4. Abre el proyecto en Android Studio, sincroniza Gradle y ejecuta la app.
+5. En la pantalla de acceso, crea una cuenta: el backend crea además tu familia personal.
 
 ### Configuración
 
-La URL del backend **no se escribe en el código**: se define por variante de build.
+La URL del backend **no se escribe en el código**: sale de `local.properties` (archivo local, no versionado) y llega al build de debug como un campo `BuildConfig`. En release queda vacía: todavía no hay una URL de producción definida.
 
-| Entorno | URL base |
-| --- | --- |
-| Emulador → backend local | `http://10.0.2.2:<puerto>` |
-| Dispositivo físico → backend local | `http://<IP-de-tu-PC>:<puerto>` |
-| Producción | `https://<tu-dominio>` (HTTPS obligatorio) |
+| Propiedad | Valor | Para qué |
+| --- | --- | --- |
+| `DEV_TARGET=emulator` (por defecto) | `http://10.0.2.2:3000` | Emulador → backend local |
+| `DEV_TARGET=device` | `http://localhost:3000` | Dispositivo físico o emulador con `adb reverse tcp:3000 tcp:3000`; `scripts/dev-reverse.sh` lo aplica a todos los conectados (repítelo tras reiniciarlos) |
+| `BACKEND_BASE_URL=<url>` | la que indiques | Sobrescribe a `DEV_TARGET` (por ejemplo, la IP de tu PC) |
+
+Un `DEV_TARGET` distinto de `emulator` y `device` (sin `BACKEND_BASE_URL`) hace fallar el build de debug con un mensaje claro.
 
 > [!WARNING]
-> El tráfico sin cifrar (HTTP) solo se permite en builds de debug. La app no contiene secretos: ni credenciales de base de datos ni API keys de proveedores de IA.
+> El tráfico sin cifrar (HTTP) solo se permite en builds de debug y solo hacia `10.0.2.2` y `localhost`. Producción exigirá HTTPS. La app no contiene secretos: ni credenciales de base de datos ni API keys de proveedores de IA.
 
 ### Comandos
 
@@ -198,23 +218,32 @@ La URL del backend **no se escribe en el código**: se define por variante de bu
 ./gradlew :app:assembleDebug              # compilar
 ./gradlew :app:testDebugUnitTest          # tests de JVM
 ./gradlew :app:lintDebug                  # lint
-./gradlew :app:connectedDebugAndroidTest  # tests instrumentados (requiere dispositivo)
+./gradlew :app:connectedDebugAndroidTest  # tests instrumentados (requiere dispositivo o emulador)
 ```
+
+Para una prueba concreta:
+
+```bash
+./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.ui.main.MainViewModelTest"
+```
+
+> La suite instrumentada completa tarda decenas de minutos en un emulador. Evita que el equipo se duerma mientras corre (por ejemplo, con `caffeinate -i`), porque los procesos quedan pausados.
 
 ### Datos de prueba (solo desarrollo)
 
-Usuario `aaaa` · contraseña `bbbb`
+No hay usuarios ni contraseñas en el repositorio: crea una cuenta de prueba desde la pantalla de registro de tu backend local. Los movimientos, categorías y medios de pago que crees para probar bórralos al terminar, y no escribas credenciales en código, logs ni documentación.
 
 ----------
 
 ## 🚦 Cómo trabajar una feature (flujo SDD)
 
 1. **Lee las reglas:** [`AGENTS.md`](AGENTS.md) y [`docs/GENERIC_RULES.md`](docs/GENERIC_RULES.md).
-2. **Lanza el prompt inicial** de [`docs/PROMPTS.md`](docs/PROMPTS.md) en tu agente, indicando la feature.
-3. **Escribe la SPEC contigo, no por ti.** El agente revisa el repo, el contrato de la API y el diseño, y pregunta lo que no puede deducir. Pocas preguntas por vez. **Lo no decidido se marca como PENDIENTE.**
-4. **Aprueba la SPEC** y solo entonces pasa al `PLAN.md`. Aprueba el plan y solo entonces se deriva `TASKS.md`.
-5. **Implementa por tareas**, de a una, con tests que se ejecutan de verdad.
-6. **Exige evidencia:** un test con nombre no es un test ejecutado, y una captura no demuestra persistencia.
+2. **Pide la feature a tu agente** indicando su carpeta en `docs/features/`. El agente lee `AGENTS.md`, `docs/GENERIC_RULES.md`, `docs/MOBILE_GUIDELINES.md` y el contrato de la API (`docs/backend/`) antes de empezar.
+3. **Escribe la SPEC contigo, no por ti** (con [`docs/SPEC_TEMPLATE.md`](docs/SPEC_TEMPLATE.md)). El agente revisa el repo, el contrato de la API y el diseño, y pregunta lo que no puede deducir. Pocas preguntas por vez. **Lo no decidido se marca como PENDIENTE.**
+4. **Aprueba la SPEC** y solo entonces pasa al `PLAN.md` (con [`docs/PLAN_TEMPLATE.md`](docs/PLAN_TEMPLATE.md)). Aprueba el plan y solo entonces se deriva `TASKS.md`.
+5. **Implementa por tareas**, de a una, con tests que se ejecutan de verdad. Las tareas se marcan como hechas solo tras ejecutar su validación.
+6. **Exige evidencia:** un test con nombre no es un test ejecutado, y una captura no demuestra persistencia. Cada tarea registra en `TASKS.md` lo que se ejecutó y lo que no se pudo verificar.
+7. **Actualiza** `docs/ROADMAP.md` y `AGENTS.md` cuando la feature cambie de estado o de arquitectura.
 
 ### Qué debe cubrir cada SPEC móvil
 
@@ -233,15 +262,17 @@ Además del negocio, cada spec revisa el checklist de [`docs/MOBILE_GUIDELINES.m
 
 ## 🎨 Diseño
 
-Las pantallas se diseñan con **Google Stitch** como referencia visual (Material Design 3, tema claro primero). Los prompts están en [`docs/ui/prompts-stitch.md`](docs/ui/prompts-stitch.md). Stitch no exporta Compose: las pantallas se traducen a Compose manualmente o con ayuda del agente, respetando el tema definido en `ui/theme`.
+Las pantallas se diseñan con **Google Stitch** como referencia visual (Material Design 3, tema claro primero). El sistema visual (colores, tipografía y componentes) está en [`docs/DESIGN.md`](docs/DESIGN.md), los prompts en [`docs/ui/prompts-stitch.md`](docs/ui/prompts-stitch.md) y las referencias de cada pantalla en `docs/ui/snapshots/`. Stitch no exporta Compose: las pantallas se traducen a Compose manualmente o con ayuda del agente, respetando el tema definido en `ui/theme` (sin colores hexadecimales en las pantallas).
 
 ----------
 
 ## 🔐 Seguridad y privacidad
 
-- Autenticación individual con JWT de acceso corto y refresh token rotatorio.
-- Tokens guardados con almacenamiento seguro del sistema (a definir en el plan de `auth`).
-- Nunca se registran en logs tokens, contraseñas ni montos.
+- Autenticación individual con JWT de acceso corto y refresh token rotatorio; la app renueva una sola vez ante varios `401`, porque el backend revoca todas las sesiones si se reutiliza un refresh token.
+- La sesión se guarda cifrada con AES-GCM y una clave del Keystore, y queda fuera de las copias de seguridad, igual que todas las cachés de datos.
+- Al terminar la sesión se borran la sesión guardada y todas las cachés.
+- Nunca se registran en logs tokens, contraseñas ni montos; los objetos con tokens ocultan su contenido en `toString()`.
+- La lista de miembros de una familia solo se usa para mostrar nombres y roles: el correo de otros miembros no se lee ni se guarda.
 - Aislamiento por familia garantizado por el backend: manipular un `familyId` en una petición no da acceso a datos ajenos.
 - Límites de uso de IA aplicados en el backend.
 
@@ -252,10 +283,12 @@ Las pantallas se diseñan con **Google Stitch** como referencia visual (Material
 | Área | Estado |
 | --- | --- |
 | Definición del producto y bounded contexts | ✅ |
-| Backend (Identity, Family & Access, Financial Tracking) | 🚧 en construcción |
-| Diseño de pantallas (Stitch) | 🚧 en curso |
-| SPEC de la primera feature (`auth`) | ⏳ pendiente |
-| Proyecto Android creado | ⏳ pendiente |
+| Proyecto Android, arquitectura base, sesión y caché offline | ✅ |
+| Features 1 a 7 (andamiaje, cabecera, autenticación, identidad visual, categorías, medios de pago y movimientos) | ✅ con SPEC, PLAN, TASKS y evidencia |
+| Features 8 a 15 (dashboard, familias, presupuestos, reportes, IA, asistente y perfil) | ⏳ pendientes |
+| Pruebas | Unas mil pruebas JVM y unas trescientas instrumentadas. El recuento, lo que queda sin verificar de cada feature (TalkBack, una segunda cuenta en la familia, etc.) y los tests de «atrás del sistema» que a veces fallan en un emulador saturado están en cada `TASKS.md` y en `docs/ROADMAP.md` |
+| Backend (Identity, Family & Access, Financial Tracking) | Las features 1 a 7 se probaron contra el backend local; las brechas conocidas están en los `BACKEND_GAPS.md` y en `docs/backend/api-contract.md` |
+| Producción | ⏳ sin URL de backend de producción ni licencia definidas |
 
 ----------
 
