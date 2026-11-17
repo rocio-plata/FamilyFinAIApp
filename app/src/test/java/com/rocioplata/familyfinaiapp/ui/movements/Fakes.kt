@@ -42,6 +42,12 @@ internal class FakeMovements : MovementsRepository {
     var createFailure: MovementFailure? = null
     var lastUsedPaymentMethodId: String? = null
 
+    // Detalle: sin emisión hasta que el test publique el movimiento (o su ausencia con `null`).
+    val detail = MutableSharedFlow<Movement?>(replay = 1)
+    val deleted = mutableListOf<String>()
+    var deleteGate: CompletableDeferred<Unit>? = null
+    var deleteFailure: MovementFailure? = null
+
     fun flowOf(month: YearMonth) = data.getOrPut(month) { MutableStateFlow(MovementsData()) }
 
     override fun movements(familyId: String, month: YearMonth): Flow<MovementsData> = flowOf(month)
@@ -52,7 +58,7 @@ internal class FakeMovements : MovementsRepository {
         return onRefresh(month)
     }
 
-    override fun movement(familyId: String, movementId: String): Flow<Movement?> = error("No se usa")
+    override fun movement(familyId: String, movementId: String): Flow<Movement?> = detail
     override suspend fun createMovement(familyId: String, movement: NewMovement): MovementResult<Movement> {
         created += movement
         createGate?.await()
@@ -70,8 +76,13 @@ internal class FakeMovements : MovementsRepository {
         movementId: String,
         changes: MovementChanges,
     ): MovementEditResult = error("No se usa")
-    override suspend fun deleteMovement(familyId: String, movementId: String): MovementResult<Unit> =
-        error("No se usa")
+    override suspend fun deleteMovement(familyId: String, movementId: String): MovementResult<Unit> {
+        deleted += movementId
+        deleteGate?.await()
+        deleteFailure?.let { return MovementResult.Failure(it) }
+        detail.tryEmit(null)
+        return MovementResult.Success(Unit)
+    }
     override suspend fun lastUsedPaymentMethodId(familyId: String): String? = lastUsedPaymentMethodId
     override suspend fun clear() = Unit
 }

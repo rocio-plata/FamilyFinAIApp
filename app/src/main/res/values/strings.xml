@@ -40,6 +40,20 @@
     <string name="movement_edit_title">Editar movimiento</string>
     <string name="movement_back_description">Volver</string>
 
+    <string name="movement_detail_gone">Este movimiento ya no existe.</string>
+    <string name="movement_detail_gone_back">Volver al listado</string>
+    <string name="movement_detail_tag_label">Etiqueta</string>
+    <string name="movement_detail_note_label">Observaciones</string>
+    <string name="movement_detail_recorded_by">Registrado por</string>
+    <string name="movement_detail_item_unavailable">No disponible</string>
+    <string name="movement_detail_archived_female">archivada</string>
+    <string name="movement_detail_archived_male">archivado</string>
+    <string name="movement_detail_edit">Editar movimiento</string>
+    <string name="movement_detail_delete">Eliminar movimiento</string>
+    <string name="movement_detail_delete_title">¿Eliminar el movimiento?</string>
+    <string name="movement_detail_delete_message">Esta acción no se puede deshacer.</string>
+    <string name="movement_detail_delete_confirm">Eliminar</string>
+    <string name="movement_detail_delete_cancel">Cancelar</string>
     <string name="movement_form_close_description">Cerrar</string>
     <string name="movement_form_currency_unknown">Sin moneda</string>
     <string name="movement_form_currency_missing">No se conoce la moneda de la familia. Abre la aplicación con conexión para actualizarla y vuelve a intentarlo.</string>

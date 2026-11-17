@@ -25,6 +25,7 @@ import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
+import com.rocioplata.familyfinaiapp.ui.movements.MovementDetailScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementFormScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementsScreen
 import com.rocioplata.familyfinaiapp.ui.paymentmethods.PaymentMethodsScreen
@@ -86,6 +87,16 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     onClose = viewModel::managementBack,
                     onInsufficientRole = viewModel::onInsufficientRole,
                     onCurrencyMismatch = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
+                route is MovementRoute.Detail -> MovementDetailScreen(
+                    familyId = family.id,
+                    movementId = route.movementId,
+                    currentUserId = (session as? SessionState.SignedIn)?.userId,
+                    viewModelKey = "${viewModelKey ?: "main"}-movement-detail-${family.id}-${uiState.managementRouteInstance}",
+                    onClose = viewModel::managementBack,
+                    onEdit = { viewModel.openMovementEdit(route.movementId) },
+                    onInsufficientRole = viewModel::onInsufficientRole,
                     modifier = modifier,
                 )
                 route is MovementRoute -> MovementRoutePlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
