@@ -806,4 +806,36 @@ class MainViewModelTest {
         advanceUntilIdle()
         assertNull(vm.route())
     }
+
+    @Test
+    fun movimiento_cadaAperturaTieneUnaInstanciaNueva_yAtrasDentroDeLaRutaLaConserva() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        assertEquals(0, vm.uiState.value.managementRouteInstance)
+
+        vm.openMovementCreate()
+        advanceUntilIdle()
+        val first = vm.uiState.value.managementRouteInstance
+        vm.managementBack()
+        advanceUntilIdle()
+        assertEquals(0, vm.uiState.value.managementRouteInstance)
+
+        vm.openMovementCreate()
+        advanceUntilIdle()
+        val second = vm.uiState.value.managementRouteInstance
+        assertTrue(first > 0)
+        assertTrue(second > first)
+
+        vm.managementBack()
+        vm.openMovementDetail("m-1")
+        advanceUntilIdle()
+        val detail = vm.uiState.value.managementRouteInstance
+        vm.openMovementEdit("m-1")
+        advanceUntilIdle()
+        val edit = vm.uiState.value.managementRouteInstance
+        vm.managementBack()
+        advanceUntilIdle()
+
+        assertTrue(edit > detail)
+        assertEquals(edit, vm.uiState.value.managementRouteInstance)
+    }
 }

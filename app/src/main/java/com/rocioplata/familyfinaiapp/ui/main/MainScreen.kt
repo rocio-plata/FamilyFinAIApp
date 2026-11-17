@@ -25,6 +25,7 @@ import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
+import com.rocioplata.familyfinaiapp.ui.movements.MovementFormScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementsScreen
 import com.rocioplata.familyfinaiapp.ui.paymentmethods.PaymentMethodsScreen
 import com.rocioplata.familyfinaiapp.domain.auth.SessionState
@@ -77,6 +78,16 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
             val canManage = family?.role == FamilyRole.OWNER
             when {
                 family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
+                route == MovementRoute.Create -> MovementFormScreen(
+                    familyId = family.id,
+                    familyName = family.name,
+                    currency = family.currency,
+                    viewModelKey = "${viewModelKey ?: "main"}-movement-form-${family.id}-${uiState.managementRouteInstance}",
+                    onClose = viewModel::managementBack,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    onCurrencyMismatch = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
                 route is MovementRoute -> MovementRoutePlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
                 route == PaymentMethodsRoute -> PaymentMethodsScreen(
                     familyId = family.id,

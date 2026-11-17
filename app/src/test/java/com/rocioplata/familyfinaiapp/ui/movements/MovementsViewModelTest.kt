@@ -1,42 +1,27 @@
 package com.rocioplata.familyfinaiapp.ui.movements
 
-import com.rocioplata.familyfinaiapp.data.network.ConnectivityObserver
 import com.rocioplata.familyfinaiapp.domain.categories.CategoriesData
-import com.rocioplata.familyfinaiapp.domain.categories.CategoriesRepository
 import com.rocioplata.familyfinaiapp.domain.categories.Category
-import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
-import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMember
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersData
-import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersRepository
-import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersResult
 import com.rocioplata.familyfinaiapp.domain.money.Money
 import com.rocioplata.familyfinaiapp.domain.movements.Movement
-import com.rocioplata.familyfinaiapp.domain.movements.MovementChanges
 import com.rocioplata.familyfinaiapp.domain.movements.MovementDates
-import com.rocioplata.familyfinaiapp.domain.movements.MovementEditResult
 import com.rocioplata.familyfinaiapp.domain.movements.MovementFailure
 import com.rocioplata.familyfinaiapp.domain.movements.MovementResult
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import com.rocioplata.familyfinaiapp.domain.movements.MovementsData
-import com.rocioplata.familyfinaiapp.domain.movements.MovementsRepository
-import com.rocioplata.familyfinaiapp.domain.movements.NewMovement
 import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethod
-import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodResult
 import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodStatus
 import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodsData
-import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodsRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -53,98 +38,11 @@ import org.junit.Before
 import org.junit.Test
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MovementsViewModelTest {
-    private class FakeMovements : MovementsRepository {
-        val data = mutableMapOf<YearMonth, MutableStateFlow<MovementsData>>()
-        val refreshed = mutableListOf<YearMonth>()
-        var gate: CompletableDeferred<Unit>? = null
-        var onRefresh: (YearMonth) -> MovementResult<Unit> = { MovementResult.Success(Unit) }
-
-        fun flowOf(month: YearMonth) = data.getOrPut(month) { MutableStateFlow(MovementsData()) }
-
-        override fun movements(familyId: String, month: YearMonth): Flow<MovementsData> = flowOf(month)
-
-        override suspend fun refresh(familyId: String, month: YearMonth): MovementResult<Unit> {
-            refreshed += month
-            gate?.await()
-            return onRefresh(month)
-        }
-
-        override fun movement(familyId: String, movementId: String): Flow<Movement?> = error("No se usa")
-        override suspend fun createMovement(familyId: String, movement: NewMovement): MovementResult<Movement> =
-            error("No se usa")
-        override suspend fun editMovement(
-            familyId: String,
-            movementId: String,
-            changes: MovementChanges,
-        ): MovementEditResult = error("No se usa")
-        override suspend fun deleteMovement(familyId: String, movementId: String): MovementResult<Unit> =
-            error("No se usa")
-        override suspend fun lastUsedPaymentMethodId(familyId: String): String? = error("No se usa")
-        override suspend fun clear() = Unit
-    }
-
-    private class FakeCategories : CategoriesRepository {
-        val data = MutableStateFlow(CategoriesData())
-        var refreshes = 0
-        override fun categories(familyId: String): Flow<CategoriesData> = data
-        override suspend fun refresh(familyId: String): CategoryResult<Unit> {
-            refreshes++
-            return CategoryResult.Success(Unit)
-        }
-        override suspend fun createCategory(familyId: String, type: CategoryType, name: String, icon: String?) =
-            error("No se usa")
-        override suspend fun updateCategory(familyId: String, categoryId: String, newName: String?, icon: IconUpdate) =
-            error("No se usa")
-        override suspend fun deprecateCategory(familyId: String, categoryId: String) = error("No se usa")
-        override suspend fun deleteCategory(familyId: String, categoryId: String) = error("No se usa")
-        override suspend fun addTag(familyId: String, categoryId: String, name: String) = error("No se usa")
-        override suspend fun renameTag(familyId: String, categoryId: String, tagId: String, name: String) =
-            error("No se usa")
-        override suspend fun reorderTags(familyId: String, categoryId: String, activeTagIdsInOrder: List<String>) =
-            error("No se usa")
-        override suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
-        override suspend fun deleteTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
-        override suspend fun clear() = Unit
-    }
-
-    private class FakePaymentMethods : PaymentMethodsRepository {
-        val data = MutableStateFlow(PaymentMethodsData())
-        var refreshes = 0
-        override fun paymentMethods(familyId: String): Flow<PaymentMethodsData> = data
-        override suspend fun refresh(familyId: String): PaymentMethodResult<Unit> {
-            refreshes++
-            return PaymentMethodResult.Success(Unit)
-        }
-        override suspend fun createPaymentMethod(familyId: String, name: String) = error("No se usa")
-        override suspend fun renamePaymentMethod(familyId: String, paymentMethodId: String, name: String) =
-            error("No se usa")
-        override suspend fun deprecatePaymentMethod(familyId: String, paymentMethodId: String) = error("No se usa")
-        override suspend fun deletePaymentMethod(familyId: String, paymentMethodId: String) = error("No se usa")
-        override suspend fun clear() = Unit
-    }
-
-    private class FakeMembers : FamilyMembersRepository {
-        val data = MutableStateFlow(FamilyMembersData())
-        var refreshes = 0
-        override fun members(familyId: String): Flow<FamilyMembersData> = data
-        override suspend fun refresh(familyId: String): FamilyMembersResult<Unit> {
-            refreshes++
-            return FamilyMembersResult.Success(Unit)
-        }
-        override suspend fun clear() = Unit
-    }
-
-    private class FakeConnectivity : ConnectivityObserver {
-        val flow = MutableSharedFlow<Boolean>(replay = 1)
-        override val isOnline: Flow<Boolean> = flow
-    }
-
     @Before
     fun setUp() = Dispatchers.setMain(StandardTestDispatcher())
 

@@ -32,6 +32,7 @@ class MainViewModel(
     // Solo en memoria: tras terminar el proceso se vuelve a Inicio (RF-08 de la 001).
     private val selectedTab = MutableStateFlow(MainDestination.Home)
     private var refreshJob: Job? = null
+    private var nextRouteInstance = 1
 
     val uiState: StateFlow<MainUiState> = combine(
         repository.header,
@@ -139,7 +140,7 @@ class MainViewModel(
         if (!allowed) return
         // `uiState` se recalcula de forma asíncrona: la elección más reciente está en `activeFamilyId`.
         val active = content.families.firstOrNull { it.id == activeFamilyId.value } ?: content.activeFamily
-        managementRoute.value = OpenRoute(active.id, route)
+        managementRoute.value = OpenRoute(active.id, route, nextRouteInstance++)
     }
 
     /** El backend rechazó una acción por rol: se vuelve a consultar el cargo sin cambiar la familia activa. */
@@ -198,12 +199,13 @@ class MainViewModel(
             managementRoute = route?.route.takeIf {
                 familiesState is FamiliesState.Content && familiesState.activeFamily.id == route?.familyId
             },
+            managementRouteInstance = route?.instance ?: 0,
         )
     }
 
     private data class Navigation(val route: OpenRoute?, val tab: MainDestination)
 
-    private data class OpenRoute(val familyId: String, val route: ManagementRoute)
+    private data class OpenRoute(val familyId: String, val route: ManagementRoute, val instance: Int)
 
     private data class RefreshState(
         val inFlight: Boolean = false,
