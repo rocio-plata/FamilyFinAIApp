@@ -98,8 +98,8 @@ private fun ManageSectionRow(
 
 // FAB sin acción (RF-04); el contenedor raíz decide cuándo mostrarlo.
 @Composable
-fun HomeFab(modifier: Modifier = Modifier) {
-    FloatingActionButton(onClick = {}, modifier = modifier) {
+fun HomeFab(modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    FloatingActionButton(onClick = onClick, modifier = modifier) {
         Icon(
             imageVector = Icons.Filled.Add,
             contentDescription = stringResource(R.string.fab_add_description),

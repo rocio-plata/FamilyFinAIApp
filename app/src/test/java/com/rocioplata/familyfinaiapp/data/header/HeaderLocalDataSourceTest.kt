@@ -40,6 +40,33 @@ class HeaderLocalDataSourceTest {
     }
 
     @Test
+    fun laMonedaDeLaFamilia_seGuardaYSeLee() = runTest {
+        val source = HeaderLocalDataSource(newStore())
+        val withCurrency = listOf(
+            Family("f-1", "Familia Plata", FamilyRole.OWNER, "CLP"),
+            Family("f-2", "Depto", FamilyRole.MEMBER, "EUR"),
+        )
+
+        source.saveFamilies("u-1", 1_000L, withCurrency)
+
+        assertEquals(Cached("u-1", 1_000L, withCurrency), source.readFamilies())
+    }
+
+    @Test
+    fun copiaAnteriorSinMoneda_sigueLeyendose_sinMoneda() = runTest {
+        val store = newStore()
+        store.edit {
+            it[stringPreferencesKey("families")] =
+                """{"schemaVersion":1,"userId":"u-1","savedAtMillis":5,"value":[{"id":"f-1","name":"Plata","role":"OWNER"}]}"""
+        }
+
+        assertEquals(
+            Cached("u-1", 5L, listOf(Family("f-1", "Plata", FamilyRole.OWNER, currency = null))),
+            HeaderLocalDataSource(store).readFamilies(),
+        )
+    }
+
+    @Test
     fun sinDatos_devuelveNulo() = runTest {
         val source = HeaderLocalDataSource(newStore())
 

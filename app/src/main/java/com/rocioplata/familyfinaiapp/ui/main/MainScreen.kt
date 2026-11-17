@@ -12,9 +12,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -28,7 +25,11 @@ import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
+import com.rocioplata.familyfinaiapp.ui.movements.MovementDetailScreen
+import com.rocioplata.familyfinaiapp.ui.movements.MovementFormScreen
+import com.rocioplata.familyfinaiapp.ui.movements.MovementsScreen
 import com.rocioplata.familyfinaiapp.ui.paymentmethods.PaymentMethodsScreen
+import com.rocioplata.familyfinaiapp.domain.auth.SessionState
 import androidx.compose.ui.tooling.preview.Preview
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
@@ -42,6 +43,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         },
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val session by container.sessionManager.state.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.onStart() }
 
     MainScreen(
@@ -50,8 +52,26 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onRetry = viewModel::retry,
         onSelectFamily = viewModel::selectFamily,
         onDismissSelector = viewModel::dismissSelector,
+        onSelectTab = viewModel::selectTab,
         onManageCategories = viewModel::openCategories,
         onManagePaymentMethods = viewModel::openPaymentMethods,
+        onAddMovement = viewModel::openMovementCreate,
+        movementsContent = { contentModifier ->
+            val family = (uiState.families as? FamiliesState.Content)?.activeFamily
+            if (family == null) {
+                TabPlaceholder(MainDestination.Movements, modifier = contentModifier)
+            } else {
+                MovementsScreen(
+                    familyId = family.id,
+                    currency = family.currency,
+                    currentUserId = (session as? SessionState.SignedIn)?.userId,
+                    viewModelKey = "${viewModelKey ?: "main"}-movements-${family.id}",
+                    onMovementClick = viewModel::openMovementDetail,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    modifier = contentModifier,
+                )
+            }
+        },
         onManagementBack = viewModel::managementBack,
         managementContent = { route ->
             val family = (uiState.families as? FamiliesState.Content)?.activeFamily
@@ -59,6 +79,39 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
             val canManage = family?.role == FamilyRole.OWNER
             when {
                 family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
+                route == MovementRoute.Create -> MovementFormScreen(
+                    familyId = family.id,
+                    familyName = family.name,
+                    currency = family.currency,
+                    viewModelKey = "${viewModelKey ?: "main"}-movement-form-${family.id}-${uiState.managementRouteInstance}",
+                    onClose = viewModel::managementBack,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    onCurrencyMismatch = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
+                route is MovementRoute.Detail -> MovementDetailScreen(
+                    familyId = family.id,
+                    movementId = route.movementId,
+                    currentUserId = (session as? SessionState.SignedIn)?.userId,
+                    viewModelKey = "${viewModelKey ?: "main"}-movement-detail-${family.id}-${uiState.managementRouteInstance}",
+                    onClose = viewModel::managementBack,
+                    onEdit = { viewModel.openMovementEdit(route.movementId) },
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
+                route is MovementRoute.Edit -> MovementFormScreen(
+                    familyId = family.id,
+                    familyName = family.name,
+                    currency = family.currency,
+                    viewModelKey = "${viewModelKey ?: "main"}-movement-form-${family.id}-${uiState.managementRouteInstance}",
+                    onClose = viewModel::managementBack,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    onCurrencyMismatch = viewModel::onInsufficientRole,
+                    movementId = route.movementId,
+                    onMovedToAnotherMonth = viewModel::closeManagement,
+                    modifier = modifier,
+                )
+                route is MovementRoute -> MovementRoutePlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
                 route == PaymentMethodsRoute -> PaymentMethodsScreen(
                     familyId = family.id,
                     viewModelKey = "${viewModelKey ?: "main"}-payment-methods-${family.id}",
@@ -93,8 +146,8 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
     )
 }
 
-// La pestaña seleccionada vive solo en memoria: se conserva al pasar a segundo
-// plano y se reinicia a Inicio al recrear la Activity (RF-08).
+// La pestaña seleccionada está en `uiState` (la guarda el ViewModel): se conserva al recrear la pantalla y
+// al pasar a segundo plano, y se reinicia a Inicio al terminar el proceso (RF-08 de la 001).
 @Composable
 fun MainScreen(
     uiState: MainUiState,
@@ -103,14 +156,17 @@ fun MainScreen(
     onSelectFamily: (String) -> Unit,
     onDismissSelector: () -> Unit,
     modifier: Modifier = Modifier,
+    onSelectTab: (MainDestination) -> Unit = {},
     onManageCategories: () -> Unit = {},
     onManagePaymentMethods: () -> Unit = {},
+    onAddMovement: () -> Unit = {},
     onManagementBack: () -> Unit = {},
     managementContent: (@Composable (ManagementRoute) -> Unit)? = null,
+    movementsContent: (@Composable (Modifier) -> Unit)? = null,
 ) {
-    var selected by remember { mutableStateOf(MainDestination.Home) }
+    val selected = uiState.selectedTab
     BackHandler(enabled = selected != MainDestination.Home && uiState.managementRoute == null) {
-        selected = MainDestination.Home
+        onSelectTab(MainDestination.Home)
     }
     // Una gestión ocupa toda la pantalla: sin cabecera de familia ni barra de pestañas.
     val route = uiState.managementRoute
@@ -126,7 +182,7 @@ fun MainScreen(
     MainScreenContent(
         selected = selected,
         onSelect = { destination ->
-            if (destination != selected) selected = destination
+            if (destination != selected) onSelectTab(destination)
         },
         uiState = uiState,
         onFamilyClick = onFamilyClick,
@@ -135,6 +191,8 @@ fun MainScreen(
         onDismissSelector = onDismissSelector,
         onManageCategories = onManageCategories,
         onManagePaymentMethods = onManagePaymentMethods,
+        onAddMovement = onAddMovement,
+        movementsContent = movementsContent,
         modifier = modifier,
     )
 }
@@ -145,6 +203,7 @@ private fun ManagementPlaceholder(route: ManagementRoute, onBack: () -> Unit, mo
     when (route) {
         PaymentMethodsRoute -> PaymentMethodsPlaceholder(onBack = onBack, modifier = modifier)
         is CategoriesRoute -> CategoriesPlaceholder(onBack = onBack, modifier = modifier)
+        is MovementRoute -> MovementRoutePlaceholder(route, onBack = onBack, modifier = modifier)
     }
 }
 
@@ -160,6 +219,8 @@ fun MainScreenContent(
     onDismissSelector: () -> Unit = {},
     onManageCategories: () -> Unit = {},
     onManagePaymentMethods: () -> Unit = {},
+    onAddMovement: () -> Unit = {},
+    movementsContent: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val content = uiState.families as? FamiliesState.Content
     Scaffold(
@@ -181,7 +242,9 @@ fun MainScreenContent(
         },
         bottomBar = { MainBottomBar(selected = selected, onSelect = onSelect) },
         floatingActionButton = {
-            if (selected == MainDestination.Home) HomeFab()
+            if (selected == MainDestination.Home || selected == MainDestination.Movements) {
+                HomeFab(onClick = onAddMovement)
+            }
         },
     ) { innerPadding ->
         val contentModifier = Modifier.padding(innerPadding)
@@ -195,6 +258,8 @@ fun MainScreenContent(
                     onManageCategories = onManageCategories.takeIf { content != null },
                     onManagePaymentMethods = onManagePaymentMethods.takeIf { content != null },
                 )
+            } else if (selected == MainDestination.Movements && movementsContent != null) {
+                movementsContent(contentModifier)
             } else {
                 TabPlaceholder(destination = selected, modifier = contentModifier, familyName = familyName)
             }

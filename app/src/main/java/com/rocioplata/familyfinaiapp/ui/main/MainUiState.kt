@@ -25,8 +25,15 @@ data class MainUiState(
     val displayName: String? = null,
     val selectorOpen: Boolean = false,
     val isRefreshing: Boolean = false,
+    /** Pestaña inferior seleccionada; vive en el ViewModel, así que sobrevive a recrear la pantalla (RF-08 de la 001). */
+    val selectedTab: MainDestination = MainDestination.Home,
     /** Gestión de la familia activa (categorías o medios de pago) a pantalla completa; `null` muestra las pestañas. */
     val managementRoute: ManagementRoute? = null,
+    /**
+     * Identifica cada apertura de una gestión: un formulario nuevo no debe reutilizar el estado de uno anterior
+     * (se usa en la clave de su ViewModel). Atrás dentro de una gestión (edición → detalle) la conserva.
+     */
+    val managementRouteInstance: Int = 0,
     // Esta spec no genera cambios locales (RF-09); la sincronización posterior lo activará.
     val hasLocalChanges: Boolean = false,
 )

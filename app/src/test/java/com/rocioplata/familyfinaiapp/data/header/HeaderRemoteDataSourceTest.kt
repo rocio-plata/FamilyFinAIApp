@@ -57,11 +57,48 @@ class HeaderRemoteDataSourceTest {
         val result = source.families()
 
         assertEquals(
-            RemoteResult.Success(listOf(Family("f-1", "Plata", FamilyRole.OWNER), Family("f-2", "Depto", FamilyRole.MEMBER))),
+            RemoteResult.Success(
+                listOf(
+                    Family("f-1", "Plata", FamilyRole.OWNER, "CLP"),
+                    Family("f-2", "Depto", FamilyRole.MEMBER, "CLP"),
+                ),
+            ),
             result,
         )
         assertEquals("Bearer tok", auth)
         assertEquals("/me/families", path)
+    }
+
+    @Test
+    fun familias_laMonedaSeLeeDeCadaFamilia() = runTest {
+        val source = source(
+            reply(
+                HttpStatusCode.OK,
+                """[{"familyId":"f-1","name":"Plata","role":"OWNER","defaultCurrency":"USD"},
+                    {"familyId":"f-2","name":"Depto","role":"MEMBER","defaultCurrency":"EUR"}]""",
+            ),
+        )
+
+        val result = source.families() as RemoteResult.Success
+
+        assertEquals(listOf("USD", "EUR"), result.value.map { it.currency })
+    }
+
+    @Test
+    fun familias_sinMoneda_oConMonedaDesconocida_quedaSinMoneda() = runTest {
+        val source = source(
+            reply(
+                HttpStatusCode.OK,
+                """[{"familyId":"f-1","name":"Plata","role":"OWNER"},
+                    {"familyId":"f-2","name":"Depto","role":"MEMBER","defaultCurrency":"ZZZZ"},
+                    {"familyId":"f-3","name":"Otra","role":"MEMBER","defaultCurrency":null}]""",
+            ),
+        )
+
+        val result = source.families() as RemoteResult.Success
+
+        assertEquals(listOf(null, null, null), result.value.map { it.currency })
+        assertEquals(listOf("Plata", "Depto", "Otra"), result.value.map { it.name })
     }
 
     @Test

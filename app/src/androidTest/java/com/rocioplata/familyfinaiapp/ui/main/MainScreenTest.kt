@@ -153,7 +153,7 @@ class MainScreenTest {
     }
 
     @Test
-    fun everyTabShowsTitleWithActiveFamilyAndNoFab() {
+    fun everyTabShowsTitleWithActiveFamilyAndOnlyMovementsHasFab() {
         setHost(severalFamilies)
 
         listOf(
@@ -166,8 +166,27 @@ class MainScreenTest {
             composeTestRule.onNodeWithTag("tab_placeholder_${destination.name}").assertIsDisplayed()
             composeTestRule.onNodeWithText("${context.getString(destination.labelRes)} · Familia Plata")
                 .assertIsDisplayed()
-            composeTestRule.onAllNodesWithContentDescription("Agregar").assertCountEquals(0)
+            composeTestRule.onAllNodesWithContentDescription("Agregar")
+                .assertCountEquals(if (destination == MainDestination.Movements) 1 else 0)
         }
+    }
+
+    @Test
+    fun fabOpensNewMovementFromHomeAndFromMovementsAndBackReturnsToTheTab() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithContentDescription("Agregar").performClick()
+        composeTestRule.onNodeWithTag("movement_create_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Nuevo movimiento").assertIsDisplayed()
+        composeTestRule.onAllNodesWithContentDescription("Agregar").assertCountEquals(0)
+        composeTestRule.onNodeWithTag("movement_back").performClick()
+        composeTestRule.onNodeWithText("Inicio").assertIsSelected()
+
+        composeTestRule.onNodeWithText("Movimientos").performClick()
+        composeTestRule.onNodeWithContentDescription("Agregar").performClick()
+        composeTestRule.onNodeWithTag("movement_create_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("movement_back").performClick()
+        composeTestRule.onNodeWithText("Movimientos").assertIsSelected()
     }
 
     @Test

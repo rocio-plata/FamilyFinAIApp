@@ -107,7 +107,9 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   rechaza la renovación, la sesión termina con motivo `Expired` o `Security` y se borran sesión y
   caché de cabecera (`onSessionEnded`); sin red la sesión se conserva. `endSession` no debe
   esperar al refresco de cabecera en curso: `HeaderRepositoryImpl.clear()` usa su propio candado y
-  un contador de época (ver `SessionEndDuringHeaderRefreshTest`). `Session`, los DTOs de auth y
+  un contador de época (ver `SessionEndDuringHeaderRefreshTest`). Al terminar la sesión también se vacían las cachés de categorías, medios de pago,
+  movimientos y miembros (`AppContainer.onSessionEnded`), cada una con el mismo esquema de época
+  (`SessionEndDuring…RefreshTest`). `Session`, los DTOs de auth y
   `RefreshOutcome` sobrescriben `toString()` para no filtrar tokens.
 - **Datos**: los data sources remotos devuelven `RemoteResult.Success/Failure` con fallos de
   dominio tipados (`HeaderFailure`) y nunca lanzan por red/servidor; sí relanzan
@@ -145,28 +147,73 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   cambio a la vez (`isBusy`); recibe `onInsufficientRole`. `PaymentMethodsContent` es stateless
   (`PaymentMethodFormDialog` y el menú ⋮ por fila); `PaymentMethodTexts` traduce los fallos y
   distingue el aviso sin conexión de una acción del menú del del formulario.
+- **Dinero y moneda de la familia** (`domain/money`, `ui/movements/MoneyFormat.kt`): `Money(amountMinor: Long,
+  currency)` es siempre un entero en la unidad menor (nunca `Double`); sumar o restar exige la misma moneda y
+  usa aritmética exacta. `MoneyInput` decide qué se puede escribir en el campo de monto según los decimales de
+  la moneda (`java.util.Currency`: CLP 0, USD 2) y convierte texto ↔ unidad menor; la parte entera admite 12
+  dígitos. `MoneyFormat` (`formatted`, `formattedFor` con `-` en gasto y `+` en ingreso, `formattedSigned`) da
+  formato con la configuración regional del dispositivo. La moneda de la familia llega en `Family.currency`
+  (`defaultCurrency` de `GET /me/families`), guardada como campo opcional de `header_cache` sin cambiar su
+  `schemaVersion`: una copia antigua se lee sin moneda. Sin moneda válida no se puede registrar un movimiento;
+  al editar se usa la del propio movimiento.
+- **Miembros de la familia** (`domain/members`, `data/members`): `FamilyMembersRepositoryImpl` descarga
+  `GET /families/:id/members` y solo lee `userId`, `displayName` y `role`; el correo no se lee ni se guarda. Caché
+  `members_cache` (una clave `members_<familia>`, `schemaVersion = 1`, excluida de las copias de seguridad,
+  `CachePolicy`). Solo lee: sin operaciones de cambio ni conectividad. `ui/movements/MemberLabel.kt` resuelve
+  quién registró un movimiento contra la lista y el `userId` de la sesión: `You` (se reconoce aunque no haya
+  lista), `Named`, `NoName`, `FormerMember` (no está en la lista) o `Unavailable` (sin lista; el listado lo omite
+  y el detalle lo indica).
+- **Movimientos** (`domain/movements`, `data/movements`, `ui/movements`): misma separación por capas que
+  categorías y medios de pago. `MovementsRepositoryImpl` expone `movements(familia, mes)` (Flow ya ordenado por
+  día y `createdAt` descendentes), `movement(familia, id)` (busca solo en los meses cargados: el backend no tiene
+  consulta individual, BG-06 de la 007), `refresh(familia, mes)` y las mutaciones `createMovement`, `editMovement` (primero
+  los datos y después la categoría; `MovementEditResult` distingue `Success`, `Failure` y `Partial`) y
+  `deleteMovement`. Sin conexión las mutaciones devuelven `Offline` sin llamar al backend (una edición sin
+  cambios no llama). Cada cambio correcto se aplica a memoria y caché de los meses cargados conservando su
+  `savedAt` (un movimiento que cambia de mes sale del mes actual); lo aplicado es lo que la app envió, no lo que
+  responde el backend. La caché es `movements_cache` (clave `movements_<familia>_<yyyy-MM>` y
+  `last_payment_method_<usuario>_<familia>`, `schemaVersion = 1`, excluida de las copias de seguridad,
+  `CachePolicy`). El día se guarda como `LocalDate`: `MovementDates` (reloj y zona del dispositivo) envía el
+  instante actual si es hoy y las 12:00 de ese día si es pasado, nunca futuro (BG-09 de la 007). Los errores de dominio se
+  aceptan con los prefijos `FINANCIAL_TRACKING.*` y `FINANCIAL.*` (BG-07 de la 007). Presentación:
+  `MovementsViewModel` (clave `sesión-familia`) combina el mes, el filtro de tipo y los repositorios de
+  categorías, medios de pago y miembros en filas ya resueltas, con subtotal por día de lo visible y resumen del
+  mes con todos; `MovementFormViewModel` es el formulario de alta y, con `movementId`, de edición (envía solo lo
+  modificado, conserva lo archivado que el movimiento ya tenía y un resultado parcial deja el formulario abierto
+  con lo pendiente); `MovementDetailViewModel` resuelve el detalle y elimina con confirmación (si el movimiento
+  desaparece pasa al estado `Gone`, con "Volver al listado"). Los dos últimos tienen una clave de ViewModel por
+  apertura de la ruta (`MainUiState.managementRouteInstance`), así que cada "+" empieza con un formulario nuevo.
+  Todas las operaciones de cambio permiten una sola a la vez, con el indicador fijado antes de lanzar la corrutina.
 - **Presentación**: `MainViewModel` combina el flujo del repositorio con estado local
   (familia activa solo en memoria, selector abierto, refresco en curso) en un
   `StateFlow<MainUiState>`; `FamiliesState` es un sealed interface
   (Loading/NoData/Content/Error). Se refresca al iniciar, en `ON_START` y al recuperar
-  conectividad. `MainScreen` tiene una sobrecarga con estado (ViewModel) y otra stateless.
+  conectividad. La pestaña inferior seleccionada también vive en `MainViewModel` (`MainUiState.selectedTab`,
+  solo en memoria: sobrevive a recrear la pantalla y tras terminar el proceso se vuelve a Inicio). `MainScreen` tiene una sobrecarga con estado (ViewModel) y otra stateless.
   `AuthViewModel` (`ui/auth`) gestiona login y registro con las reglas de `AuthValidation` y los
   mensajes de `AuthTexts`; `AuthContent` es la parte stateless.
 - **Navegación**: aún no hay librería. `AppRoot`/`RootViewModel` eligen la pantalla según
   `SessionState`: nada en `Loading`, `AuthScreen` en `SignedOut` y `MainScreen` en `SignedIn`; la
   generación de la sesión reinicia el estado de los ViewModels al cambiar de usuario. Las pestañas
-  inferiores son el enum `MainDestination` (su orden es el de la barra). La gestión de categorías
+  inferiores son el enum `MainDestination` (su orden es el de la barra); la pestaña Movimientos muestra
+  `MovementsScreen` mediante el hueco `movementsContent` de `MainScreen` (nulo en los tests de UI, que usan
+  `TabPlaceholder`). La gestión de categorías
   (`CategoriesRoute`: listado, alta o edición) y la de medios de pago (`PaymentMethodsRoute`) son
   rutas **en memoria** de `MainViewModel` (`managementRoute`, ligada a la familia con la que se
   abrió), no pestañas ni una librería de navegación: se abren desde «Gestionar» en Inicio, ocultan
   la cabecera y la barra inferior, impiden cambiar de familia mientras están abiertas, se cierran
   si esa familia desaparece de la cabecera y se pierden si el proceso muere (se vuelve a Inicio).
-  `MainViewModel.onInsufficientRole()` vuelve a consultar la cabecera cuando el backend rechaza una
-  acción por rol: si el usuario ya no es miembro, la familia desaparece y la ruta se cierra sola.
+  Las pantallas de un movimiento son también rutas en memoria (`MovementRoute.Create`, `Detail(id)` y
+  `Edit(id)`): el "+" de Inicio y de Movimientos abre `Create` y tocar una fila abre `Detail`; `Edit` solo se abre
+  desde su `Detail` y atrás desde ella vuelve al detalle, mientras que `Create` y `Detail` vuelven a la pestaña de
+  origen. Una edición que mueve el movimiento a otro mes cierra todo de una vez (`closeManagement()`), porque el
+  detalle ya no lo encontraría. `MainViewModel.onInsufficientRole()` vuelve a consultar la cabecera cuando el
+  backend rechaza una acción por rol: si el usuario ya no es miembro, la familia desaparece y la ruta se cierra sola.
 - **Tests**: unitarios JVM con `kotlinx-coroutines-test` y `ktor-client-mock`; los de UI
   (`androidTest`) usan `TestMainHost`, que reproduce lo mínimo del ViewModel sobre la
   sobrecarga stateless de `MainScreen`, sin red ni caché; los de acceso (`AuthScreenTest`,
-  `AppRootTest`) usan `AuthContent` y `AppRootContent` con repositorios falsos.
+  `AppRootTest`) usan `AuthContent` y `AppRootContent` con repositorios falsos. Los repositorios falsos de los tests de movimientos (movimientos, categorías, medios de pago y
+  miembros) están compartidos en `app/src/test/…/ui/movements/Fakes.kt`.
 
 ## Documentación y especificaciones
 
