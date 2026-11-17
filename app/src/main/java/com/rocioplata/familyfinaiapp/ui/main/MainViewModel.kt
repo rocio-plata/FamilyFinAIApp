@@ -124,6 +124,11 @@ class MainViewModel(
         }
     }
 
+    /** Cierra la gestión abierta de una vez, sea cual sea su nivel (p. ej. de la edición de un movimiento al listado). */
+    fun closeManagement() {
+        managementRoute.value = null
+    }
+
     private fun openRoute(route: ManagementRoute) {
         val content = uiState.value.families as? FamiliesState.Content ?: return
         // Desde las pestañas solo se abre un listado, el alta o el detalle de un movimiento; el alta y la edición de

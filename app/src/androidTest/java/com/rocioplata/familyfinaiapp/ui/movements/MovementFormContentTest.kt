@@ -23,6 +23,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.rocioplata.familyfinaiapp.domain.categories.Category
@@ -546,5 +550,31 @@ class MovementFormContentTest {
         tag("movement_form_save").assertIsNotEnabled()
         composeTestRule.onNodeWithTag("movement_form_amount").assertIsNotEnabled()
         tag("movement_form_saving").assertIsDisplayed()
+    }
+
+    @Test
+    fun withTheLargestFontTheCategoriesUseTwoColumnsSoNamesAreNotBrokenMidWord() {
+        val many = (1..5).map { Category("c-$it", CategoryType.EXPENSE, "Categoría $it", null, CategoryStatus.ACTIVE, emptyList()) }
+        composeTestRule.setContent {
+            val base = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 2f)) {
+                FamilyFinAIAppTheme {
+                    MovementFormContent(
+                        state = state(categories = many), familyName = "Familia", onClose = {}, onTypeChange = {},
+                        onAmountChange = {}, onTitleChange = {}, onCategorySelect = {}, onTagSelect = {},
+                        onPaymentMethodSelect = {}, onToday = {}, onYesterday = {}, onDateSelect = {}, onNoteChange = {},
+                        onSave = {}, onRetryOptions = {}, onConfirmDiscard = {}, onDismissDiscard = {},
+                        onNoticeConsumed = {},
+                    )
+                }
+            }
+        }
+
+        val tops = (1..5).map { tag("movement_form_category_c-$it").getUnclippedBoundsInRoot().top }
+        // Dos por fila: la 1 y la 2 comparten fila, la 3 baja, la 5 queda en la tercera fila.
+        assertEquals(tops[0], tops[1])
+        assertTrue(tops[2] > tops[0])
+        assertEquals(tops[2], tops[3])
+        assertTrue(tops[4] > tops[2])
     }
 }

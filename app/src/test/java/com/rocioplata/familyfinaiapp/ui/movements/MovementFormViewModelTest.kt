@@ -837,6 +837,7 @@ class MovementFormViewModelTest {
         movement: Movement? = original,
         emit: Boolean = true,
         currency: String? = "CLP",
+        onMoved: (() -> Unit)? = null,
         configure: (FakeMovements, FakeCategories, FakePaymentMethods) -> Unit = { _, _, _ -> },
     ): Rig {
         val movements = FakeMovements()
@@ -851,6 +852,7 @@ class MovementFormViewModelTest {
             movements, categories, paymentMethods, "f-1", currency, dates,
             onClose = { closed++ }, onInsufficientRole = { insufficient++ }, onCurrencyMismatch = { mismatch++ },
             movementId = "m-1",
+            onMovedToAnotherMonth = onMoved ?: { closed++; Unit },
         )
         backgroundScope.launch { vm.uiState.collect {} }
         advanceUntilIdle()
@@ -1403,5 +1405,79 @@ class MovementFormViewModelTest {
         rig.vm.save()
         advanceUntilIdle()
         assertEquals(Money(50_000, "CLP"), rig.movements.edited.single().changes.amount)
+    }
+
+    // --- Edición que mueve el movimiento a otro mes (hallazgo de T-23) ---
+
+    @Test
+    fun edicion_alMoverLaFechaAOtroMes_vuelveAlListadoYNoAlDetalle() = runTest {
+        var moved = 0
+        val rig = createEdit(onMoved = { moved++; Unit })
+
+        rig.vm.onDateSelect(LocalDate.of(2026, 10, 15))
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(1, moved)
+        assertEquals(0, rig.closed())
+        assertEquals(LocalDate.of(2026, 10, 15), rig.movements.edited.single().changes.date)
+    }
+
+    @Test
+    fun edicion_alCambiarLaFechaDentroDelMismoMes_vuelveAlDetalle() = runTest {
+        var moved = 0
+        val rig = createEdit(onMoved = { moved++; Unit })
+
+        rig.vm.onDateSelect(LocalDate.of(2026, 11, 3))
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(0, moved)
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun edicion_sinCambiarLaFecha_vuelveAlDetalle() = runTest {
+        var moved = 0
+        val rig = createEdit(onMoved = { moved++; Unit })
+
+        rig.vm.onTitleChange("Otro")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(0, moved)
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun edicion_parcialConLaFechaEnOtroMes_alTerminarVuelveAlListado() = runTest {
+        var moved = 0
+        val rig = createEdit(onMoved = { moved++; Unit }) { movements, _, _ -> movements.editPartialFailure = MovementFailure.Network }
+        rig.vm.onDateSelect(LocalDate.of(2026, 10, 15))
+        rig.vm.onCategorySelect("c-transport")
+        rig.vm.save()
+        advanceUntilIdle()
+        assertEquals(0, moved)
+
+        rig.movements.editPartialFailure = null
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(1, moved)
+        assertEquals(0, rig.closed())
+    }
+
+    @Test
+    fun edicion_cerrarSinGuardar_nuncaVuelveAlListado() = runTest {
+        var moved = 0
+        val rig = createEdit(onMoved = { moved++; Unit })
+        rig.vm.onDateSelect(LocalDate.of(2026, 10, 15))
+
+        rig.vm.requestClose()
+        rig.vm.confirmDiscard()
+        advanceUntilIdle()
+
+        assertEquals(0, moved)
+        assertEquals(1, rig.closed())
     }
 }

@@ -67,12 +67,20 @@ class MovementFormViewModel(
     private val onCurrencyMismatch: () -> Unit = {},
     /** Movimiento que se edita; nulo en el alta. */
     private val movementId: String? = null,
+    /**
+     * Se guardó una edición que movió el movimiento a otro mes: el detalle de debajo ya no lo encuentra (el mes
+     * de destino puede no estar cargado), así que se vuelve directamente al listado. Por defecto, igual que [onClose].
+     */
+    private val onMovedToAnotherMonth: () -> Unit = onClose,
 ) : ViewModel() {
     private val familyCurrency: String? = currency?.takeIf { Money.isKnown(it) }
     private val isEdit = movementId != null
     private val today: LocalDate = dates.today()
 
     private val fields = MutableStateFlow(Fields(date = today))
+
+    // Mes del movimiento al abrir la edición, para saber si el guardado lo mueve a otro mes.
+    private var initialMonth: YearMonth? = null
 
     // Copias síncronas de los flujos de los repositorios: al guardar o cerrar se valida contra el estado
     // actual, no contra el último `uiState` publicado, que se recalcula de forma asíncrona.
@@ -225,6 +233,7 @@ class MovementFormViewModel(
             note = movement.note.orEmpty(),
             original = movement,
         )
+        initialMonth = YearMonth.from(movement.date)
     }
 
     // Mientras se guarda, o mientras se lee el movimiento que se edita, el formulario no cambia.
@@ -325,8 +334,9 @@ class MovementFormViewModel(
     private fun onEditResult(result: MovementEditResult, changes: MovementChanges) {
         when (result) {
             MovementEditResult.Success -> {
+                val finalDate = changes.date ?: fields.value.original?.date
                 fields.update { it.copy(isSaving = false) }
-                onClose()
+                if (finalDate != null && YearMonth.from(finalDate) != initialMonth) onMovedToAnotherMonth() else onClose()
             }
             is MovementEditResult.Failure ->
                 if (result.failure == MovementFailure.NotFound) onMovementGone() else onSaveFailed(result.failure)

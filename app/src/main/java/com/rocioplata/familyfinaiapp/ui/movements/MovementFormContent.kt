@@ -59,6 +59,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -91,6 +92,10 @@ import java.util.Currency
 import java.util.Locale
 
 private const val CATEGORY_COLUMNS = 4
+
+// Con la fuente muy grande, 4 columnas parten los nombres a mitad de palabra: se pasa a 2 (T-23).
+private const val LARGE_FONT_SCALE = 1.3f
+private const val LARGE_FONT_CATEGORY_COLUMNS = 2
 
 /**
  * Formulario "Nuevo movimiento" a pantalla completa (RF-05 a RF-07, RF-16): "X", familia y moneda, tipo, monto,
@@ -313,8 +318,9 @@ private fun CategorySection(
                 "movement_form_no_categories",
             )
             else -> {
+                val columns = if (LocalDensity.current.fontScale > LARGE_FONT_SCALE) LARGE_FONT_CATEGORY_COLUMNS else CATEGORY_COLUMNS
                 FlowRow(
-                    maxItemsInEachRow = CATEGORY_COLUMNS,
+                    maxItemsInEachRow = columns,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth().selectableGroup(),
@@ -329,7 +335,7 @@ private fun CategorySection(
                         )
                     }
                     // Completa la última fila para que las casillas tengan siempre el mismo ancho.
-                    repeat((CATEGORY_COLUMNS - state.categories.size % CATEGORY_COLUMNS) % CATEGORY_COLUMNS) {
+                    repeat((columns - state.categories.size % columns) % columns) {
                         Spacer(Modifier.weight(1f))
                     }
                 }

@@ -838,4 +838,30 @@ class MainViewModelTest {
         assertTrue(edit > detail)
         assertEquals(edit, vm.uiState.value.managementRouteInstance)
     }
+
+    @Test
+    fun movimiento_cerrarLaGestionDeUnaVez_vuelveALasPestanasDesdeLaEdicion() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.selectTab(MainDestination.Movements)
+        vm.openMovementDetail("m-1")
+        vm.openMovementEdit("m-1")
+        advanceUntilIdle()
+        assertEquals(MovementRoute.Edit("m-1"), vm.route())
+
+        vm.closeManagement()
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        assertEquals(MainDestination.Movements, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun cerrarLaGestionSinNingunaAbierta_noHaceNada() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        vm.closeManagement()
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+    }
 }

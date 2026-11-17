@@ -18,7 +18,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
+import android.view.KeyEvent
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.money.Money
@@ -265,8 +267,13 @@ class MovementDetailContentTest {
     @Test
     fun backWithTheDialogOpenCancelsTheDeletion() {
         val calls = show(state = content(confirmingDelete = true))
+        composeTestRule.onNodeWithTag("movement_detail_delete_dialog").assertIsDisplayed()
+        composeTestRule.waitForIdle()
 
-        pressBack()
+        // Se envía la tecla directamente y se espera el resultado: `pressBack()` de Espresso espera a que la
+        // raíz tenga foco y en un emulador saturado a veces no lo recibe en 10 s.
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        composeTestRule.waitUntil(timeoutMillis = 10_000) { calls.cancel == 1 }
 
         assertEquals(1, calls.cancel)
         assertEquals(0, calls.back)

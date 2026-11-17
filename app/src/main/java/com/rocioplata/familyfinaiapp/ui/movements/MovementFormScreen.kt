@@ -28,6 +28,8 @@ fun MovementFormScreen(
     modifier: Modifier = Modifier,
     /** Movimiento que se edita; nulo para un alta. */
     movementId: String? = null,
+    /** Se guardó una edición que movió el movimiento a otro mes: se vuelve al listado, no al detalle. */
+    onMovedToAnotherMonth: () -> Unit = onClose,
 ) {
     val container = (LocalContext.current.applicationContext as FamilyFinApp).container
     val viewModel: MovementFormViewModel = viewModel(
@@ -45,6 +47,7 @@ fun MovementFormScreen(
                     onInsufficientRole = onInsufficientRole,
                     onCurrencyMismatch = onCurrencyMismatch,
                     movementId = movementId,
+                    onMovedToAnotherMonth = onMovedToAnotherMonth,
                 )
             }
         },

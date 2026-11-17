@@ -108,6 +108,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     onInsufficientRole = viewModel::onInsufficientRole,
                     onCurrencyMismatch = viewModel::onInsufficientRole,
                     movementId = route.movementId,
+                    onMovedToAnotherMonth = viewModel::closeManagement,
                     modifier = modifier,
                 )
                 route is MovementRoute -> MovementRoutePlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
