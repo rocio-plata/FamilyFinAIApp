@@ -71,6 +71,8 @@
     <string name="movement_form_date_cancel">Cancelar</string>
     <string name="movement_form_note_label">Observaciones (opcional)</string>
     <string name="movement_form_save">Guardar movimiento</string>
+    <string name="movement_form_save_changes">Guardar cambios</string>
+    <string name="movement_form_partial_saved">Se guardaron los datos del movimiento, pero no el cambio de categoría o etiqueta. Revísalo y vuelve a guardar.</string>
     <string name="movement_form_options_loading">Cargando categorías y medios de pago…</string>
     <string name="movement_form_options_error">No se pudieron cargar las categorías y los medios de pago.</string>
     <string name="movement_form_no_expense_categories">No hay categorías de gastos activas. Créalas en Inicio, en Categorías, con «Gestionar».</string>

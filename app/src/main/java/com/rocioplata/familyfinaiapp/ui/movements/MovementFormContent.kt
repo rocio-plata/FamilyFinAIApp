@@ -147,7 +147,9 @@ fun MovementFormContent(
         snackbarHost = { SnackbarHost(snackbar, modifier = Modifier.imePadding()) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.movement_create_title)) },
+                title = {
+                    Text(stringResource(if (state.isEditing) R.string.movement_edit_title else R.string.movement_create_title))
+                },
                 navigationIcon = {
                     IconButton(onClick = onClose, enabled = !state.isSaving, modifier = Modifier.testTag("movement_form_close")) {
                         Icon(Icons.Filled.Close, stringResource(R.string.movement_form_close_description))
@@ -167,14 +169,22 @@ fun MovementFormContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             FamilyLine(familyName, state.currency)
-            TypeSelector(state.type, enabled = !state.isSaving, onTypeChange)
-            AmountField(state, onAmountChange)
-            TitleField(state, onTitleChange)
-            CategorySection(state, onCategorySelect, onTagSelect, onRetryOptions)
-            PaymentMethodSection(state, onPaymentMethodSelect)
-            DateSection(state, onToday, onYesterday, onDateSelect)
-            NoteField(state, onNoteChange)
-            SaveSection(state, onSave)
+            if (state.isLoadingMovement) {
+                LoadingMovement()
+            } else {
+                if (state.savedPartially) {
+                    Hint(stringResource(R.string.movement_form_partial_saved), "movement_form_partial")
+                }
+                // El tipo de un movimiento no se puede cambiar al editarlo (RF-09).
+                TypeSelector(state.type, enabled = !state.isSaving && !state.isEditing, onTypeChange)
+                AmountField(state, onAmountChange)
+                TitleField(state, onTitleChange)
+                CategorySection(state, onCategorySelect, onTagSelect, onRetryOptions)
+                PaymentMethodSection(state, onPaymentMethodSelect)
+                DateSection(state, onToday, onYesterday, onDateSelect)
+                NoteField(state, onNoteChange)
+                SaveSection(state, onSave)
+            }
         }
     }
     if (state.confirmingDiscard) DiscardDialog(onConfirmDiscard, onDismissDiscard)
@@ -334,7 +344,14 @@ private fun CategorySection(
                         selected = tag.id == state.tagId,
                         onClick = { onTagSelect(tag.id) },
                         enabled = !state.isSaving,
-                        label = { Text("#${tag.name}") },
+                        label = {
+                            val archived = if (tag.status == TagStatus.DEPRECATED) {
+                                " (${stringResource(R.string.movement_detail_archived_female)})"
+                            } else {
+                                ""
+                            }
+                            Text("#${tag.name}$archived")
+                        },
                         modifier = Modifier.testTag("movement_form_tag_${tag.id}"),
                     )
                 }
@@ -373,6 +390,15 @@ private fun CategoryTile(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            // Solo aparece al editar un movimiento cuya categoría se archivó después (RF-10).
+            if (category.status == CategoryStatus.DEPRECATED) {
+                Text(
+                    text = stringResource(R.string.movement_detail_archived_female),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("movement_form_category_archived_${category.id}"),
+                )
+            }
         }
     }
 }
@@ -391,7 +417,14 @@ private fun PaymentMethodSection(state: MovementFormUiState, onSelect: (String) 
                         selected = method.id == state.paymentMethodId,
                         onClick = { onSelect(method.id) },
                         enabled = !state.isSaving,
-                        label = { Text(method.name) },
+                        label = {
+                            val archived = if (method.status == PaymentMethodStatus.DEPRECATED) {
+                                " (${stringResource(R.string.movement_detail_archived_male)})"
+                            } else {
+                                ""
+                            }
+                            Text("${method.name}$archived")
+                        },
                         leadingIcon = { Icon(Icons.Filled.CreditCard, contentDescription = null, modifier = Modifier.size(18.dp)) },
                         modifier = Modifier.testTag("movement_form_payment_${method.id}"),
                     )
@@ -510,7 +543,7 @@ private fun SaveSection(state: MovementFormUiState, onSave: () -> Unit) {
             Icon(Icons.Filled.Check, contentDescription = null)
         }
         Text(
-            text = stringResource(R.string.movement_form_save),
+            text = stringResource(if (state.isEditing) R.string.movement_form_save_changes else R.string.movement_form_save),
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(start = 8.dp),
         )
@@ -535,6 +568,14 @@ private fun DiscardDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
             }
         },
     )
+}
+
+@Composable
+private fun LoadingMovement() {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp).testTag("movement_form_loading"),
+        contentAlignment = Alignment.Center,
+    ) { CircularProgressIndicator() }
 }
 
 @Composable

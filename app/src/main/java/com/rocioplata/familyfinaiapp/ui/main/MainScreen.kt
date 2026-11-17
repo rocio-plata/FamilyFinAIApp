@@ -99,6 +99,17 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     onInsufficientRole = viewModel::onInsufficientRole,
                     modifier = modifier,
                 )
+                route is MovementRoute.Edit -> MovementFormScreen(
+                    familyId = family.id,
+                    familyName = family.name,
+                    currency = family.currency,
+                    viewModelKey = "${viewModelKey ?: "main"}-movement-form-${family.id}-${uiState.managementRouteInstance}",
+                    onClose = viewModel::managementBack,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    onCurrencyMismatch = viewModel::onInsufficientRole,
+                    movementId = route.movementId,
+                    modifier = modifier,
+                )
                 route is MovementRoute -> MovementRoutePlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
                 route == PaymentMethodsRoute -> PaymentMethodsScreen(
                     familyId = family.id,

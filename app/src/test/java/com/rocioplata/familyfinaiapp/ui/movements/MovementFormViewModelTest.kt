@@ -8,6 +8,10 @@ import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import com.rocioplata.familyfinaiapp.domain.money.Money
 import com.rocioplata.familyfinaiapp.domain.movements.AmountError
+import com.rocioplata.familyfinaiapp.domain.movements.CategoryChange
+import com.rocioplata.familyfinaiapp.domain.movements.Movement
+import com.rocioplata.familyfinaiapp.domain.movements.MovementChanges
+import com.rocioplata.familyfinaiapp.domain.movements.NoteUpdate
 import com.rocioplata.familyfinaiapp.domain.movements.DateError
 import com.rocioplata.familyfinaiapp.domain.movements.MovementDates
 import com.rocioplata.familyfinaiapp.domain.movements.MovementFailure
@@ -37,6 +41,7 @@ import org.junit.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -394,9 +399,10 @@ class MovementFormViewModelTest {
         advanceUntilIdle()
         assertEquals("m-card", rig.state.paymentMethodId)
 
+        // Un medio archivado se ignora: se conserva la elección anterior.
         rig.vm.onPaymentMethodSelect("m-old")
         advanceUntilIdle()
-        assertEquals("m-cash", rig.state.paymentMethodId)
+        assertEquals("m-card", rig.state.paymentMethodId)
         assertEquals(listOf("m-card", "m-cash"), rig.state.paymentMethods.map { it.id })
     }
 
@@ -817,5 +823,585 @@ class MovementFormViewModelTest {
         }
 
         assertEquals(FormOptionsState.Ready, rig.state.options)
+    }
+
+    // --- Edición (T-20: CA-11, CA-12, CA-13, CA-19, CA-22) ---
+
+    private val original = Movement(
+        id = "m-1", type = MovementType.EXPENSE, amount = Money(45_900, "CLP"), categoryId = "c-food",
+        tagId = "t-1", paymentMethodId = "m-card", title = "Supermercado", note = "Compra semanal",
+        date = LocalDate.of(2026, 11, 12), recordedBy = "u-1", createdAt = Instant.EPOCH,
+    )
+
+    private fun TestScope.createEdit(
+        movement: Movement? = original,
+        emit: Boolean = true,
+        currency: String? = "CLP",
+        configure: (FakeMovements, FakeCategories, FakePaymentMethods) -> Unit = { _, _, _ -> },
+    ): Rig {
+        val movements = FakeMovements()
+        val categories = FakeCategories().apply { data.value = CategoriesData(listOf(food, transport, oldCategory, salary)) }
+        val paymentMethods = FakePaymentMethods().apply { data.value = PaymentMethodsData(listOf(card, cash, oldMethod)) }
+        configure(movements, categories, paymentMethods)
+        if (emit) movements.detail.tryEmit(movement)
+        var closed = 0
+        var insufficient = 0
+        var mismatch = 0
+        val vm = MovementFormViewModel(
+            movements, categories, paymentMethods, "f-1", currency, dates,
+            onClose = { closed++ }, onInsufficientRole = { insufficient++ }, onCurrencyMismatch = { mismatch++ },
+            movementId = "m-1",
+        )
+        backgroundScope.launch { vm.uiState.collect {} }
+        advanceUntilIdle()
+        return Rig(movements, categories, paymentMethods, vm, { closed }, { insufficient }, { mismatch })
+    }
+
+    @Test
+    fun edicion_cargaLosDatosDelMovimiento() = runTest {
+        val rig = createEdit()
+        val s = rig.state
+
+        assertTrue(s.isEditing)
+        assertFalse(s.isLoadingMovement)
+        assertEquals(MovementType.EXPENSE, s.type)
+        assertEquals("45900", s.amountText)
+        assertEquals("Supermercado", s.title)
+        assertEquals("c-food", s.categoryId)
+        assertEquals("t-1", s.tagId)
+        assertEquals("m-card", s.paymentMethodId)
+        assertEquals(LocalDate.of(2026, 11, 12), s.date)
+        assertEquals("Compra semanal", s.note)
+        assertEquals(FormOptionsState.Ready, s.options)
+        assertFalse(s.savedPartially)
+    }
+
+    @Test
+    fun edicion_conMontoConDecimales_loMuestraEnSuFormatoEditable() = runTest {
+        val rig = createEdit(original.copy(amount = Money(1_250, "USD")), currency = "USD")
+
+        assertEquals("12,50", rig.state.amountText)
+    }
+
+    @Test
+    fun edicion_sinObservaciones_dejaElCampoVacio() = runTest {
+        assertEquals("", createEdit(original.copy(note = null)).state.note)
+    }
+
+    @Test
+    fun edicion_mientrasSeLeeElMovimiento_estaCargando_yNoSePuedeEditar() = runTest {
+        val rig = createEdit(emit = false)
+
+        assertTrue(rig.state.isLoadingMovement)
+        assertEquals(FormOptionsState.Loading, rig.state.options)
+        rig.vm.onTitleChange("x")
+        rig.vm.save()
+        advanceUntilIdle()
+        assertEquals("", rig.state.title)
+        assertTrue(rig.movements.edited.isEmpty())
+
+        rig.movements.detail.tryEmit(original)
+        advanceUntilIdle()
+        assertFalse(rig.state.isLoadingMovement)
+        assertEquals("Supermercado", rig.state.title)
+    }
+
+    @Test
+    fun edicion_siElMovimientoNoEstaEnMemoria_cierra() = runTest {
+        val rig = createEdit(movement = null)
+
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun edicion_noRefrescaElUltimoMedioNiLoPropone() = runTest {
+        val rig = createEdit(original.copy(paymentMethodId = null)) { movements, _, _ ->
+            movements.lastUsedPaymentMethodId = "m-cash"
+        }
+
+        assertNull(rig.state.paymentMethodId)
+    }
+
+    @Test
+    fun edicion_elTipoNoSePuedeCambiar() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onTypeChange(MovementType.INCOME)
+        advanceUntilIdle()
+
+        assertEquals(MovementType.EXPENSE, rig.state.type)
+        assertEquals("c-food", rig.state.categoryId)
+    }
+
+    @Test
+    fun edicion_unIngresoSoloOfreceCategoriasDeIngreso() = runTest {
+        val income = original.copy(type = MovementType.INCOME, categoryId = "c-salary", tagId = null)
+        val rig = createEdit(income)
+
+        assertEquals(listOf("c-salary"), rig.state.categories.map { it.id })
+    }
+
+    @Test
+    fun edicion_sinCambios_cierraSinLlamar() = runTest {
+        val rig = createEdit()
+
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertTrue(rig.movements.edited.isEmpty())
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun edicion_cadaCampoPorSeparado_enviaSoloEseCampo() = runTest {
+        data class Case(val name: String, val change: (MovementFormViewModel) -> Unit, val expected: MovementChanges)
+        val cases = listOf(
+            Case("monto", { it.onAmountChange("50000") }, MovementChanges(amount = Money(50_000, "CLP"))),
+            Case("concepto", { it.onTitleChange("  Super Jumbo ") }, MovementChanges(title = "Super Jumbo")),
+            Case("observaciones", { it.onNoteChange("Otra nota") }, MovementChanges(note = NoteUpdate.Set("Otra nota"))),
+            Case("fecha", { it.onYesterday() }, MovementChanges(date = today.minusDays(1))),
+            Case("medio", { it.onPaymentMethodSelect("m-cash") }, MovementChanges(paymentMethodId = "m-cash")),
+            Case("etiqueta", { it.onTagSelect("t-2") }, MovementChanges(category = CategoryChange("c-food", "t-2"))),
+            Case("categoria", { it.onCategorySelect("c-transport") }, MovementChanges(category = CategoryChange("c-transport", null))),
+        )
+        cases.forEach { case ->
+            val rig = createEdit()
+            case.change(rig.vm)
+            rig.vm.save()
+            advanceUntilIdle()
+
+            assertEquals(case.name, listOf(case.expected), rig.movements.edited.map { it.changes })
+            assertEquals(case.name, 1, rig.closed())
+        }
+    }
+
+    @Test
+    fun edicion_borrarLasObservaciones_envianRemove() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onNoteChange("   ")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(NoteUpdate.Remove, rig.movements.edited.single().changes.note)
+    }
+
+    @Test
+    fun edicion_laFechaSoloSeEnviaSiCambioElDia() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onYesterday()
+        rig.vm.onDateSelect(original.date)
+        rig.vm.onTitleChange("Otro")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertNull(rig.movements.edited.single().changes.date)
+        assertEquals("Otro", rig.movements.edited.single().changes.title)
+    }
+
+    @Test
+    fun edicion_datosYCategoriaAlMismoTiempo_seEnvianJuntos() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onTitleChange("Nuevo")
+        rig.vm.onCategorySelect("c-transport")
+        rig.vm.onTagSelect("t-bus")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(
+            MovementChanges(title = "Nuevo", category = CategoryChange("c-transport", "t-bus")),
+            rig.movements.edited.single().changes,
+        )
+        assertEquals("m-1", rig.movements.edited.single().movementId)
+    }
+
+    @Test
+    fun edicion_quitarLaEtiqueta_enviaLaMismaCategoriaSinEtiqueta() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onTagSelect("t-1")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(CategoryChange("c-food", null), rig.movements.edited.single().changes.category)
+    }
+
+    @Test
+    fun edicion_medioArchivado_seConservaYSeGuardaElRestoSinCambiarlo() = runTest {
+        val rig = createEdit(original.copy(paymentMethodId = "m-old"))
+        assertEquals("m-old", rig.state.paymentMethodId)
+        assertEquals(listOf("m-card", "m-cash", "m-old"), rig.state.paymentMethods.map { it.id })
+
+        rig.vm.onTitleChange("Otro")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertNull(rig.movements.edited.single().changes.paymentMethodId)
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun edicion_medioArchivado_alCambiarloSoloSeOfrecenActivos() = runTest {
+        val rig = createEdit(original.copy(paymentMethodId = "m-old"))
+
+        rig.vm.onPaymentMethodSelect("m-cash")
+        advanceUntilIdle()
+        assertEquals("m-cash", rig.state.paymentMethodId)
+
+        rig.vm.save()
+        advanceUntilIdle()
+        assertEquals("m-cash", rig.movements.edited.single().changes.paymentMethodId)
+    }
+
+    @Test
+    fun edicion_otroMedioArchivadoNoSePuedeElegir() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onPaymentMethodSelect("m-old")
+        advanceUntilIdle()
+
+        assertEquals("m-card", rig.state.paymentMethodId)
+    }
+
+    @Test
+    fun edicion_movimientoSinMedioDePago_seGuardaSinExigirlo() = runTest {
+        val rig = createEdit(original.copy(paymentMethodId = null))
+
+        rig.vm.onTitleChange("Otro")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertFalse(rig.state.errors.paymentMethod)
+        assertNull(rig.movements.edited.single().changes.paymentMethodId)
+    }
+
+    @Test
+    fun edicion_categoriaYEtiquetaArchivadas_seConservanMientrasNoSeCambien() = runTest {
+        val archivedTag = Tag("t-gone", "vieja", TagStatus.DEPRECATED, 5)
+        val archivedFood = food.copy(status = CategoryStatus.DEPRECATED, tags = food.tags + archivedTag)
+        val rig = createEdit(original.copy(tagId = "t-gone")) { _, categories, _ ->
+            categories.data.value = CategoriesData(listOf(archivedFood, transport, salary))
+        }
+
+        assertEquals("c-food", rig.state.categoryId)
+        assertEquals("t-gone", rig.state.tagId)
+        assertEquals(listOf("c-food", "c-transport"), rig.state.categories.map { it.id })
+        assertEquals(CategoryStatus.DEPRECATED, rig.state.categories.first { it.id == "c-food" }.status)
+        assertTrue(rig.state.tags.any { it.id == "t-gone" })
+
+        rig.vm.onTitleChange("Otro")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertNull(rig.movements.edited.single().changes.category)
+    }
+
+    @Test
+    fun edicion_alCambiarDeCategoria_laEtiquetaArchivadaOriginalYaNoSeOfrece_peroSePuedeVolver() = runTest {
+        val archivedTag = Tag("t-gone", "vieja", TagStatus.DEPRECATED, 5)
+        val rig = createEdit(original.copy(tagId = "t-gone")) { _, categories, _ ->
+            categories.data.value = CategoriesData(listOf(food.copy(tags = food.tags + archivedTag), transport, oldCategory, salary))
+        }
+        assertTrue(rig.state.tags.any { it.id == "t-gone" })
+
+        rig.vm.onCategorySelect("c-transport")
+        advanceUntilIdle()
+        assertNull(rig.state.tagId)
+        assertFalse(rig.state.tags.any { it.id == "t-gone" })
+        rig.vm.onTagSelect("t-gone")
+        advanceUntilIdle()
+        assertNull(rig.state.tagId)
+
+        // Volver a la categoría original vuelve a ofrecer su etiqueta original, y es lo único archivado que se ofrece.
+        rig.vm.onCategorySelect("c-food")
+        advanceUntilIdle()
+        assertEquals(listOf("t-1", "t-2", "t-gone"), rig.state.tags.map { it.id })
+        assertFalse(rig.state.categories.any { it.id == "c-old" })
+    }
+
+    @Test
+    fun edicion_otraCategoriaArchivadaNoSePuedeElegir() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onCategorySelect("c-old")
+        advanceUntilIdle()
+
+        assertEquals("c-food", rig.state.categoryId)
+    }
+
+    // --- Validación en edición ---
+
+    @Test
+    fun edicion_conUnCampoInvalido_noLlamaYMuestraElAviso() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onAmountChange("")
+        rig.vm.onTitleChange("   ")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(AmountError.REQUIRED, rig.state.errors.amount)
+        assertEquals(TitleError.REQUIRED, rig.state.errors.title)
+        assertTrue(rig.movements.edited.isEmpty())
+        assertEquals(0, rig.closed())
+    }
+
+    @Test
+    fun edicion_montoEnCero_esInvalido() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onAmountChange("0")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(AmountError.MUST_BE_POSITIVE, rig.state.errors.amount)
+    }
+
+    // --- Resultado parcial (CA-13) ---
+
+    @Test
+    fun edicion_resultadoParcial_informa_siguesAbierto_yElReintentoSoloEnviaLoPendiente() = runTest {
+        val rig = createEdit { movements, _, _ -> movements.editPartialFailure = MovementFailure.Network }
+        rig.vm.onTitleChange("Nuevo")
+        rig.vm.onCategorySelect("c-transport")
+
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertTrue(rig.state.savedPartially)
+        assertEquals(MovementFailure.Network, rig.state.notice)
+        assertFalse(rig.state.isSaving)
+        assertEquals(0, rig.closed())
+        assertEquals("Nuevo", rig.state.title)
+        assertEquals("c-transport", rig.state.categoryId)
+
+        rig.movements.editPartialFailure = null
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals(2, rig.movements.edited.size)
+        assertEquals(MovementChanges(category = CategoryChange("c-transport", null)), rig.movements.edited.last().changes)
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun edicion_alReintentarTrasUnParcial_elAvisoDeParcialSeQuita() = runTest {
+        val rig = createEdit { movements, _, _ -> movements.editPartialFailure = MovementFailure.Network }
+        rig.vm.onTitleChange("Nuevo")
+        rig.vm.onCategorySelect("c-transport")
+        rig.vm.save()
+        advanceUntilIdle()
+
+        val gate = CompletableDeferred<Unit>()
+        rig.movements.editGate = gate
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertFalse(rig.state.savedPartially)
+        assertTrue(rig.state.isSaving)
+        gate.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun edicion_parcialConCategoriaNoDisponible_vuelveALaCategoriaOriginal_yConservaLosDatosGuardados() = runTest {
+        val rig = createEdit { movements, _, _ -> movements.editPartialFailure = MovementFailure.CategoryUnavailable }
+        rig.vm.onTitleChange("Nuevo")
+        rig.vm.onCategorySelect("c-transport")
+
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertTrue(rig.state.savedPartially)
+        assertEquals("c-food", rig.state.categoryId)
+        assertEquals("t-1", rig.state.tagId)
+        assertEquals("Nuevo", rig.state.title)
+        assertEquals(2, rig.categories.refreshes)
+    }
+
+    // --- Fallos (CA-22) ---
+
+    private fun TestScope.editFailed(failure: MovementFailure, change: (MovementFormViewModel) -> Unit): Rig =
+        createEdit { movements, _, _ -> movements.editFailure = failure }.also {
+            change(it.vm)
+            it.vm.save()
+            advanceUntilIdle()
+        }
+
+    @Test
+    fun edicion_sinConexion_avisaYConservaLoEscrito() = runTest {
+        val rig = editFailed(MovementFailure.Offline) { it.onTitleChange("Nuevo") }
+
+        assertEquals(MovementFailure.Offline, rig.state.notice)
+        assertEquals("Nuevo", rig.state.title)
+        assertFalse(rig.state.isSaving)
+        assertFalse(rig.state.savedPartially)
+        assertEquals(0, rig.closed())
+    }
+
+    @Test
+    fun edicion_categoriaNoDisponible_vuelveALaOriginalYRefrescaLasCategorias() = runTest {
+        val rig = editFailed(MovementFailure.CategoryUnavailable) {
+            it.onTitleChange("Nuevo")
+            it.onCategorySelect("c-transport")
+        }
+
+        assertEquals("c-food", rig.state.categoryId)
+        assertEquals("t-1", rig.state.tagId)
+        assertEquals("Nuevo", rig.state.title)
+        assertEquals(2, rig.categories.refreshes)
+    }
+
+    @Test
+    fun edicion_etiquetaNoDisponible_vuelveALaOriginalSiEsLaMismaCategoria() = runTest {
+        val rig = editFailed(MovementFailure.TagUnavailable) { it.onTagSelect("t-2") }
+
+        assertEquals("t-1", rig.state.tagId)
+        assertEquals("c-food", rig.state.categoryId)
+        assertEquals(2, rig.categories.refreshes)
+    }
+
+    @Test
+    fun edicion_etiquetaNoDisponibleEnOtraCategoria_quedaSinEtiqueta() = runTest {
+        val rig = editFailed(MovementFailure.TagUnavailable) {
+            it.onCategorySelect("c-transport")
+            it.onTagSelect("t-bus")
+        }
+
+        assertEquals("c-transport", rig.state.categoryId)
+        assertNull(rig.state.tagId)
+    }
+
+    @Test
+    fun edicion_medioNoDisponible_vuelveAlOriginalYRefrescaLosMedios() = runTest {
+        val rig = editFailed(MovementFailure.PaymentMethodUnavailable) { it.onPaymentMethodSelect("m-cash") }
+
+        assertEquals("m-card", rig.state.paymentMethodId)
+        assertEquals(2, rig.paymentMethods.refreshes)
+    }
+
+    @Test
+    fun edicion_sinPermiso_avisaYPideReevaluarElRol() = runTest {
+        val rig = editFailed(MovementFailure.NotAllowed) { it.onTitleChange("Nuevo") }
+
+        assertEquals(1, rig.insufficientRole())
+        assertEquals(MovementFailure.NotAllowed, rig.state.notice)
+    }
+
+    @Test
+    fun edicion_monedaCambiada_pideConsultarLaCabecera() = runTest {
+        val rig = editFailed(MovementFailure.CurrencyMismatch) { it.onTitleChange("Nuevo") }
+
+        assertEquals(1, rig.currencyMismatch())
+    }
+
+    @Test
+    fun edicion_elMovimientoYaNoExiste_cierraYRefrescaSuMes() = runTest {
+        val rig = editFailed(MovementFailure.NotFound) { it.onTitleChange("Nuevo") }
+
+        assertEquals(1, rig.closed())
+        assertEquals(YearMonth.of(2026, 11), rig.movements.refreshed.last())
+        assertFalse(rig.state.isSaving)
+    }
+
+    @Test
+    fun edicion_dosPulsacionesDeGuardar_hacenUnaSolaLlamada() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val rig = createEdit { movements, _, _ -> movements.editGate = gate }
+        rig.vm.onTitleChange("Nuevo")
+
+        rig.vm.save()
+        rig.vm.save()
+        advanceUntilIdle()
+        rig.vm.onTitleChange("Otro")
+        advanceUntilIdle()
+        assertEquals("Nuevo", rig.state.title)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, rig.movements.edited.size)
+        assertEquals(1, rig.closed())
+    }
+
+    // --- Descarte en edición (CA-19) ---
+
+    @Test
+    fun edicion_sinCambios_cierraDirectamente() = runTest {
+        val rig = createEdit()
+
+        rig.vm.requestClose()
+        advanceUntilIdle()
+
+        assertEquals(1, rig.closed())
+        assertFalse(rig.state.confirmingDiscard)
+    }
+
+    @Test
+    fun edicion_cualquierCambio_pideConfirmacion() = runTest {
+        val changes: List<(MovementFormViewModel) -> Unit> = listOf(
+            { it.onAmountChange("1") },
+            { it.onTitleChange("x") },
+            { it.onNoteChange("x") },
+            { it.onYesterday() },
+            { it.onPaymentMethodSelect("m-cash") },
+            { it.onCategorySelect("c-transport") },
+            { it.onTagSelect("t-2") },
+        )
+        changes.forEachIndexed { index, change ->
+            val rig = createEdit()
+            change(rig.vm)
+            rig.vm.requestClose()
+            advanceUntilIdle()
+            assertTrue("cambio $index", rig.state.confirmingDiscard)
+            assertEquals("cambio $index", 0, rig.closed())
+            rig.vm.confirmDiscard()
+            advanceUntilIdle()
+            assertEquals("cambio $index", 1, rig.closed())
+        }
+    }
+
+    @Test
+    fun edicion_volverAlValorOriginal_noCuentaComoCambio() = runTest {
+        val rig = createEdit()
+
+        rig.vm.onTitleChange("Otro")
+        rig.vm.onTitleChange("Supermercado")
+        rig.vm.onAmountChange("1")
+        rig.vm.onAmountChange("45900")
+        rig.vm.requestClose()
+        advanceUntilIdle()
+
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun edicion_tomandoElOriginalDespuesDeUnParcial_loGuardadoNoCuentaComoCambio() = runTest {
+        val rig = createEdit { movements, _, _ -> movements.editPartialFailure = MovementFailure.Network }
+        rig.vm.onTitleChange("Nuevo")
+        rig.vm.onCategorySelect("c-transport")
+        rig.vm.save()
+        advanceUntilIdle()
+        // Solo queda pendiente la categoría: volver a la original deja el formulario igual a lo guardado.
+        rig.vm.onCategorySelect("c-food")
+        rig.vm.onTagSelect("t-1")
+        rig.vm.requestClose()
+        advanceUntilIdle()
+
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun edicion_sinMonedaDeLaFamilia_usaLaDelMovimiento() = runTest {
+        val rig = createEdit(currency = null)
+
+        assertEquals("CLP", rig.state.currency)
+        assertFalse(rig.state.currencyMissing)
+        rig.vm.onAmountChange("50000")
+        rig.vm.save()
+        advanceUntilIdle()
+        assertEquals(Money(50_000, "CLP"), rig.movements.edited.single().changes.amount)
     }
 }

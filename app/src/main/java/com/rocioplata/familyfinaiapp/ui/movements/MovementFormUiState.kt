@@ -34,9 +34,11 @@ enum class FormOptionsState {
 }
 
 /**
- * Estado del formulario de un movimiento (RF-05 a RF-07, RF-16). Vive en el ViewModel y sobrevive a la
- * recreación. [categories], [tags] y [paymentMethods] ya vienen filtrados: solo activos, y las categorías
- * solo del tipo elegido (RF-06, RF-07).
+ * Estado del formulario de un movimiento (RF-05 a RF-07, RF-09, RF-10, RF-16). Vive en el ViewModel y
+ * sobrevive a la recreación. [categories], [tags] y [paymentMethods] ya vienen filtrados: solo activos, y las
+ * categorías solo del tipo elegido (RF-06, RF-07). En edición se añaden la categoría, la etiqueta y el medio
+ * de pago actuales del movimiento aunque estén archivados (se distinguen por su `status`), que se conservan
+ * mientras no se cambien (RF-09, RF-10).
  */
 data class MovementFormUiState(
     val type: MovementType,
@@ -66,6 +68,15 @@ data class MovementFormUiState(
     val confirmingDiscard: Boolean,
     /** Último fallo al guardar, para avisar; [MovementFormViewModel.consumeNotice] lo quita. */
     val notice: MovementFailure?,
+    /** Edición de un movimiento existente (RF-09): el tipo no se puede cambiar y se parte de sus datos. */
+    val isEditing: Boolean = false,
+    /** En edición, aún no se ha leído el movimiento: no hay nada que mostrar ni editar. */
+    val isLoadingMovement: Boolean = false,
+    /**
+     * Se guardó una parte de los cambios (los datos o la categoría) y la otra falló: el formulario sigue abierto
+     * con lo pendiente y [notice] dice qué falló (RF-10, CA-13).
+     */
+    val savedPartially: Boolean = false,
 ) {
     val currencyMissing: Boolean get() = currency == null
 }

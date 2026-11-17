@@ -48,6 +48,13 @@ internal class FakeMovements : MovementsRepository {
     var deleteGate: CompletableDeferred<Unit>? = null
     var deleteFailure: MovementFailure? = null
 
+    // Edición: registra lo enviado y devuelve el resultado configurado (éxito, fallo o parcial).
+    data class Edit(val movementId: String, val changes: MovementChanges)
+    val edited = mutableListOf<Edit>()
+    var editGate: CompletableDeferred<Unit>? = null
+    var editFailure: MovementFailure? = null
+    var editPartialFailure: MovementFailure? = null
+
     fun flowOf(month: YearMonth) = data.getOrPut(month) { MutableStateFlow(MovementsData()) }
 
     override fun movements(familyId: String, month: YearMonth): Flow<MovementsData> = flowOf(month)
@@ -75,7 +82,13 @@ internal class FakeMovements : MovementsRepository {
         familyId: String,
         movementId: String,
         changes: MovementChanges,
-    ): MovementEditResult = error("No se usa")
+    ): MovementEditResult {
+        edited += Edit(movementId, changes)
+        editGate?.await()
+        editFailure?.let { return MovementEditResult.Failure(it) }
+        editPartialFailure?.let { return MovementEditResult.Partial(it) }
+        return MovementEditResult.Success
+    }
     override suspend fun deleteMovement(familyId: String, movementId: String): MovementResult<Unit> {
         deleted += movementId
         deleteGate?.await()

@@ -105,4 +105,47 @@ class MainScreenBehaviorTest {
         composeTestRule.onAllNodesWithTag("movement_create_screen").assertCountEquals(1)
         composeTestRule.onAllNodesWithContentDescription("Agregar").assertCountEquals(0)
     }
+
+    @Test
+    fun backFromTheEditReturnsToTheDetailAndThenToTheTabs() {
+        composeTestRule.setContent {
+            FamilyFinAIAppTheme {
+                TestMainHost(
+                    initial = MainUiState(
+                        families = contentState(), displayName = "rocío", selectedTab = MainDestination.Movements,
+                        managementRoute = MovementRoute.Detail("m-1"),
+                    ),
+                )
+            }
+        }
+        composeTestRule.onNodeWithTag("test_detail_screen").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("test_detail_edit").performClick()
+        composeTestRule.onNodeWithTag("movement_edit_screen").assertIsDisplayed()
+
+        composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeTestRule.onNodeWithTag("test_detail_screen").assertIsDisplayed()
+
+        composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeTestRule.onAllNodesWithTag("test_detail_screen").assertCountEquals(0)
+        composeTestRule.onNodeWithText("Movimientos").assertIsSelected()
+    }
+
+    @Test
+    fun theBackArrowOfTheEditAlsoReturnsToTheDetail() {
+        composeTestRule.setContent {
+            FamilyFinAIAppTheme {
+                TestMainHost(
+                    initial = MainUiState(
+                        families = contentState(), displayName = "rocío",
+                        managementRoute = MovementRoute.Edit("m-1"),
+                    ),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("movement_back").performClick()
+
+        composeTestRule.onNodeWithTag("test_detail_screen").assertIsDisplayed()
+    }
 }

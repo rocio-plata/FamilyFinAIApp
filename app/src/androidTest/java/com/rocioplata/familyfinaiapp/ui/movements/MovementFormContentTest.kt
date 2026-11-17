@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -77,9 +79,13 @@ class MovementFormContentTest {
         isSaving: Boolean = false,
         confirmingDiscard: Boolean = false,
         notice: MovementFailure? = null,
+        isEditing: Boolean = false,
+        isLoadingMovement: Boolean = false,
+        savedPartially: Boolean = false,
     ) = MovementFormUiState(
         type, amount, currency, title, categories, categoryId, tags, tagId, methods, methodId, date, today, note,
         errors, options, noCategories, noPaymentMethods, isSaving, confirmingDiscard, notice,
+        isEditing, isLoadingMovement, savedPartially,
     )
 
     private class Calls {
@@ -406,5 +412,139 @@ class MovementFormContentTest {
 
         composeTestRule.onNodeWithTag("movement_form_amount").assertTextContains("45900")
         composeTestRule.onNodeWithTag("movement_form_title").assertTextContains("Super")
+    }
+
+    // --- Edición (T-21: CA-11, CA-12, CA-13) ---
+
+    private val archivedCategory = Category(
+        "c-old", CategoryType.EXPENSE, "Vieja", "bolt", CategoryStatus.DEPRECATED,
+        listOf(Tag("t-old", "antigua", TagStatus.DEPRECATED, 0)),
+    )
+    private val archivedMethod = PaymentMethod("m-old", "Cuenta vieja", PaymentMethodStatus.DEPRECATED)
+
+    @Test
+    fun editingShowsItsOwnTitleAndTheDataOfTheMovement() {
+        show(
+            state(
+                isEditing = true, amount = "45900", title = "Supermercado", categoryId = "c-food", tags = food.tags,
+                tagId = "t-1", methodId = "m-card", note = "Compra semanal", date = today.minusDays(4),
+            ),
+        )
+
+        composeTestRule.onNodeWithText("Editar movimiento").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("movement_form_amount").assertTextContains("45900")
+        composeTestRule.onNodeWithTag("movement_form_title").assertTextContains("Supermercado")
+        tag("movement_form_category_c-food").assertIsSelected()
+        tag("movement_form_tag_t-1").assertIsSelected()
+        tag("movement_form_payment_m-card").assertIsSelected()
+        tag("movement_form_note").assertTextContains("Compra semanal")
+        tag("movement_form_date_other").assertIsSelected()
+        tag("movement_form_save").assertTextContains("Guardar cambios")
+    }
+
+    @Test
+    fun creatingKeepsItsTitleAndSaveLabel() {
+        show(state())
+
+        composeTestRule.onNodeWithText("Nuevo movimiento").assertIsDisplayed()
+        tag("movement_form_save").assertTextContains("Guardar movimiento")
+    }
+
+    @Test
+    fun whenEditingTheTypeSelectorIsDisabledButShowsTheType() {
+        val calls = show(state(isEditing = true, type = MovementType.INCOME))
+
+        composeTestRule.onNodeWithTag("movement_form_type_INCOME").assertIsSelected().assertIsNotEnabled()
+        composeTestRule.onNodeWithTag("movement_form_type_EXPENSE").assertIsNotEnabled()
+        composeTestRule.onNodeWithTag("movement_form_type_EXPENSE").performClick()
+        assertTrue(calls.types.isEmpty())
+    }
+
+    @Test
+    fun whenCreatingTheTypeSelectorIsEnabled() {
+        show(state())
+
+        composeTestRule.onNodeWithTag("movement_form_type_EXPENSE").assertIsEnabled()
+        composeTestRule.onNodeWithTag("movement_form_type_INCOME").assertIsEnabled()
+    }
+
+    @Test
+    fun archivedElementsAreIndicated() {
+        show(
+            state(
+                isEditing = true, categories = listOf(archivedCategory, food), categoryId = "c-old",
+                tags = archivedCategory.tags, tagId = "t-old", methods = listOf(card, archivedMethod),
+                methodId = "m-old",
+            ),
+        )
+
+        tag("movement_form_category_c-old").assertTextContains("archivada", substring = true)
+        tag("movement_form_category_c-food").assert(!hasText("archivada", substring = true))
+        tag("movement_form_tag_t-old").assertTextContains("(archivada)", substring = true)
+        tag("movement_form_payment_m-old").assertTextContains("(archivado)", substring = true)
+        tag("movement_form_payment_m-card").assertIsDisplayed()
+    }
+
+    @Test
+    fun anArchivedCurrentCategoryCanStillBeKeptAndOthersChosen() {
+        val calls = show(
+            state(
+                isEditing = true, categories = listOf(archivedCategory, food), categoryId = "c-old",
+                tags = archivedCategory.tags, tagId = "t-old",
+            ),
+        )
+
+        tag("movement_form_category_c-old").assertIsSelected()
+        tag("movement_form_category_c-food").performClick()
+
+        assertEquals(listOf("c-food"), calls.categories)
+    }
+
+    @Test
+    fun aPartialSaveShowsWhatWasSavedAndWhatIsPending() {
+        show(state(isEditing = true, savedPartially = true, notice = MovementFailure.Network))
+
+        composeTestRule.onNodeWithTag("movement_form_partial").assertIsDisplayed()
+            .assertTextContains("Se guardaron los datos", substring = true)
+            .assertTextContains("no el cambio de categoría", substring = true)
+        tag("movement_form_save").assertIsEnabled()
+    }
+
+    @Test
+    fun withoutAPartialSaveThereIsNoPartialNotice() {
+        show(state(isEditing = true))
+
+        composeTestRule.onAllNodesWithTag("movement_form_partial").assertCountEquals(0)
+    }
+
+    @Test
+    fun whileTheMovementIsBeingReadShowsProgressAndNoFields() {
+        show(state(isEditing = true, isLoadingMovement = true))
+
+        composeTestRule.onNodeWithTag("movement_form_loading").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("movement_form_amount").assertCountEquals(0)
+        composeTestRule.onAllNodesWithTag("movement_form_save").assertCountEquals(0)
+        composeTestRule.onNodeWithTag("movement_form_close").assertIsDisplayed()
+    }
+
+    @Test
+    fun editingDiscardsWithTheSameDialog() {
+        val calls = show(state(isEditing = true, title = "x", confirmingDiscard = true))
+
+        composeTestRule.onNodeWithTag("movement_form_discard_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("movement_form_discard_keep").performClick()
+        composeTestRule.onNodeWithTag("movement_form_discard_confirm").performClick()
+
+        assertEquals(1, calls.dismissDiscard)
+        assertEquals(1, calls.confirmDiscard)
+    }
+
+    @Test
+    fun editingWhileSavingDisablesEverything() {
+        show(state(isEditing = true, isSaving = true))
+
+        tag("movement_form_save").assertIsNotEnabled()
+        composeTestRule.onNodeWithTag("movement_form_amount").assertIsNotEnabled()
+        tag("movement_form_saving").assertIsDisplayed()
     }
 }

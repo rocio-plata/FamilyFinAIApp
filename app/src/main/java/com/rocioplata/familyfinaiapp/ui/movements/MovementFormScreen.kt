@@ -11,7 +11,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rocioplata.familyfinaiapp.FamilyFinApp
 
 /**
- * Entrada con estado del formulario "Nuevo movimiento" de [familyId]. [viewModelKey] debe incluir la sesión,
+ * Entrada con estado del formulario de [familyId]: "Nuevo movimiento" o, con [movementId], "Editar movimiento". [viewModelKey] debe incluir la sesión,
  * la familia y la apertura de la ruta (`main-<generación>-movement-form-<familia>-<apertura>`): así cada
  * apertura empieza con un formulario vacío y cambiar de familia o de usuario nunca reutiliza lo escrito.
  * [onClose] se llama al guardar, al descartar y al salir sin cambios.
@@ -26,6 +26,8 @@ fun MovementFormScreen(
     onInsufficientRole: () -> Unit,
     onCurrencyMismatch: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Movimiento que se edita; nulo para un alta. */
+    movementId: String? = null,
 ) {
     val container = (LocalContext.current.applicationContext as FamilyFinApp).container
     val viewModel: MovementFormViewModel = viewModel(
@@ -42,6 +44,7 @@ fun MovementFormScreen(
                     onClose = onClose,
                     onInsufficientRole = onInsufficientRole,
                     onCurrencyMismatch = onCurrencyMismatch,
+                    movementId = movementId,
                 )
             }
         },
