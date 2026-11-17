@@ -29,7 +29,7 @@ las TASKS de cada una.
 | 4 | Identidad visual de la app | `004-brand-identity` | Hecha | CA-06 sin verificar: no se logró ver la pantalla de arranque del sistema |
 | 5 | Categorías y tags | `005-categories` | Hecha | Listado, alta, edición, archivar, eliminar y tags (con reordenado). BG-01: el backend no permite reactivar lo archivado. BG-02 a BG-04: la categoría no tiene color, fecha de archivado ni orden modificable. BG-05: sin categorías de ingreso por defecto. BG-06: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*`. BG-07: el nombre duplicado se rechaza entre tipos. Sin verificar de extremo a extremo: CA-07, los casos «con movimientos» de CA-12 y CA-17, CA-19 con datos de más de 24 h o sin datos, rol Integrante y TalkBack |
 | 6 | Medios de pago | `006-payment-methods` | Hecha | Listado, alta, renombrado, archivar y eliminar. BG-01: el backend no permite leer el medio predeterminado, que pasa a «Perfil y ajustes». BG-02: no se puede reactivar lo archivado. BG-04: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*` (confirmado en ejecución). BG-07: el backend permite renombrar un archivado, que la app no ofrece. Sin verificar de extremo a extremo: CA-14 («Efectivo» es predeterminado), CA-06 (Integrante), el caso «con movimientos» de CA-13 y CA-15 sin copia o con datos de más de 24 h. Sin verificar manualmente: TalkBack, fuente máxima con teclado, foco automático del campo y atrás o tocar fuera con el formulario abierto |
-| 7 | Movimientos | `007-financial-items` | Tareas | SPEC y PLAN aprobados; TASKS derivadas, sin implementar. BG-11: el backend no admite movimientos con fecha futura (a pedir) |
+| 7 | Movimientos | `007-financial-items` | Hecha | Listado por mes con resumen, filtro por tipo y subtotales por día; alta, detalle, edición y eliminación; miembros de la familia para mostrar quién registró; moneda de la familia; pestaña seleccionada en `MainViewModel`. BG-06: el backend no tiene consulta individual y el detalle sale de los meses cargados. BG-07: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*` (sin comprobar el prefijo real en ejecución). BG-11: el backend no admite movimientos con fecha futura (a pedir). Verificado en el emulador con el backend local (2026-11-17), con los matices de la tabla de `TASKS.md`: CA-01 a CA-11, CA-13, CA-14, CA-16, CA-17, CA-19, CA-20, CA-21, CA-23, CA-25 y CA-26, y la parte propia de CA-24. Sin verificar de extremo a extremo: CA-15 y los casos de otro miembro y «Ex-miembro» de CA-24 (sin segunda cuenta en la familia), CA-12 y CA-22 (medio, categoría o etiqueta archivados por otra sesión), CA-18, CA-16 con datos de más de 24 h, la elección de etiqueta con datos reales y TalkBack |
 | 8 | Dashboard | `dashboard` | Pendiente | |
 | 9 | Gestión de familias | `family-management` | Pendiente | |
 | 10 | Presupuestos | `budgets` | Pendiente | |
@@ -89,15 +89,19 @@ el sistema muestre el icono nuevo (CA-06).
 - **Depende de:** auth. Puede hacerse en paralelo con categorías.
 - **Backend:** Financial Tracking.
 
-### 7. Movimientos
+### 7. Movimientos — Hecha
 
 - **Por qué ahora:** es el valor central de la app y la base de dashboard,
   presupuestos, reportes e IA.
-- **Alcance orientativo:** alta manual, listado, detalle y edición.
+- **Alcance orientativo:** alta manual, listado, detalle y edición. Se
+  implementó también la eliminación, el filtro por tipo y el resumen del mes.
 - **Depende de:** categorías y medios de pago.
 - **Decisiones que fuerza:** representación y formato del dinero (entero en la
   unidad menor, nunca `Double`; CLP por defecto) y un formulario de movimiento
-  reutilizable por las funcionalidades de IA.
+  reutilizable por las funcionalidades de IA. Resueltas en la 007: el dinero es
+  `Money` con la moneda de la familia (`Family.currency`), el formulario es un
+  solo `MovementFormViewModel` para el alta y la edición, y la pestaña
+  seleccionada vive en `MainViewModel`.
 - **Backend:** Financial Tracking.
 
 ### 8. Dashboard

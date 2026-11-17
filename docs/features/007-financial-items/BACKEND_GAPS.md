@@ -2,7 +2,9 @@
 
 Verificado contra `docs/backend/api-contract.md` (§3.4.3 y §6.3) y, el
 2026-11-15, leyendo el código del backend (`familyFinAI-backend`,
-`src/contexts/financial-tracking`). Nada se ha probado en ejecución.
+`src/contexts/financial-tracking`). El 2026-11-17 se probó en ejecución, con el
+emulador y el backend local, una parte de lo anterior (ver «Observado en
+ejecución»); lo que no figura ahí sigue sin comprobarse.
 
 | ID | Brecha | Estado | Evidencia |
 | --- | --- | --- | --- |
@@ -17,3 +19,21 @@ Verificado contra `docs/backend/api-contract.md` (§3.4.3 y §6.3) y, el
 | BG-09 | La fecha no puede ser futura respecto al instante del servidor, y una fecha sin hora (`YYYY-MM-DD`) se interpreta como medianoche UTC. Según la zona horaria del dispositivo, "hoy" podría rechazarse o guardarse en el día equivocado si la app no envía un instante bien formado. | Abierta, a resolver en la app (PLAN) | `transaction-date.ts` (`date > new Date()`) y `new Date(occurredOn)` en las rutas |
 | BG-10 | La moneda del movimiento debe ser la de la familia (`SHARED.CURRENCY_MISMATCH`). `GET /me/families` ya devuelve `defaultCurrency`, pero la app todavía no lo lee. | Abierta, a resolver en la app | `create-financial-item.usecase.ts`; respuesta de `GET /me/families` |
 | BG-11 | No se pueden registrar movimientos con fecha futura: el backend los rechaza al crear y al editar. La persona quiere poder registrarlos; requiere un cambio del backend (y decidir cómo cuentan en dashboard, presupuestos y reportes). Mientras tanto la app no permite elegir fechas futuras. | Abierta, a pedir al backend; no bloqueante para la 007 | Contrato §3.4.3 (`occurredOn`: "No puede ser una fecha futura") y `transaction-date.ts` (`FUTURE_TRANSACTION_DATE`) |
+
+## Observado en ejecución (2026-11-17)
+
+Emulador con el backend local, cuenta de desarrollo (Propietario), familia «Mis finanzas personales» con moneda CLP y zona horaria `America/Santiago` (T-23 de `TASKS.md`).
+
+| ID | Observado | Sin comprobar |
+| --- | --- | --- |
+| BG-01 | El listado del mes con `from` y `to` devuelve los movimientos del período y la app los ordena (día y `createdAt` descendentes). Un mes sin movimientos devuelve lista vacía. | El orden sin que la app lo corrija |
+| BG-03 | `recordedBy` se resuelve con la lista de miembros: el movimiento propio muestra el nombre visible del usuario, sus iniciales y su rol «Propietario». | Otro miembro, «Ex-miembro» y nombre vacío (no hay una segunda cuenta en la familia) |
+| BG-06 | Sin consulta individual, el detalle sale de los meses cargados y funciona al abrirlo desde el listado. Consecuencia en la app (corregida): una edición que movía el movimiento a un mes no cargado dejaba el detalle diciendo que ya no existía; ahora se vuelve al listado. | |
+| BG-09 | Un día pasado elegido en el dispositivo (15 de octubre) se guarda y se vuelve a mostrar como el mismo día, en la zona `America/Santiago`; el día de hoy y el de ayer también. El selector no permite días futuros. | Otras zonas horarias y el caso cercano a la medianoche |
+| BG-10 | La moneda de la familia (CLP) llega por `GET /me/families` y la muestra y usa el formulario. | Un cambio de moneda de la familia (`SHARED.CURRENCY_MISMATCH`) |
+| BG-11 | La app no ofrece fechas futuras. | La respuesta real del backend a una fecha futura (la app nunca la envía) |
+| BG-07 | No se observó ningún error de dominio del backend, así que el prefijo real (`FINANCIAL_TRACKING.*` o `FINANCIAL.*`) de los movimientos sigue sin comprobarse; la app acepta ambos. | El prefijo y los códigos `PAYMENT_METHOD_NOT_ACTIVE`, `TAG_NOT_ACTIVE` y los de título u observación |
+| BG-02, BG-04, BG-05, BG-08 | No se comprobaron en ejecución: la app siempre envía `from` y `to` juntos, siempre envía `paymentMethodId` y no filtra por medio de pago ni por texto. | La presencia de `paymentMethodId` en el listado de una sesión nueva |
+
+No aparecieron brechas nuevas del backend en la ejecución.
+

@@ -412,3 +412,40 @@ Tras aprobar el plan, deriva TASKS.md con IDs, dependencias, referencias a RF/CA
 y comprobaciones. No marques una tarea terminada sin realizar su validación;
 si está bloqueada, registra el motivo.
 -->
+
+## Ajustes durante la implementación
+
+El plan anterior sigue siendo el aprobado. Estos son los puntos en que lo
+implementado difiere de él o lo precisa; cada uno tiene su evidencia en la
+tarea indicada de `TASKS.md`.
+
+- **Estado del listado (T-14).** `MovementsUiState` lleva el mes, si se puede
+  avanzar y el filtro en todos los estados, y `Loading`, `Error` y `Content`
+  quedan en un campo `list`. Así se puede cambiar de mes desde la carga o el
+  error.
+- **Detalle de un movimiento que ya no existe (T-18, T-19).** En lugar de
+  cerrarse solo, el detalle pasa a un estado `Gone` con el aviso y «Volver al
+  listado», para poder informar al usuario (CA-22). Tras eliminar con éxito sí
+  se cierra directamente.
+- **Clave de los ViewModels de formulario y detalle (T-17).** La ruta no basta
+  para distinguir aperturas: `MainUiState.managementRouteInstance` identifica
+  cada apertura y entra en la clave, de modo que cada «+» empieza con un
+  formulario nuevo.
+- **Edición que cambia de mes (T-23).** Si la edición mueve el movimiento a otro
+  mes, el detalle de debajo ya no lo encuentra (el mes de destino puede no estar
+  cargado). El formulario avisa con `onMovedToAnotherMonth` y
+  `MainViewModel.closeManagement()` vuelve al listado de una vez.
+- **Opciones del formulario (T-16, T-20).** El alta y la edición solo aceptan
+  lo que el formulario ofrece (categorías y medios activos del tipo y, al
+  editar, también los actuales aunque estén archivados). El medio de pago se
+  elige con chips, no con un desplegable.
+- **Fuente grande (T-23).** Con una escala de fuente mayor de 1,3 la cuadrícula
+  de categorías pasa de 4 a 2 columnas para no partir los nombres.
+- **Dominio de miembros (T-05).** `FamilyMembersFailure` no tiene `Offline`: el
+  repositorio solo lee y un fallo de red es `Network`.
+- **Repositorio de movimientos (T-09).** Lo que se aplica a memoria y caché tras
+  un cambio es lo que la app envió, no lo que responde el backend, y un cambio
+  no vuelve a marcar el mes como recién descargado.
+- **Pruebas.** Los repositorios falsos de los tests de movimientos se comparten
+  en `app/src/test/…/ui/movements/Fakes.kt`.
+
