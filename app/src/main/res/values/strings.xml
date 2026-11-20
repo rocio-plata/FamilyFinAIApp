@@ -368,4 +368,41 @@
     <string name="categories_error_invalid_data">Recibimos datos inesperados. Inténtalo de nuevo.</string>
     <string name="categories_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
     <string name="categories_error_reorder_failed">No se pudo guardar el nuevo orden. Se restauró el anterior.</string>
+
+    <!-- Dashboard de Inicio (008) -->
+    <string name="dashboard_month_previous">Mes anterior</string>
+    <string name="dashboard_month_next">Mes siguiente</string>
+    <string name="dashboard_current_month">Mes actual</string>
+    <string name="dashboard_type_expenses">Gastos</string>
+    <string name="dashboard_type_income">Ingresos</string>
+    <string name="dashboard_type_tile_description">%1$s, %2$s</string>
+    <string name="dashboard_type_tile_selected_description">%1$s, %2$s, seleccionado</string>
+    <string name="dashboard_available">Disponible</string>
+    <string name="dashboard_breakdown_title_expenses">Desglose de gastos</string>
+    <string name="dashboard_breakdown_title_income">Desglose de ingresos</string>
+    <string name="dashboard_variation_vs_previous">%1$s vs mes anterior</string>
+    <string name="dashboard_variation_up_description">Subió %1$s respecto del mes anterior</string>
+    <string name="dashboard_variation_down_description">Bajó %1$s respecto del mes anterior</string>
+    <string name="dashboard_variation_unchanged_description">Sin cambios respecto del mes anterior</string>
+    <string name="dashboard_chart_total">TOTAL</string>
+    <string name="dashboard_chart_received">%1$s recibido</string>
+    <string name="dashboard_chart_description_expenses">Gastos del mes, total %1$s</string>
+    <string name="dashboard_chart_description_income">Ingresos del mes, total %1$s</string>
+    <string name="dashboard_categories_title_expenses">Gastos por categoría</string>
+    <string name="dashboard_categories_title_income">Ingresos por categoría</string>
+    <plurals name="dashboard_categories_count">
+        <item quantity="one">%d categoría</item>
+        <item quantity="other">%d categorías</item>
+    </plurals>
+    <string name="dashboard_categories_loading">Cargando categorías…</string>
+    <string name="dashboard_categories_empty_expenses">No hay categorías de gasto activas.</string>
+    <string name="dashboard_categories_empty_income">No hay categorías de ingreso activas.</string>
+    <string name="dashboard_category_archived">Archivada</string>
+    <string name="dashboard_category_card_description">%1$s, %2$s</string>
+    <string name="dashboard_category_card_archived_description">%1$s, %2$s, archivada</string>
+    <string name="dashboard_category_card_action">Registrar un movimiento en %1$s</string>
+    <string name="dashboard_empty_month">No hay movimientos este mes. Registra uno con el botón «+».</string>
+    <string name="dashboard_loading">Cargando el resumen del mes…</string>
+    <string name="dashboard_error">No se pudo cargar el resumen del mes</string>
+    <string name="dashboard_retry">Reintentar</string>
 </resources>
