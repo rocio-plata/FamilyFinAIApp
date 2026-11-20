@@ -187,7 +187,28 @@ The palette grounds the interface in deep mineral tones and organic sage, avoidi
 - **Warning / Budget Cap (`#D9822B` / Container `#FDF3E7`):** Soft honey amber for threshold warnings.
 
 ### Category Accents
-- **Slate Blue (`#4B6B94`)**, **Soft Plum (`#7A5877`)**, **Sage Pine (`#386B5A`)**, **Nordic Sand (`#C4A482`)**, **Mauve (`#9B6A78`)**, and **Terracotta Clay (`#C06352`)**.
+Each category can have one of 16 colors (feature 008). The backend only stores the key (`color`); the app maps it to a light-mode and a dark-mode value. A category without a color, or with a key the app does not know, falls back to the color at its position (modulo 16) among the categories of its type. Every value keeps at least 3:1 contrast with the card surface of its mode (WCAG 1.4.11): white in light mode and `#263331` in dark mode. The order below is the order of the picker and of the fallback; it alternates warm, cool and neutral tones so that neighbouring categories look different. Values live in `ui/theme/Color.kt` and the catalog in `ui/categories/CategoryColors.kt`.
+
+| # | Key | Name (es) | Light | Dark |
+| :-: | --- | --- | --- | --- |
+| 1 | `sage` | Salvia | `#386B5A` | `#7FB8A4` |
+| 2 | `amber` | Ámbar | `#B0691C` | `#E8A25C` |
+| 3 | `slate` | Pizarra | `#4B6B94` | `#93B0D6` |
+| 4 | `coral` | Coral | `#C06352` | `#EE9A8A` |
+| 5 | `plum` | Ciruela | `#7A5877` | `#C59DC1` |
+| 6 | `olive` | Oliva | `#66752B` | `#B3C27A` |
+| 7 | `ocean` | Océano | `#2F6F9A` | `#80BCE3` |
+| 8 | `rose` | Rosa | `#B8506A` | `#EE93AA` |
+| 9 | `sand` | Arena | `#93734F` | `#D9BC98` |
+| 10 | `indigo` | Índigo | `#555FA3` | `#A3ACE6` |
+| 11 | `brick` | Ladrillo | `#9E4B3C` | `#E39383` |
+| 12 | `teal` | Turquesa | `#2D7366` | `#7CC4B5` |
+| 13 | `lavender` | Lavanda | `#7A68A6` | `#BCADE6` |
+| 14 | `mustard` | Mostaza | `#8C7A1E` | `#D8C66E` |
+| 15 | `mauve` | Malva | `#9B6A78` | `#D6A7B4` |
+| 16 | `graphite` | Grafito | `#5E6B70` | `#A9B6BB` |
+
+Sage, Slate, Plum, Sand, Mauve and Coral derive from the original accents (Sage Pine, Slate Blue, Soft Plum, Nordic Sand, Mauve and Terracotta Clay). Amber and Sand are darker than the original honey amber (`#D9822B`) and Nordic Sand (`#C4A482`), which did not reach 3:1 on white.
 
 ## Typography
 

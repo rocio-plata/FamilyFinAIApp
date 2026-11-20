@@ -130,11 +130,40 @@ class CategoriesLocalDataSourceTest {
     }
 
     @Test
+    fun colorGuardado_seLeeIgual_tambienDesconocidoParaLaApp() = runTest {
+        val source = CategoriesLocalDataSource(newStore())
+        val colored = listOf(
+            Category("c-1", CategoryType.EXPENSE, "Casa", "home", CategoryStatus.ACTIVE, emptyList(), "teal"),
+            Category("c-2", CategoryType.INCOME, "Sueldo", null, CategoryStatus.ACTIVE, emptyList(), "fucsia_99"),
+            Category("c-3", CategoryType.EXPENSE, "Sin color", null, CategoryStatus.ACTIVE, emptyList()),
+        )
+
+        source.save("f-1", "u-1", 1L, colored)
+
+        assertEquals(Cached("u-1", 1L, colored), source.read("f-1"))
+        assertEquals(listOf("teal", "fucsia_99", null), source.read("f-1")?.value?.map { it.color })
+    }
+
+    @Test
+    fun copiaAnteriorSinColor_seLeeSinColor_ySinSubirLaVersion() = runTest {
+        val store = newStore()
+        store.edit {
+            it[keyF1] =
+                """{"schemaVersion":1,"userId":"u-1","savedAtMillis":1,"value":[{"id":"c","type":"EXPENSE","name":"N","icon":"home","status":"ACTIVE","tags":[]}]}"""
+        }
+
+        assertEquals(
+            Cached("u-1", 1L, listOf(Category("c", CategoryType.EXPENSE, "N", "home", CategoryStatus.ACTIVE, emptyList()))),
+            CategoriesLocalDataSource(store).read("f-1"),
+        )
+    }
+
+    @Test
     fun camposNuevosEnElJson_seIgnoran() = runTest {
         val store = newStore()
         store.edit {
             it[keyF1] =
-                """{"schemaVersion":1,"userId":"u-1","savedAtMillis":1,"extra":true,"value":[{"id":"c","type":"EXPENSE","name":"N","status":"ACTIVE","color":"x","tags":[]}]}"""
+                """{"schemaVersion":1,"userId":"u-1","savedAtMillis":1,"extra":true,"value":[{"id":"c","type":"EXPENSE","name":"N","status":"ACTIVE","futuro":"x","tags":[]}]}"""
         }
 
         assertEquals(

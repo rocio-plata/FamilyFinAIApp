@@ -69,6 +69,8 @@ class CategoriesLocalDataSource(
         val type: String,
         val name: String,
         val icon: String? = null,
+        // Opcional y añadido sin subir `schemaVersion`: una copia anterior se lee sin color (RF-14 de la 008).
+        val color: String? = null,
         val status: String,
         val tags: List<TagJson>,
     ) {
@@ -76,12 +78,12 @@ class CategoriesLocalDataSource(
             val categoryType = CategoryType.entries.firstOrNull { it.name == type } ?: return null
             val categoryStatus = CategoryStatus.entries.firstOrNull { it.name == status } ?: return null
             val domainTags = tags.map { it.toDomainOrNull() ?: return null }
-            return Category(id, categoryType, name, icon, categoryStatus, domainTags)
+            return Category(id, categoryType, name, icon, categoryStatus, domainTags, color)
         }
 
         companion object {
             fun from(category: Category) = CategoryJson(
-                category.id, category.type.name, category.name, category.icon, category.status.name,
+                category.id, category.type.name, category.name, category.icon, category.color, category.status.name,
                 category.tags.map(TagJson::from),
             )
         }
