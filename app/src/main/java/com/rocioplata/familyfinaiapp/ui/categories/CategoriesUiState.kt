@@ -9,6 +9,8 @@ import com.rocioplata.familyfinaiapp.domain.categories.Tag
 data class CategoryItem(
     val category: Category,
     val activeTags: List<Tag>,
+    /** Color a dibujar: el de la categoría o, si no tiene o no se conoce, el de su posición (RF-14 de la 008). */
+    val color: CategoryColorOption = CategoryColors.fallback(0),
 )
 
 /** Algo que el listado debe mostrar una sola vez y luego confirmar con `consumeEvent()`. */

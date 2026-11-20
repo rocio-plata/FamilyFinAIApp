@@ -293,6 +293,10 @@
     <string name="categories_color_mustard">Mostaza</string>
     <string name="categories_color_mauve">Malva</string>
     <string name="categories_color_graphite">Grafito</string>
+    <string name="categories_color_section_title">Color</string>
+    <string name="categories_color_none">Automático</string>
+    <string name="categories_color_none_description">Color automático</string>
+    <string name="categories_color_preview_description">Vista previa del icono en %1$s</string>
     <string name="categories_icon_section_title">Icono</string>
     <string name="categories_icon_available_count" tools:ignore="PluralsCandidate">%1$d disponibles</string>
     <string name="categories_icon_none">Sin icono</string>

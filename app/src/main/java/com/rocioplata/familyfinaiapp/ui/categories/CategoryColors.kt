@@ -1,7 +1,10 @@
 package com.rocioplata.familyfinaiapp.ui.categories
 
 import androidx.annotation.StringRes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.rocioplata.familyfinaiapp.R
 import com.rocioplata.familyfinaiapp.domain.categories.Category
 import com.rocioplata.familyfinaiapp.ui.theme.CategoryAmberDark
@@ -48,6 +51,18 @@ data class CategoryColorOption(
     @param:StringRes val nameRes: Int,
     val tone: CategoryTone,
 )
+
+/** El color de este tono para el modo claro u oscuro que muestra el tema actual. */
+@Composable
+fun CategoryColorOption.displayColor(): Color = tone.forMode(dark = MaterialTheme.colorScheme.background.luminance() < 0.5f)
+
+/** Fondo suave de un icono o tarjeta de categoría: el mismo color con transparencia, sin valores adicionales. */
+fun Color.softBackground(): Color = copy(alpha = SOFT_BACKGROUND_ALPHA)
+
+/** Negro o blanco, el que más contraste da sobre este color (la marca de «seleccionado» sobre un color). */
+fun Color.readableOn(): Color = if (luminance() > 0.4f) Color.Black else Color.White
+
+private const val SOFT_BACKGROUND_ALPHA = 0.16f
 
 /**
  * Catálogo de los 16 colores de categoría (RF-14), en el orden del selector y del respaldo por posición:

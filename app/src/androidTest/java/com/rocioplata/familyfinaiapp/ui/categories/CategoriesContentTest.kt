@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -33,6 +34,8 @@ import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -93,6 +96,12 @@ class CategoriesContentTest {
     private val gimnasio = item("c4", "Gimnasio", "fitness_center", CategoryStatus.DEPRECATED)
     private val vacaciones = item("c5", "Vacaciones", "flight", CategoryStatus.DEPRECATED)
 
+    private fun coloredItem(id: String, name: String, icon: String, colorKey: String) = CategoryItem(
+        Category(id, CategoryType.EXPENSE, name, icon, CategoryStatus.ACTIVE, emptyList(), colorKey),
+        emptyList(),
+        CategoryColors.find(colorKey)!!,
+    )
+
     /**
      * Muestra la pantalla con un host mínimo que reproduce lo que haría el ViewModel con el estado
      * (texto de búsqueda, pestaña y sección plegable), sin repositorio ni red.
@@ -137,6 +146,21 @@ class CategoriesContentTest {
     }
 
     // --- Pestañas y contadores (CA-02) ---
+
+    @Test
+    fun eachCategoryIconIsDrawnInItsOwnColor() {
+        show(content(active = listOf(coloredItem("c1", "Comida", "shopping_cart", "coral"), coloredItem("c2", "Casa", "home", "ocean"))))
+
+        val coral = CategoryColors.find("coral")!!.tone.light
+        val ocean = CategoryColors.find("ocean")!!.tone.light
+        val first = rule.onNodeWithTag("category_row_c1").captureToImage()
+        val second = rule.onNodeWithTag("category_row_c2").captureToImage()
+
+        assertTrue("c1 sin su color", first.containsColorNear(coral))
+        assertTrue("c2 sin su color", second.containsColorNear(ocean))
+        assertFalse("c1 no debe usar el color de c2", first.containsColorNear(ocean))
+        assertFalse("c2 no debe usar el color de c1", second.containsColorNear(coral))
+    }
 
     @Test
     fun tabsShowTheirLabelsAndActiveCounts() {

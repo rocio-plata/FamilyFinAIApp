@@ -85,6 +85,7 @@ fun CategoryEditScreen(
             onLeave = onBack,
             onNameChange = viewModel::setName,
             onIconChange = viewModel::setIcon,
+            onColorChange = viewModel::setColor,
             onTypeChange = viewModel::setType,
             onSubmit = viewModel::submit,
             onArchive = viewModel::archive,

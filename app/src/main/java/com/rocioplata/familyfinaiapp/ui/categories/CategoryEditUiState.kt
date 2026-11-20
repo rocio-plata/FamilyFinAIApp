@@ -68,7 +68,7 @@ sealed interface CategoryEditUiState {
         val archived: Boolean,
         /** Activos por su posición y, después, los archivados (RF-19). Vacío al crear. */
         val tags: List<Tag>,
-        /** Nombre o icono distintos de lo guardado: pide confirmar antes de salir (CA-24). */
+        /** Nombre, icono o color distintos de lo guardado: pide confirmar antes de salir (CA-24). */
         val hasUnsavedChanges: Boolean,
         val isBusy: Boolean,
         val event: CategoryEditEvent?,
@@ -76,6 +76,10 @@ sealed interface CategoryEditUiState {
         val newTagName: String = "",
         val tagError: NameFieldError? = null,
         val renaming: TagRenameDraft? = null,
+        /** Clave del color elegido (o la guardada) o `null` si no hay; puede ser una que la app no conoce (RF-15 de la 008). */
+        val color: String? = null,
+        /** Color a dibujar en la vista previa: el elegido o el de respaldo por posición (RF-14 de la 008). */
+        val effectiveColor: CategoryColorOption = CategoryColors.fallback(0),
     ) : CategoryEditUiState {
         val canSubmit: Boolean get() = !readOnly && !isBusy && (isCreate || hasUnsavedChanges)
     }
