@@ -252,7 +252,7 @@ Crea una nueva familia. El usuario creador queda automáticamente asignado con r
   }
   ```
 - **Errores posibles**:
-  - `400`: `FAMILY.INVALID_FAMILY_NAME`.
+  - `400`: `FAMILY_ACCESS.INVALID_FAMILY_NAME`.
 
 ---
 
@@ -322,7 +322,7 @@ Actualiza el orden de visualización de las familias del usuario. La lista provi
   ```
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `400`: `FAMILY.INVALID_FAMILY_ORDER` (faltan IDs o contiene IDs a los que no pertenece).
+  - `400`: `FAMILY_ACCESS.INVALID_FAMILY_ORDER` (faltan IDs o contiene IDs a los que no pertenece).
 
 ---
 
@@ -385,7 +385,7 @@ Crea una invitación para que otro usuario se sume a la familia.
   ```
 - **Errores posibles**:
   - `403`: `FAMILY.INSUFFICIENT_ROLE` (si quien invita no es OWNER).
-  - `409`: `FAMILY.ALREADY_MEMBER` (el usuario invitado ya es miembro de la familia).
+  - `409`: `FAMILY_ACCESS.ALREADY_MEMBER` (el usuario invitado ya es miembro de la familia).
 
 ---
 
@@ -394,8 +394,8 @@ Acepta una invitación pendiente. El email del usuario autenticado debe coincidi
 - **Autenticación**: Bearer Token.
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `404`: `FAMILY.INVITATION_NOT_FOUND`.
-  - `400`: `FAMILY.INVITATION_EXPIRED`, `FAMILY.INVITATION_NOT_PENDING`.
+  - `404`: `FAMILY_ACCESS.INVITATION_NOT_FOUND`.
+  - `400`: `FAMILY_ACCESS.INVITATION_EXPIRED`, `FAMILY_ACCESS.INVITATION_NOT_PENDING`.
   - `403`: Si el usuario autenticado tiene un email distinto al invitado.
 
 ---
@@ -405,8 +405,8 @@ Revoca una invitación pendiente.
 - **Autenticación**: Bearer Token (creador de la invitación o administrador).
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `404`: `FAMILY.INVITATION_NOT_FOUND`.
-  - `400`: `FAMILY.INVITATION_NOT_PENDING`.
+  - `404`: `FAMILY_ACCESS.INVITATION_NOT_FOUND`.
+  - `400`: `FAMILY_ACCESS.INVITATION_NOT_PENDING`.
 
 ---
 
@@ -415,8 +415,8 @@ Remueve a un miembro de la familia.
 - **Autenticación**: Bearer Token + Rol `OWNER`.
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `400`: `FAMILY.CANNOT_REMOVE_LAST_OWNER` (no se puede expulsar o remover al único OWNER existente).
-  - `404`: `FAMILY.MEMBER_NOT_FOUND`.
+  - `400`: `FAMILY_ACCESS.CANNOT_REMOVE_LAST_OWNER` (no se puede expulsar o remover al único OWNER existente).
+  - `404`: `FAMILY_ACCESS.MEMBER_NOT_FOUND`.
 
 ---
 
@@ -429,8 +429,8 @@ Modifica el rol de un miembro de la familia.
   | `newRole` | string | Sí | `"OWNER"` \| `"MEMBER"` |
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `400`: `FAMILY.CANNOT_REMOVE_LAST_OWNER` (no se puede degradar a MEMBER si es el único OWNER).
-  - `404`: `FAMILY.MEMBER_NOT_FOUND`.
+  - `400`: `FAMILY_ACCESS.CANNOT_REMOVE_LAST_OWNER` (no se puede degradar a MEMBER si es el único OWNER).
+  - `404`: `FAMILY_ACCESS.MEMBER_NOT_FOUND`.
 
 ---
 
@@ -468,7 +468,7 @@ Crea un nuevo medio de pago (ej. "Efectivo", "Tarjeta Santander", "Cuenta Corrie
   }
   ```
 - **Errores posibles**:
-  - `409`: `FINANCIAL.DUPLICATE_PAYMENT_METHOD_NAME`.
+  - `409`: `FINANCIAL_TRACKING.DUPLICATE_PAYMENT_METHOD_NAME`.
 
 ---
 
@@ -497,8 +497,8 @@ Renombra un medio de pago existente.
 - **Request Body**: `{ "name": "Tarjeta Débito Santander" }`
 - **Respuesta `200 OK`**: Retorna el objeto `PaymentMethod` actualizado.
 - **Errores posibles**:
-  - `404`: `FINANCIAL.PAYMENT_METHOD_NOT_FOUND`.
-  - `409`: `FINANCIAL.DUPLICATE_PAYMENT_METHOD_NAME`.
+  - `404`: `FINANCIAL_TRACKING.PAYMENT_METHOD_NOT_FOUND`.
+  - `409`: `FINANCIAL_TRACKING.DUPLICATE_PAYMENT_METHOD_NAME`.
 
 ---
 
@@ -507,7 +507,7 @@ Depreca un medio de pago para que no aparezca en nuevas selecciones, pero preser
 - **Autenticación**: Bearer Token + Miembro.
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `404`: `FINANCIAL.PAYMENT_METHOD_NOT_FOUND`.
+  - `404`: `FINANCIAL_TRACKING.PAYMENT_METHOD_NOT_FOUND`.
 
 ---
 
@@ -516,8 +516,8 @@ Elimina físicamente un medio de pago.
 - **Autenticación**: Bearer Token + Miembro.
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `409`: `FINANCIAL.PAYMENT_METHOD_HAS_ASSOCIATED_ITEMS` (no se puede borrar si ya tiene movimientos registrados; debe deprecarse en su lugar).
-  - `409`: `FINANCIAL.PAYMENT_METHOD_IS_SOMEONES_DEFAULT` (no se puede borrar si es el medio por defecto de algún miembro).
+  - `409`: `FINANCIAL_TRACKING.PAYMENT_METHOD_HAS_ASSOCIATED_ITEMS` (no se puede borrar si ya tiene movimientos registrados; debe deprecarse en su lugar).
+  - `409`: `FINANCIAL_TRACKING.PAYMENT_METHOD_IS_SOMEONES_DEFAULT` (no se puede borrar si es el medio por defecto de algún miembro).
 
 ---
 
@@ -530,8 +530,8 @@ Establece el medio de pago preferido para el usuario autenticado en la familia. 
   | `paymentMethodId` | string (UUID) | Sí |
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `404`: `FINANCIAL.PAYMENT_METHOD_NOT_FOUND`.
-  - `400`: `FINANCIAL.PAYMENT_METHOD_NOT_ACTIVE`.
+  - `404`: `FINANCIAL_TRACKING.PAYMENT_METHOD_NOT_FOUND`.
+  - `400`: `FINANCIAL_TRACKING.PAYMENT_METHOD_NOT_ACTIVE`.
 
 ---
 
@@ -546,6 +546,7 @@ Crea una nueva categoría de gastos o ingresos.
   | `type` | string | Sí | `"EXPENSE"` \| `"INCOME"` |
   | `name` | string | Sí | 1 a 50 caracteres |
   | `icon` | string | No | 1 a 40 caracteres (clave del catálogo de íconos en la app) |
+  | `color` | string | No | 1 a 40 caracteres (clave de la paleta de colores de la app; el backend solo la guarda) |
 - **Respuesta `201 Created`**:
   ```json
   {
@@ -553,12 +554,13 @@ Crea una nueva categoría de gastos o ingresos.
     "type": "EXPENSE",
     "name": "Alimentación",
     "icon": "shopping_cart",
+    "color": "teal_500",
     "status": "ACTIVE"
   }
   ```
 - **Errores posibles**:
-  - `403`: `FINANCIAL.INSUFFICIENT_ROLE` (si no es OWNER).
-  - `409`: `FINANCIAL.DUPLICATE_CATEGORY_NAME` (no pueden existir dos categorías activas o deprecadas del mismo tipo con el mismo nombre).
+  - `403`: `FAMILY.INSUFFICIENT_ROLE` (si no es OWNER).
+  - `409`: `FINANCIAL_TRACKING.DUPLICATE_CATEGORY_NAME` (no pueden existir dos categorías activas o deprecadas del mismo tipo con el mismo nombre).
 
 ---
 
@@ -576,6 +578,7 @@ Obtiene las categorías de la familia junto con sus tags anidados.
       "type": "EXPENSE",
       "name": "Alimentación",
       "icon": "shopping_cart",
+      "color": "teal_500",
       "status": "ACTIVE",
       "tags": [
         {
@@ -598,13 +601,14 @@ Obtiene las categorías de la familia junto con sus tags anidados.
 ---
 
 #### `PATCH /families/:familyId/categories/:categoryId`
-Actualiza el nombre y/o ícono de una categoría.
+Actualiza el nombre, ícono y/o color de una categoría.
 - **Autenticación**: Bearer Token + Rol `OWNER`.
 - **Request Body** (al menos uno requerido):
   ```json
   {
     "newName": "Alimentación & Bebidas",
-    "newIcon": "restaurant" // o null para remover el ícono
+    "newIcon": "restaurant", // o null para remover el ícono
+    "newColor": "coral_400" // o null para remover el color
   }
   ```
 - **Respuesta `200 OK`**:
@@ -613,12 +617,13 @@ Actualiza el nombre y/o ícono de una categoría.
     "id": "c1c2c3c4-0000-4111-8222-abcdefabcdef",
     "name": "Alimentación & Bebidas",
     "icon": "restaurant",
+    "color": "coral_400",
     "status": "ACTIVE"
   }
   ```
 - **Errores posibles**:
-  - `404`: `FINANCIAL.CATEGORY_NOT_FOUND`.
-  - `409`: `FINANCIAL.DUPLICATE_CATEGORY_NAME`.
+  - `404`: `FINANCIAL_TRACKING.CATEGORY_NOT_FOUND`.
+  - `409`: `FINANCIAL_TRACKING.DUPLICATE_CATEGORY_NAME`.
 
 ---
 
@@ -634,7 +639,7 @@ Elimina físicamente una categoría.
 - **Autenticación**: Bearer Token + Rol `OWNER`.
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `409`: `FINANCIAL.CATEGORY_HAS_ASSOCIATED_ITEMS` (si tiene transacciones asociadas no puede borrarse; use deprecate).
+  - `409`: `FINANCIAL_TRACKING.CATEGORY_HAS_ASSOCIATED_ITEMS` (si tiene transacciones asociadas no puede borrarse; use deprecate).
 
 ---
 
@@ -655,8 +660,8 @@ Agrega un sub-tag a la categoría especificada.
   }
   ```
 - **Errores posibles**:
-  - `400`: `FINANCIAL.CATEGORY_NOT_ACTIVE`.
-  - `409`: `FINANCIAL.DUPLICATE_TAG_NAME`.
+  - `400`: `FINANCIAL_TRACKING.CATEGORY_NOT_ACTIVE`.
+  - `409`: `FINANCIAL_TRACKING.DUPLICATE_TAG_NAME`.
 
 ---
 
@@ -696,7 +701,7 @@ Elimina físicamente un tag. Falla si ya tiene movimientos asociados.
 - **Autenticación**: Bearer Token + Rol `OWNER`.
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `409`: `FINANCIAL.TAG_HAS_ASSOCIATED_ITEMS`.
+  - `409`: `FINANCIAL_TRACKING.TAG_HAS_ASSOCIATED_ITEMS`.
 
 ---
 
@@ -731,11 +736,11 @@ Registra un nuevo movimiento financiero (gasto o ingreso según la categoría).
   }
   ```
 - **Errores posibles**:
-  - `400`: `FINANCIAL.NO_DEFAULT_PAYMENT_METHOD_SET` (si no se proveyó `paymentMethodId` y el usuario no tiene default configurado).
-  - `400`: `FINANCIAL.FUTURE_TRANSACTION_DATE` (la fecha es futura).
-  - `400`: `FINANCIAL.CATEGORY_NOT_ACTIVE`.
-  - `400`: `FINANCIAL.TAG_DOES_NOT_BELONG_TO_CATEGORY`.
-  - `404`: `FINANCIAL.CATEGORY_NOT_FOUND`, `FINANCIAL.PAYMENT_METHOD_NOT_FOUND`.
+  - `400`: `FINANCIAL_TRACKING.NO_DEFAULT_PAYMENT_METHOD_SET` (si no se proveyó `paymentMethodId` y el usuario no tiene default configurado).
+  - `400`: `FINANCIAL_TRACKING.FUTURE_TRANSACTION_DATE` (la fecha es futura).
+  - `400`: `FINANCIAL_TRACKING.CATEGORY_NOT_ACTIVE`.
+  - `400`: `FINANCIAL_TRACKING.TAG_DOES_NOT_BELONG_TO_CATEGORY`.
+  - `404`: `FINANCIAL_TRACKING.CATEGORY_NOT_FOUND`, `FINANCIAL_TRACKING.PAYMENT_METHOD_NOT_FOUND`.
 
 ---
 
@@ -786,8 +791,8 @@ Actualiza datos de un movimiento existente (monto, título, nota, medio de pago,
   ```
 - **Respuesta `200 OK`**: Retorna el `FinancialItem` con los datos actualizados.
 - **Errores posibles**:
-  - `400`: `FINANCIAL.FUTURE_TRANSACTION_DATE`.
-  - `404`: `FINANCIAL.FINANCIAL_ITEM_NOT_FOUND`.
+  - `400`: `FINANCIAL_TRACKING.FUTURE_TRANSACTION_DATE`.
+  - `404`: `FINANCIAL_TRACKING.FINANCIAL_ITEM_NOT_FOUND`.
 
 ---
 
@@ -801,10 +806,10 @@ Reclasifica el movimiento hacia otra categoría y/o tag.
   | `newTagId` | string (UUID) \| null | No |
 - **Respuesta `200 OK`**: Retorna el `FinancialItem` reclasificado.
 - **Errores posibles**:
-  - `400`: `FINANCIAL.CANNOT_RECLASSIFY_ACROSS_TYPES` (no se puede pasar un ítem de tipo EXPENSE a una categoría INCOME ni viceversa).
-  - `400`: `FINANCIAL.CATEGORY_NOT_ACTIVE`.
-  - `400`: `FINANCIAL.TAG_DOES_NOT_BELONG_TO_CATEGORY`.
-  - `404`: `FINANCIAL.CATEGORY_NOT_FOUND`.
+  - `400`: `FINANCIAL_TRACKING.CANNOT_RECLASSIFY_ACROSS_TYPES` (no se puede pasar un ítem de tipo EXPENSE a una categoría INCOME ni viceversa).
+  - `400`: `FINANCIAL_TRACKING.CATEGORY_NOT_ACTIVE`.
+  - `400`: `FINANCIAL_TRACKING.TAG_DOES_NOT_BELONG_TO_CATEGORY`.
+  - `404`: `FINANCIAL_TRACKING.CATEGORY_NOT_FOUND`.
 
 ---
 
@@ -813,7 +818,7 @@ Elimina físicamente un movimiento financiero y emite el evento de dominio corre
 - **Autenticación**: Bearer Token + Miembro.
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `404`: `FINANCIAL.FINANCIAL_ITEM_NOT_FOUND`.
+  - `404`: `FINANCIAL_TRACKING.FINANCIAL_ITEM_NOT_FOUND`.
 
 ---
 
@@ -931,42 +936,70 @@ Desactiva la configuración del presupuesto sin borrar su historial.
 Todos los reportes ofrecen vistas consolidadas de lectura optimizadas para visualizaciones en dashboards y gráficos de la app móvil.
 
 #### `GET /families/:familyId/dashboard`
-Obtiene el resumen consolidado del mes (ingresos totales, gastos totales, saldo neto y desglose porcentual por categorías de gasto).
+Obtiene el resumen consolidado del mes: ingresos totales, gastos totales, saldo neto y el desglose por categoría de gastos e ingresos.
 - **Autenticación**: Bearer Token + Miembro.
 - **Query Params**:
   - `period` (string `YYYY-MM`, opcional, default: mes en curso).
+- **Reglas del desglose**:
+  - `expenseByCategory` contiene las categorías de tipo `EXPENSE` e `incomeByCategory` las de tipo `INCOME`.
+  - Se incluyen **todas las categorías activas** del tipo, también las que no tienen movimientos en el período (`amount` en 0 y `percentage` en 0), más las categorías **deprecadas** que sí tengan movimientos en el período.
+  - `percentage` es la proporción de la categoría sobre el total de su tipo (`totalExpenses` o `totalIncome`), con un decimal; es 0 si el total es 0.
+  - Orden: monto descendente y, a igualdad, por nombre.
+  - `icon` y `color` son la clave guardada en la categoría, o `null` si no tiene.
+  - Los totales y el saldo cuentan todos los movimientos del período, incluso los de categorías que ya no existen; esas categorías no aparecen en el desglose.
+  - `categoryBreakdown` (forma anterior) **fue retirado**, sin compatibilidad.
 - **Respuesta `200 OK`**:
   ```json
   {
-    "totalExpenses": {
-      "amount": 450000,
-      "currency": "CLP"
-    },
-    "totalIncome": {
-      "amount": 1200000,
-      "currency": "CLP"
-    },
+    "period": "2026-08",
+    "currency": "CLP",
+    "totalExpenses": { "amount": 450000, "currency": "CLP" },
+    "totalIncome": { "amount": 1200000, "currency": "CLP" },
     "balance": { "amount": 750000, "currency": "CLP" },
-    "categoryBreakdown": [
+    "expenseByCategory": [
       {
         "categoryId": "c1c2c3c4-0000-4111-8222-abcdefabcdef",
-        "totalExpense": {
-          "amount": 270000,
-          "currency": "CLP"
-        },
+        "name": "Alimentación",
+        "icon": "shopping_cart",
+        "color": "teal_500",
+        "status": "ACTIVE",
+        "amount": { "amount": 270000, "currency": "CLP" },
         "percentage": 60
       },
       {
         "categoryId": "c2c3c4c5-0000-4111-8222-abcdefabcdef",
-        "totalExpense": {
-          "amount": 180000,
-          "currency": "CLP"
-        },
+        "name": "Transporte",
+        "icon": null,
+        "color": null,
+        "status": "ACTIVE",
+        "amount": { "amount": 180000, "currency": "CLP" },
         "percentage": 40
+      },
+      {
+        "categoryId": "c3c4c5c6-0000-4111-8222-abcdefabcdef",
+        "name": "Salud",
+        "icon": null,
+        "color": null,
+        "status": "ACTIVE",
+        "amount": { "amount": 0, "currency": "CLP" },
+        "percentage": 0
+      }
+    ],
+    "incomeByCategory": [
+      {
+        "categoryId": "c4c5c6c7-0000-4111-8222-abcdefabcdef",
+        "name": "Sueldo",
+        "icon": "payments",
+        "color": null,
+        "status": "ACTIVE",
+        "amount": { "amount": 1200000, "currency": "CLP" },
+        "percentage": 100
       }
     ]
   }
   ```
+- **Errores posibles**:
+  - `400`: `HTTP.INVALID_REQUEST_BODY` (período con formato inválido).
 
 ---
 
@@ -994,7 +1027,7 @@ Reporte de gastos agrupados por cada medio de pago para un periodo.
 ---
 
 #### `GET /families/:familyId/reports/breakdown`
-Desglose detallado por categoría con nombre y monto para un periodo.
+Desglose detallado por categoría con nombre, `color` (clave de paleta o `null`) y monto para un periodo.
 - **Autenticación**: Bearer Token + Miembro.
 - **Query Params**:
   - `period` (string `YYYY-MM`, **requerido**).
@@ -1005,6 +1038,7 @@ Desglose detallado por categoría con nombre y monto para un periodo.
     {
       "categoryId": "c1c2c3c4-0000-4111-8222-abcdefabcdef",
       "categoryName": "Alimentación",
+      "color": "teal_500",
       "amount": 270000,
       "currency": "CLP"
     }
@@ -1092,6 +1126,7 @@ Navegación jerárquica multinivel de gastos. El nivel de respuesta se adapta a 
         {
           "categoryId": "c1c2c3c4-0000-4111-8222-abcdefabcdef",
           "categoryName": "Alimentación",
+          "color": "teal_500",
           "amount": { "amount": 270000, "currency": "CLP" }
         }
       ]
@@ -1162,6 +1197,7 @@ Procesa una descripción en lenguaje natural y extrae la sugerencia estructurada
     "occurredOn": "2026-10-12T00:00:00.000Z",
     "title": "Farmacia Ahumada",
     "confidence": 0.88,
+    "expiresAt": "2026-10-13T00:00:00.000Z",
     "rawInput": "Gasté 18500 en farmacia Ahumada hoy para los remedios"
   }
   ```
@@ -1187,13 +1223,14 @@ Sube y escanea una imagen de recibo o boleta.
     "occurredOn": "2026-10-12T11:20:00.000Z",
     "title": "Supermercado Lider",
     "confidence": 0.94,
+    "expiresAt": "2026-10-13T11:20:00.000Z",
     "merchantName": "Lider Express",
     "receiptImageRef": "boleta_12102026.jpg"
   }
   ```
 - **Errores posibles**:
   - `400`: `HTTP.INVALID_REQUEST_BODY` (si no se envía el archivo).
-  - `400`: `AI.UNREADABLE_RECEIPT` (la imagen no contiene texto legible ni datos financieros reconocibles).
+  - `400`: `AI_ASSISTANCE.UNREADABLE_RECEIPT` (la imagen no contiene texto legible ni datos financieros reconocibles).
 
 ---
 
@@ -1211,10 +1248,13 @@ Confirma la sugerencia (opcionalmente aplicando correcciones manuales antes de g
     "title": "Supermercado Lider"
   }
   ```
-- **Respuesta `204 No Content`**
+- **Notas**: `amount` es un entero en unidades menores; si se envía sin `currency` se asume `CLP`. El item se crea mediante `CreateFinancialItemUseCase`, por lo que aplica la validación de moneda familiar (`SHARED.CURRENCY_MISMATCH`, 409).
+- **Respuesta `201 Created`**: el `FinancialItem` creado (mismo formato que `POST /families/:familyId/items`).
 - **Errores posibles**:
-  - `404`: `AI.SUGGESTION_NOT_FOUND`.
-  - `400`: `AI.SUGGESTION_NOT_PENDING` (la sugerencia ya fue confirmada o descartada previamente).
+  - `404`: `AI_ASSISTANCE.SUGGESTION_NOT_FOUND`.
+  - `400`: `AI_ASSISTANCE.SUGGESTION_NOT_PENDING` (la sugerencia ya fue confirmada o descartada previamente).
+  - `400`: `AI.SUGGESTION_EXPIRED` (la sugerencia venció).
+  - `400`: `AI.CATEGORY_REQUIRED` (ni la sugerencia ni las correcciones traen categoría).
 
 ---
 
@@ -1223,8 +1263,8 @@ Descarta una sugerencia sin persistirla en el registro financiero.
 - **Autenticación**: Bearer Token + Miembro.
 - **Respuesta `204 No Content`**
 - **Errores posibles**:
-  - `404`: `AI.SUGGESTION_NOT_FOUND`.
-  - `400`: `AI.SUGGESTION_NOT_PENDING`.
+  - `404`: `AI_ASSISTANCE.SUGGESTION_NOT_FOUND`.
+  - `400`: `AI_ASSISTANCE.SUGGESTION_NOT_PENDING`.
 
 ---
 
@@ -1239,28 +1279,28 @@ Descarta una sugerencia sin persistirla en el registro financiero.
 | `IDENTITY.INVALID_CREDENTIALS` | 401 | Credenciales de login o contraseña actual erróneas. | Mostrar mensaje de credenciales incorrectas. |
 | `AUTH.INVALID_REFRESH_TOKEN` | 401 | El refresh token expiró o no existe. | Forzar redirección al login. |
 | `AUTH.POSSIBLE_TOKEN_THEFT` | 401 | Se reusó un refresh token ya utilizado. | Redirigir a login alertando sobre sesión cerrada por seguridad. |
-| `FAMILY.INVALID_FAMILY_NAME` | 400 | Nombre de familia vacío o mayor a 60 caracteres. | Validar tamaño en input. |
-| `FAMILY.INVALID_FAMILY_ORDER` | 400 | La lista de IDs para reordenar no coincide con las familias del usuario. | Refrescar listado antes de enviar reordenamiento. |
-| `FAMILY.ALREADY_MEMBER` | 409 | El email invitado ya pertenece a la familia. | Alertar que el usuario ya es miembro. |
-| `FAMILY.INVITATION_NOT_FOUND` | 404 | La invitación no existe. | Informar que la invitación no fue encontrada. |
-| `FAMILY.INVITATION_EXPIRED` | 400 | La invitación superó su tiempo de vigencia. | Solicitar al administrador un nuevo reenvío. |
-| `FAMILY.INVITATION_NOT_PENDING` | 400 | La invitación ya fue aceptada o revocada. | Mostrar estado actualizado. |
-| `FAMILY.CANNOT_REMOVE_LAST_OWNER` | 400 | Se intentó degradar o remover al único OWNER. | Notificar que se debe promover a otro miembro antes. |
+| `FAMILY_ACCESS.INVALID_FAMILY_NAME` | 400 | Nombre de familia vacío o mayor a 60 caracteres. | Validar tamaño en input. |
+| `FAMILY_ACCESS.INVALID_FAMILY_ORDER` | 400 | La lista de IDs para reordenar no coincide con las familias del usuario. | Refrescar listado antes de enviar reordenamiento. |
+| `FAMILY_ACCESS.ALREADY_MEMBER` | 409 | El email invitado ya pertenece a la familia. | Alertar que el usuario ya es miembro. |
+| `FAMILY_ACCESS.INVITATION_NOT_FOUND` | 404 | La invitación no existe. | Informar que la invitación no fue encontrada. |
+| `FAMILY_ACCESS.INVITATION_EXPIRED` | 400 | La invitación superó su tiempo de vigencia. | Solicitar al administrador un nuevo reenvío. |
+| `FAMILY_ACCESS.INVITATION_NOT_PENDING` | 400 | La invitación ya fue aceptada o revocada. | Mostrar estado actualizado. |
+| `FAMILY_ACCESS.CANNOT_REMOVE_LAST_OWNER` | 400 | Se intentó degradar o remover al único OWNER. | Notificar que se debe promover a otro miembro antes. |
 | `FAMILY.INSUFFICIENT_ROLE` | 403 | El usuario no cuenta con rol OWNER para esta acción. | Ocultar botones de administración a usuarios MEMBER. |
-| `FINANCIAL.DUPLICATE_PAYMENT_METHOD_NAME` | 409 | Ya existe un medio de pago con ese nombre. | Solicitar un nombre diferenciado. |
-| `FINANCIAL.PAYMENT_METHOD_HAS_ASSOCIATED_ITEMS` | 409 | No se puede eliminar porque tiene transacciones vinculadas. | Ofrecer la opción de "Deprecar / Desactivar". |
-| `FINANCIAL.PAYMENT_METHOD_IS_SOMEONES_DEFAULT` | 409 | Es el medio por defecto de un miembro de la familia. | Avisar que el usuario debe cambiar su default primero. |
-| `FINANCIAL.NO_DEFAULT_PAYMENT_METHOD_SET` | 400 | Se intentó crear ítem sin método y el usuario no tiene default. | Pedir al usuario que seleccione un método o configure su default. |
-| `FINANCIAL.DUPLICATE_CATEGORY_NAME` | 409 | Ya existe una categoría con ese nombre y tipo. | Avisar duplicado de categoría. |
-| `FINANCIAL.CATEGORY_HAS_ASSOCIATED_ITEMS` | 409 | No se puede eliminar categoría con transacciones. | Ofrecer deprecación. |
-| `FINANCIAL.FUTURE_TRANSACTION_DATE` | 400 | La fecha de la transacción es futura. | Bloquear fechas futuras en el datepicker de la app. |
-| `FINANCIAL.CANNOT_RECLASSIFY_ACROSS_TYPES` | 400 | Cambio incompatible entre EXPENSE e INCOME. | Limitar las categorías seleccionables al mismo tipo. |
-| `FINANCIAL.TAG_DOES_NOT_BELONG_TO_CATEGORY` | 400 | El tag seleccionado no pertenece a la categoría elegida. | Filtrar los tags dependientes de la categoría. |
+| `FINANCIAL_TRACKING.DUPLICATE_PAYMENT_METHOD_NAME` | 409 | Ya existe un medio de pago con ese nombre. | Solicitar un nombre diferenciado. |
+| `FINANCIAL_TRACKING.PAYMENT_METHOD_HAS_ASSOCIATED_ITEMS` | 409 | No se puede eliminar porque tiene transacciones vinculadas. | Ofrecer la opción de "Deprecar / Desactivar". |
+| `FINANCIAL_TRACKING.PAYMENT_METHOD_IS_SOMEONES_DEFAULT` | 409 | Es el medio por defecto de un miembro de la familia. | Avisar que el usuario debe cambiar su default primero. |
+| `FINANCIAL_TRACKING.NO_DEFAULT_PAYMENT_METHOD_SET` | 400 | Se intentó crear ítem sin método y el usuario no tiene default. | Pedir al usuario que seleccione un método o configure su default. |
+| `FINANCIAL_TRACKING.DUPLICATE_CATEGORY_NAME` | 409 | Ya existe una categoría con ese nombre y tipo. | Avisar duplicado de categoría. |
+| `FINANCIAL_TRACKING.CATEGORY_HAS_ASSOCIATED_ITEMS` | 409 | No se puede eliminar categoría con transacciones. | Ofrecer deprecación. |
+| `FINANCIAL_TRACKING.FUTURE_TRANSACTION_DATE` | 400 | La fecha de la transacción es futura. | Bloquear fechas futuras en el datepicker de la app. |
+| `FINANCIAL_TRACKING.CANNOT_RECLASSIFY_ACROSS_TYPES` | 400 | Cambio incompatible entre EXPENSE e INCOME. | Limitar las categorías seleccionables al mismo tipo. |
+| `FINANCIAL_TRACKING.TAG_DOES_NOT_BELONG_TO_CATEGORY` | 400 | El tag seleccionado no pertenece a la categoría elegida. | Filtrar los tags dependientes de la categoría. |
 | `BUDGETING.CATEGORY_NOT_EXPENSE` | 400 | Se intentó presupuestar una categoría de INCOME. | Permitir presupuestos únicamente en categorías de gastos. |
 | `BUDGETING.DUPLICATE_BUDGET_CONFIGURATION` | 409 | La categoría ya tiene un presupuesto configurado. | Abrir la pantalla de edición del presupuesto existente. |
-| `AI.SUGGESTION_NOT_FOUND` | 404 | La sugerencia de IA no existe. | Descartar de la cola visual de sugerencias. |
-| `AI.SUGGESTION_NOT_PENDING` | 400 | La sugerencia ya fue resuelta (confirmada o descartada). | Descartar de la cola visual de sugerencias. |
-| `AI.UNREADABLE_RECEIPT` | 400 | No se pudo extraer información del recibo. | Sugerir tomar una fotografía con mejor iluminación y encuadre. |
+| `AI_ASSISTANCE.SUGGESTION_NOT_FOUND` | 404 | La sugerencia de IA no existe. | Descartar de la cola visual de sugerencias. |
+| `AI_ASSISTANCE.SUGGESTION_NOT_PENDING` | 400 | La sugerencia ya fue resuelta (confirmada o descartada). | Descartar de la cola visual de sugerencias. |
+| `AI_ASSISTANCE.UNREADABLE_RECEIPT` | 400 | No se pudo extraer información del recibo. | Sugerir tomar una fotografía con mejor iluminación y encuadre. |
 
 ---
 
@@ -1291,13 +1331,13 @@ ya implementadas se describen en la sección 3 y no se repiten aquí como pendie
 
 | ID | Brecha | Por qué importa a la app |
 | :--: | --- | --- |
-| C1-IA | La confirmación de una sugerencia de IA no valida todavía que su moneda coincida con la moneda familiar | Al confirmar, devolver `SHARED.CURRENCY_MISMATCH` si la sugerencia o sus cambios usan otra moneda |
+| C1-IA | La validación de moneda al confirmar una sugerencia de IA ocurre vía `CreateFinancialItemUseCase` (`SHARED.CURRENCY_MISMATCH`), pero no tiene un test dedicado | Añadir un test de `ConfirmSuggestion`/ruta que cubra el rechazo por moneda distinta a la familiar |
 
 ### 6.0b Moneda de la familia
 
 Las reglas de moneda para items, presupuestos y configuración ya están implementadas y
-documentadas en la sección 3. La única brecha restante es validar la moneda durante la
-confirmación de sugerencias de IA (ver `C1-IA`).
+documentadas en la sección 3. La confirmación de sugerencias de IA reutiliza la validación de
+`CreateFinancialItemUseCase`; solo falta un test dedicado (ver `C1-IA`).
 
 ### 6.1 Invitaciones y miembros (pantallas: Selector de familias, Gestión de familia)
 
@@ -1311,11 +1351,13 @@ confirmación de sugerencias de IA (ver `C1-IA`).
 | B1 | `dashboard.categoryBreakdown` trae solo `categoryId`, y solo gastos | `expenseByCategory[]` e `incomeByCategory[]` con `categoryId`, `name`, `icon`, `status`, `amount` (Money), `percentage`; `currency` a nivel superior |
 | B2 | No aparecen las categorías **sin movimientos**, pero el diseño muestra `$0` | Incluir todas las categorías activas, más las deprecadas que tengan movimientos en el período |
 | B3 | `dashboard.balance` es un número suelto | Devolverlo como `Money` (ver T2) |
+
+> **Estado**: B1, B2 y B3 están implementadas (dashboard con `expenseByCategory`/`incomeByCategory`, categorías sin movimientos en $0, `balance` como `Money`). B4–B8 siguen abiertas.
 | B4 | `breakdown` no trae `icon`, `status` ni `percentage` | Añadirlos; parámetro `includeEmpty`; `currency` y `total` a nivel superior |
 | B5 | `comparison`: no se documenta qué pasa cuando el período base es 0; los períodos se llaman `periodA`/`periodB` tanto en la consulta como en la respuesta | `expenseVariation` e `incomeVariation` pasan a `number \| null` (null si el base es 0); la respuesta usa `a` y `b` y un `currency` superior |
 | B6 | `trend`: no se documenta si los meses sin datos aparecen ni el rango máximo | Rellenar meses vacíos con 0; rango máximo 24 meses; `REPORTING.INVALID_PERIOD_RANGE`; respuesta `{ fromPeriod, toPeriod, currency, points[] }` |
 | B7 | `drilldown` solo describe gastos y sus entradas no traen `icon`, `percentage` ni `itemCount` homogéneos | Parámetro `type` (default `EXPENSE`); añadir `icon`, `percentage` e `itemCount` en niveles `category` y `tag` |
-| B8 | Los períodos inválidos no tienen código de error propio | `REPORTING.INVALID_PERIOD` |
+| B8 | Los períodos inválidos no tienen código de error propio | `SHARED.INVALID_PERIOD` |
 
 ### 6.3 Movimientos (pantalla: Listado y detalle)
 
@@ -1373,7 +1415,7 @@ se mantienen en la tabla de brechas de la sección 6 y en el plan de implementac
 | Login / registro | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout` | — |
 | Selector de familias | `GET /me/families`, `PUT /me/families/order`, `POST /families`, `GET /me/invitations`, `POST /invitations/:id/accept`, `POST /invitations/:id/decline` | — |
 | Gestión de familia | `GET /families/:id/members`, `GET/POST /families/:id/invitations`, `DELETE /invitations/:id`, `PATCH .../members/:id/role`, `DELETE .../members/:id`, `PATCH .../settings/currency` | — |
-| Dashboard | `GET /families/:id/dashboard`, `GET /families/:id/categories` | B1–B3 |
+| Dashboard | `GET /families/:id/dashboard`, `GET /families/:id/categories` | B1–B3 (implementadas) |
 | Categorías | `GET/POST/PATCH/DELETE /families/:id/categories...`, tags | — |
 | Registro manual | `POST /families/:id/items`, `GET .../categories`, `GET .../payment-methods` | — |
 | Registro con texto | `POST .../suggestions/text`, `POST .../suggestions/:id/confirm`, `DELETE .../suggestions/:id` | S3–S4 |
@@ -1393,14 +1435,14 @@ Los siguientes aparecen en las descripciones de endpoints y deben permanecer sin
 
 | Código | HTTP | Cuándo | Mensaje sugerido |
 | --- | :--: | --- | --- |
-| `FAMILY.MEMBER_NOT_FOUND` | 404 | El miembro no existe en la familia | "Este miembro ya no pertenece a la familia." |
-| `FINANCIAL.CATEGORY_NOT_FOUND` | 404 | Categoría inexistente | "La categoría ya no existe." |
-| `FINANCIAL.CATEGORY_NOT_ACTIVE` | 400 | Categoría deprecada usada en un registro nuevo | "Esta categoría está archivada." |
-| `FINANCIAL.PAYMENT_METHOD_NOT_FOUND` | 404 | Medio de pago inexistente | "El medio de pago ya no existe." |
-| `FINANCIAL.PAYMENT_METHOD_NOT_ACTIVE` | 400 | Medio de pago deprecado | "Este medio de pago está archivado." |
-| `FINANCIAL.FINANCIAL_ITEM_NOT_FOUND` | 404 | Movimiento inexistente | "El movimiento ya no existe." |
-| `FINANCIAL.DUPLICATE_TAG_NAME` | 409 | Tag repetido en la categoría | "Ya existe un tag con ese nombre." |
-| `FINANCIAL.TAG_HAS_ASSOCIATED_ITEMS` | 409 | Borrar tag con movimientos | "Tiene movimientos asociados. Puedes archivarlo." |
+| `FAMILY_ACCESS.MEMBER_NOT_FOUND` | 404 | El miembro no existe en la familia | "Este miembro ya no pertenece a la familia." |
+| `FINANCIAL_TRACKING.CATEGORY_NOT_FOUND` | 404 | Categoría inexistente | "La categoría ya no existe." |
+| `FINANCIAL_TRACKING.CATEGORY_NOT_ACTIVE` | 400 | Categoría deprecada usada en un registro nuevo | "Esta categoría está archivada." |
+| `FINANCIAL_TRACKING.PAYMENT_METHOD_NOT_FOUND` | 404 | Medio de pago inexistente | "El medio de pago ya no existe." |
+| `FINANCIAL_TRACKING.PAYMENT_METHOD_NOT_ACTIVE` | 400 | Medio de pago deprecado | "Este medio de pago está archivado." |
+| `FINANCIAL_TRACKING.FINANCIAL_ITEM_NOT_FOUND` | 404 | Movimiento inexistente | "El movimiento ya no existe." |
+| `FINANCIAL_TRACKING.DUPLICATE_TAG_NAME` | 409 | Tag repetido en la categoría | "Ya existe un tag con ese nombre." |
+| `FINANCIAL_TRACKING.TAG_HAS_ASSOCIATED_ITEMS` | 409 | Borrar tag con movimientos | "Tiene movimientos asociados. Puedes archivarlo." |
 | `SHARED.INVALID_EMAIL` | 400 | Email con formato inválido | "Revisa el correo electrónico." |
 | `SHARED.UNSUPPORTED_CURRENCY` | 400 | Moneda no soportada | "Moneda no disponible." |
 | `BUDGETING.NO_OVERRIDE_FOR_PERIOD` | 400 | Quitar un override inexistente | "Ese mes no tiene un presupuesto especial." |
@@ -1408,18 +1450,38 @@ Los siguientes aparecen en las descripciones de endpoints y deben permanecer sin
 | `SHARED.CURRENCY_MISMATCH` | 409 | Item, presupuesto o sugerencia en una moneda distinta a la de la familia | "La moneda no coincide con la de la familia." |
 | `FAMILY.CURRENCY_LOCKED` | 409 | Cambiar la moneda con items o presupuestos activos (`details.reasons`) | "No puedes cambiar la moneda mientras haya movimientos o presupuestos activos." |
 | `SHARED.INVALID_AMOUNT` | 400 | Monto no entero o fuera de rango seguro | "Revisa el monto." |
-| `REPORTING.INVALID_PERIOD` | 400 | Período mal formado | "Período no válido." |
+| `SHARED.INVALID_PERIOD` | 400 | Período mal formado | "Período no válido." |
 | `REPORTING.INVALID_PERIOD_RANGE` | 400 | Rango de meses inválido o mayor a 24 | "Elige un rango de hasta 24 meses." |
 | `FAMILY.INVITATION_NOT_FOR_USER` | 403 | Aceptar o rechazar una invitación de otro email | "Esta invitación no es para tu cuenta." |
-| `AI.UNPARSEABLE_TEXT` | 400 | Texto sin monto interpretable | "No pude entender el texto. Incluye un monto." |
+| `AI_ASSISTANCE.UNPARSEABLE_TEXT` | 400 | Texto sin monto interpretable | "No pude entender el texto. Incluye un monto." |
 | `AI.CATEGORY_REQUIRED` | 400 | Confirmar sin categoría | "Elige una categoría." |
 | `AI.SUGGESTION_EXPIRED` | 400 | Sugerencia vencida (24 h) | "La sugerencia expiró. Genera otra." |
 | `AI.UNSUPPORTED_IMAGE_TYPE` | 400 | Imagen en formato no admitido | "Usa una imagen JPEG, PNG o WebP." |
 | `AI.USAGE_LIMIT_EXCEEDED` | 429 | Cupo diario de IA agotado (`details.limit/used/resetsAt`) | "Llegaste al límite diario de IA." |
+| `AI_ASSISTANCE.PROVIDER_UNAVAILABLE` | 400 | El proveedor de IA no está disponible | "El asistente no está disponible. Inténtalo más tarde." |
+| `AI_ASSISTANCE.INVALID_CONFIDENCE_SCORE` / `INVALID_MERCHANT_NAME` / `INVALID_RECEIPT_IMAGE_REF` | 400 | Valor inválido en una sugerencia generada | "No se pudo procesar la sugerencia." |
+| `FAMILY_ACCESS.FAMILY_NOT_FOUND` | 404 | La familia no existe | "Esta familia ya no existe." |
+| `FAMILY_ACCESS.INVITATION_NOT_ACCEPTED` | 400 | La operación requiere una invitación aceptada | "La invitación aún no fue aceptada." |
+| `FINANCIAL_TRACKING.TAG_NOT_FOUND` | 404 | Tag inexistente | "El tag ya no existe." |
+| `FINANCIAL_TRACKING.TAG_NOT_ACTIVE` | 400 | Tag deprecado usado en un registro nuevo | "Este tag está archivado." |
+| `FINANCIAL_TRACKING.UNSUPPORTED_CURRENCY` | 400 | Moneda no soportada en Financial Tracking | "Moneda no disponible." |
+| `FINANCIAL_TRACKING.INVALID_TITLE` / `INVALID_NOTE` / `INVALID_CATEGORY_NAME` / `INVALID_CATEGORY_ICON` / `INVALID_CATEGORY_COLOR` / `INVALID_TAG_NAME` / `INVALID_TAG_ORDER` / `INVALID_PAYMENT_METHOD_NAME` | 400 | Valor de entrada inválido según reglas de dominio | Mostrar el mensaje devuelto en `message` |
+| `BUDGETING.BUDGET_CONFIGURATION_NOT_FOUND` | 404 | La configuración de presupuesto no existe | "Ese presupuesto ya no existe." |
+| `BUDGETING.INVALID_BUDGET_BALANCE` | 400 | Saldo de presupuesto inválido | Mostrar el mensaje devuelto en `message` |
+| `REPORTING.INVALID_ITEM_COUNT` | 400 | Conteo de movimientos inválido en el read model | Reintentar; reportar si persiste |
+| `REPORTING.TAG_WITHOUT_CATEGORY` | 400 | Drill-down por tag sin categoría | Enviar `categoryId` junto con `tagId` |
+| `IDENTITY.USER_NOT_FOUND` | 404 | El usuario no existe | Cerrar sesión y volver al login |
 | Errores 401/403 de middleware | 401/403 | `AUTH.MISSING_TOKEN`, `AUTH.INVALID_TOKEN`, `FAMILY.NOT_A_MEMBER`, `FAMILY.INSUFFICIENT_ROLE` | Según el código |
 
 Los códigos de error deben mantenerse alineados con `resolveHttpStatus` y los esquemas de
 `openapi.yaml`.
+
+> **Prefijos reales**: el cuerpo de error expone `error.code` tal como lo define cada error de
+> dominio. Los contextos usan los prefijos `FAMILY_ACCESS.*`, `FINANCIAL_TRACKING.*` y
+> `AI_ASSISTANCE.*`; los códigos transversales conservan `FAMILY.*` (`NOT_A_MEMBER`,
+> `INSUFFICIENT_ROLE`, `CURRENCY_LOCKED`, `INVITATION_NOT_FOR_USER`), `AI.*`
+> (`CATEGORY_REQUIRED`, `SUGGESTION_EXPIRED`, `USAGE_LIMIT_EXCEEDED`, `UNSUPPORTED_IMAGE_TYPE`),
+> `AUTH.*` y `SHARED.*`.
 
 ---
 
