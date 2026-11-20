@@ -4,6 +4,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
@@ -59,7 +61,7 @@ class MainScreenTest {
         listOf("Inicio", "Movimientos", "Reportes", "Presupuestos", "Asistente").forEach {
             composeTestRule.onNodeWithText(it).assertIsDisplayed()
         }
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
     }
 
     @Test
@@ -75,7 +77,7 @@ class MainScreenTest {
         composeTestRule.onAllNodesWithText("Elegir familia").assertCountEquals(0)
         composeTestRule.onNodeWithContentDescription("Selector de familia: Familia Gómez, Integrante")
             .assertIsDisplayed()
-        composeTestRule.onNodeWithText("Inicio · Familia Gómez").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Gómez")
     }
 
     @Test
@@ -89,7 +91,7 @@ class MainScreenTest {
         composeTestRule.waitForIdle()
         composeTestRule.onAllNodesWithText("Elegir familia").assertCountEquals(0)
         composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
     }
 
     @Test
@@ -99,7 +101,7 @@ class MainScreenTest {
         composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).performClick()
 
         composeTestRule.onAllNodesWithText("Elegir familia").assertCountEquals(0)
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
     }
 
     @Test
@@ -204,12 +206,52 @@ class MainScreenTest {
     // --- Gestión de categorías (005, T-13) ---
 
     @Test
-    fun homeShowsCategoriesTitleWithManageLinkAndKeepsTheFamilyText() {
+    fun homeShowsTheDashboardOfTheActiveFamilyWithItsCategoriesManageLink() {
         setHost(severalFamilies)
 
-        composeTestRule.onNodeWithText("Categorías").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("home_manage_categories").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
+        composeTestRule.onNodeWithTag("dashboard_breakdown_card").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_manage_categories").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun homeNoLongerShowsTheCategoriesSectionNorTheProvisionalText() {
+        setHost(severalFamilies)
+
+        composeTestRule.onAllNodesWithText("Categorías").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Inicio · Familia Plata").assertCountEquals(0)
+        composeTestRule.onNodeWithText("Gastos por categoría").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun homeScrollsToReachThePaymentMethodsSectionBelowTheDashboard() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithText("Medios de pago").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").assertIsDisplayed()
+    }
+
+    @Test
+    fun tappingACategoryOfTheDashboardOpensTheNewMovementScreenFullScreen() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithTag("dashboard_category_c-food").performScrollTo().performClick()
+
+        composeTestRule.onNodeWithTag("movement_create_screen").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("home_content").assertCountEquals(0)
+        composeTestRule.onAllNodesWithContentDescription(OWNER_SELECTOR).assertCountEquals(0)
+    }
+
+    @Test
+    fun theDashboardIsRebuiltWhenTheFamilyChanges() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
+
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).performClick()
+        composeTestRule.onNodeWithContentDescription("Familia Gómez, Integrante").performClick()
+
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Gómez")
+        composeTestRule.onNodeWithTag("dashboard_breakdown_card").assertIsDisplayed()
     }
 
     @Test
@@ -224,7 +266,7 @@ class MainScreenTest {
     fun manageOpensCategoriesFullScreenWithoutHeaderNorTabs() {
         setHost(severalFamilies)
 
-        composeTestRule.onNodeWithTag("home_manage_categories").performClick()
+        composeTestRule.onNodeWithTag("home_manage_categories").performScrollTo().performClick()
 
         composeTestRule.onNodeWithTag("categories_screen").assertIsDisplayed()
         composeTestRule.onNodeWithText("Categorías").assertIsDisplayed()
@@ -240,33 +282,33 @@ class MainScreenTest {
     @Test
     fun theArrowReturnsToHomeWithHeaderAndTabs() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithTag("home_manage_categories").performClick()
+        composeTestRule.onNodeWithTag("home_manage_categories").performScrollTo().performClick()
 
         composeTestRule.onNodeWithContentDescription("Volver").performClick()
 
         composeTestRule.onAllNodesWithTag("categories_screen").assertCountEquals(0)
         composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
         composeTestRule.onNodeWithText("Inicio").assertIsSelected()
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
     }
 
     @Test
     fun theSystemBackGestureReturnsToHome() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithTag("home_manage_categories").performClick()
+        composeTestRule.onNodeWithTag("home_manage_categories").performScrollTo().performClick()
         composeTestRule.onNodeWithTag("categories_screen").assertIsDisplayed()
 
         pressBack()
 
         composeTestRule.onAllNodesWithTag("categories_screen").assertCountEquals(0)
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
         composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
     }
 
     @Test
     fun categoriesBackArrowHasATouchTargetOfAtLeast48dp() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithTag("home_manage_categories").performClick()
+        composeTestRule.onNodeWithTag("home_manage_categories").performScrollTo().performClick()
 
         // El área táctil (no el tamaño visual de 40 dp) es la que debe llegar a 48 dp.
         composeTestRule.onNodeWithTag("categories_back")
@@ -277,23 +319,24 @@ class MainScreenTest {
     // --- Gestión de medios de pago (006, T-09) ---
 
     @Test
-    fun homeShowsPaymentMethodsSectionRightAboveCategories() {
+    fun homeShowsPaymentMethodsSectionBelowTheDashboard() {
         setHost(severalFamilies)
 
-        composeTestRule.onNodeWithText("Medios de pago").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Medios de pago").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("home_manage_payment_methods").assertIsDisplayed()
         val paymentTop = composeTestRule.onNodeWithText("Medios de pago").fetchSemanticsNode().positionInRoot.y
-        val categoriesTop = composeTestRule.onNodeWithText("Categorías").fetchSemanticsNode().positionInRoot.y
-        assertTrue("«Medios de pago» debe estar encima de «Categorías»", paymentTop < categoriesTop)
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        val dashboard = composeTestRule.onNodeWithTag("dashboard_content").fetchSemanticsNode()
+        val dashboardBottom = dashboard.positionInRoot.y + dashboard.size.height
+        assertTrue("«Medios de pago» debe estar debajo del dashboard", paymentTop >= dashboardBottom)
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
     }
 
     @Test
     fun theTwoManageLinksAreToldApartByTheScreenReader() {
         setHost(severalFamilies)
 
-        composeTestRule.onNodeWithContentDescription("Gestionar medios de pago").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Gestionar categorías").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Gestionar medios de pago").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Gestionar categorías").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -308,7 +351,7 @@ class MainScreenTest {
     fun managePaymentMethodsOpensFullScreenWithoutHeaderNorTabs() {
         setHost(severalFamilies)
 
-        composeTestRule.onNodeWithTag("home_manage_payment_methods").performClick()
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").performScrollTo().performClick()
 
         composeTestRule.onNodeWithTag("payment_methods_screen").assertIsDisplayed()
         composeTestRule.onAllNodesWithTag("categories_screen").assertCountEquals(0)
@@ -325,32 +368,32 @@ class MainScreenTest {
     @Test
     fun thePaymentMethodsArrowReturnsToHomeWithHeaderAndTabs() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithTag("home_manage_payment_methods").performClick()
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").performScrollTo().performClick()
 
         composeTestRule.onNodeWithContentDescription("Volver").performClick()
 
         composeTestRule.onAllNodesWithTag("payment_methods_screen").assertCountEquals(0)
         composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
     }
 
     @Test
     fun theSystemBackGestureReturnsFromPaymentMethodsToHome() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithTag("home_manage_payment_methods").performClick()
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").performScrollTo().performClick()
         composeTestRule.onNodeWithTag("payment_methods_screen").assertIsDisplayed()
 
         pressBack()
 
         composeTestRule.onAllNodesWithTag("payment_methods_screen").assertCountEquals(0)
-        composeTestRule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
         composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
     }
 
     @Test
     fun paymentMethodsBackArrowHasATouchTargetOfAtLeast48dp() {
         setHost(severalFamilies)
-        composeTestRule.onNodeWithTag("home_manage_payment_methods").performClick()
+        composeTestRule.onNodeWithTag("home_manage_payment_methods").performScrollTo().performClick()
 
         composeTestRule.onNodeWithTag("payment_methods_back")
             .assertTouchWidthIsEqualTo(48.dp)
@@ -363,7 +406,7 @@ class MainScreenTest {
 
         // El área táctil (no el tamaño visual de 40 dp del botón) es la que debe llegar a 48 dp.
         listOf("home_manage_payment_methods", "home_manage_categories").forEach {
-            composeTestRule.onNodeWithTag(it).assertTouchHeightIsEqualTo(48.dp).assertWidthIsAtLeast(48.dp)
+            composeTestRule.onNodeWithTag(it).performScrollTo().assertTouchHeightIsEqualTo(48.dp).assertWidthIsAtLeast(48.dp)
         }
     }
 }

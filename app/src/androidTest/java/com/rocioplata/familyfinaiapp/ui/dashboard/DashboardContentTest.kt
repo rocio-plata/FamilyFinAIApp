@@ -592,7 +592,7 @@ class DashboardContentTest {
     fun manageOpensTheCategoriesManagement() {
         val events = show(state())
 
-        rule.onNodeWithTag("dashboard_manage_categories").assertIsEnabled().performClick()
+        rule.onNodeWithTag("home_manage_categories").assertIsEnabled().performClick()
 
         assertEquals(1, events.manage)
     }
@@ -603,7 +603,7 @@ class DashboardContentTest {
 
         rule.onNodeWithTag("dashboard_categories_empty").assert(hasText("No hay categorías de gasto activas."))
         absent("dashboard_categories_count")
-        rule.onNodeWithTag("dashboard_manage_categories").performClick()
+        rule.onNodeWithTag("home_manage_categories").performClick()
         assertEquals(1, events.manage)
     }
 

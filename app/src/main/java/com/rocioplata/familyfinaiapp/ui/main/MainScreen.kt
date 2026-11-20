@@ -23,14 +23,17 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rocioplata.familyfinaiapp.FamilyFinApp
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
+import com.rocioplata.familyfinaiapp.ui.dashboard.DashboardScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementDetailScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementFormScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementsScreen
 import com.rocioplata.familyfinaiapp.ui.paymentmethods.PaymentMethodsScreen
 import com.rocioplata.familyfinaiapp.domain.auth.SessionState
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
 @Composable
@@ -53,9 +56,26 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onSelectFamily = viewModel::selectFamily,
         onDismissSelector = viewModel::dismissSelector,
         onSelectTab = viewModel::selectTab,
-        onManageCategories = viewModel::openCategories,
         onManagePaymentMethods = viewModel::openPaymentMethods,
-        onAddMovement = viewModel::openMovementCreate,
+        onAddMovement = { viewModel.openMovementCreate() },
+        homeDashboardContent = { contentModifier ->
+            val family = (uiState.families as? FamiliesState.Content)?.activeFamily
+            if (family != null) {
+                // La instancia de la familia activa va en la clave: cada cambio de familia, también volver a una anterior,
+                // empieza con un dashboard nuevo (mes en curso y gastos); sin cambio, el mes y el tipo se conservan.
+                DashboardScreen(
+                    familyId = family.id,
+                    currency = family.currency,
+                    viewModelKey = "${viewModelKey ?: "main"}-dashboard-${family.id}-${uiState.activeFamilyInstance}",
+                    onCategoryClick = { categoryId, type -> viewModel.openMovementCreate(categoryId, type) },
+                    onManageCategories = viewModel::openCategories,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    // Debajo van los medios de pago: el espacio para el botón «+» lo deja Inicio al final.
+                    bottomSpace = 16.dp,
+                    modifier = contentModifier,
+                )
+            }
+        },
         movementsContent = { contentModifier ->
             val family = (uiState.families as? FamiliesState.Content)?.activeFamily
             if (family == null) {
@@ -79,10 +99,12 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
             val canManage = family?.role == FamilyRole.OWNER
             when {
                 family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
-                route == MovementRoute.Create -> MovementFormScreen(
+                route is MovementRoute.Create -> MovementFormScreen(
                     familyId = family.id,
                     familyName = family.name,
                     currency = family.currency,
+                    initialType = route.type ?: MovementType.EXPENSE,
+                    initialCategoryId = route.categoryId,
                     viewModelKey = "${viewModelKey ?: "main"}-movement-form-${family.id}-${uiState.managementRouteInstance}",
                     onClose = viewModel::managementBack,
                     onInsufficientRole = viewModel::onInsufficientRole,
@@ -157,12 +179,12 @@ fun MainScreen(
     onDismissSelector: () -> Unit,
     modifier: Modifier = Modifier,
     onSelectTab: (MainDestination) -> Unit = {},
-    onManageCategories: () -> Unit = {},
     onManagePaymentMethods: () -> Unit = {},
     onAddMovement: () -> Unit = {},
     onManagementBack: () -> Unit = {},
     managementContent: (@Composable (ManagementRoute) -> Unit)? = null,
     movementsContent: (@Composable (Modifier) -> Unit)? = null,
+    homeDashboardContent: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val selected = uiState.selectedTab
     BackHandler(enabled = selected != MainDestination.Home && uiState.managementRoute == null) {
@@ -189,10 +211,10 @@ fun MainScreen(
         onRetry = onRetry,
         onSelectFamily = onSelectFamily,
         onDismissSelector = onDismissSelector,
-        onManageCategories = onManageCategories,
         onManagePaymentMethods = onManagePaymentMethods,
         onAddMovement = onAddMovement,
         movementsContent = movementsContent,
+        homeDashboardContent = homeDashboardContent,
         modifier = modifier,
     )
 }
@@ -217,10 +239,10 @@ fun MainScreenContent(
     onRetry: () -> Unit = {},
     onSelectFamily: (String) -> Unit = {},
     onDismissSelector: () -> Unit = {},
-    onManageCategories: () -> Unit = {},
     onManagePaymentMethods: () -> Unit = {},
     onAddMovement: () -> Unit = {},
     movementsContent: (@Composable (Modifier) -> Unit)? = null,
+    homeDashboardContent: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val content = uiState.families as? FamiliesState.Content
     Scaffold(
@@ -254,9 +276,8 @@ fun MainScreenContent(
             if (selected == MainDestination.Home) {
                 HomeContent(
                     modifier = contentModifier,
-                    familyName = familyName,
-                    onManageCategories = onManageCategories.takeIf { content != null },
                     onManagePaymentMethods = onManagePaymentMethods.takeIf { content != null },
+                    dashboardContent = homeDashboardContent.takeIf { content != null },
                 )
             } else if (selected == MainDestination.Movements && movementsContent != null) {
                 movementsContent(contentModifier)

@@ -34,6 +34,12 @@ data class MainUiState(
      * (se usa en la clave de su ViewModel). Atrás dentro de una gestión (edición → detalle) la conserva.
      */
     val managementRouteInstance: Int = 0,
+    /**
+     * Cuántas veces ha cambiado la familia activa desde que se abrió la pantalla (RF-01, CA-18 de la 008): forma parte de
+     * la clave del ViewModel del dashboard, así que cada cambio, también volver a una familia anterior, empieza en el
+     * mes en curso con gastos. Cambia con la familia efectiva, también si la anterior desaparece de la cabecera.
+     */
+    val activeFamilyInstance: Int = 0,
     // Esta spec no genera cambios locales (RF-09); la sincronización posterior lo activará.
     val hasLocalChanges: Boolean = false,
 )

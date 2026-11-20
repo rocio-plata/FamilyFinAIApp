@@ -9,6 +9,7 @@ import com.rocioplata.familyfinaiapp.domain.header.HeaderFailure
 import com.rocioplata.familyfinaiapp.domain.header.HeaderRefreshResult
 import com.rocioplata.familyfinaiapp.domain.header.HeaderRepository
 import com.rocioplata.familyfinaiapp.domain.header.Timed
+import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -647,6 +648,106 @@ class MainViewModelTest {
         assertEquals(MainDestination.Assistant, vm.uiState.value.selectedTab)
     }
 
+    // --- Instancia de la familia activa (T-14 de la 008: clave del ViewModel del dashboard) ---
+
+    private fun MainViewModel.instance() = uiState.value.activeFamilyInstance
+    private fun MainViewModel.activeId() = (uiState.value.families as FamiliesState.Content).activeFamily.id
+
+    @Test
+    fun instanciaDeFamilia_empiezaEnCero() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+
+        assertEquals(0, vm.instance())
+        assertEquals("f-1", vm.activeId())
+    }
+
+    @Test
+    fun instanciaDeFamilia_cambiaConCadaCambioDeFamilia_tambienAlVolverALaAnterior() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        val start = vm.instance()
+
+        vm.selectFamily("f-2")
+        advanceUntilIdle()
+        val second = vm.instance()
+        vm.selectFamily("f-1")
+        advanceUntilIdle()
+        val third = vm.instance()
+
+        assertEquals(start + 1, second)
+        assertEquals(start + 2, third)
+        assertEquals("f-1", vm.activeId())
+    }
+
+    @Test
+    fun instanciaDeFamilia_elegirLaMismaFamilia_noCambia() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        val start = vm.instance()
+
+        vm.selectFamily("f-1")
+        vm.selectFamily("f-1")
+        advanceUntilIdle()
+
+        assertEquals(start, vm.instance())
+    }
+
+    @Test
+    fun instanciaDeFamilia_refrescarLaCabecera_noCambia() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.selectFamily("f-2")
+        advanceUntilIdle()
+        val before = vm.instance()
+
+        vm.retry()
+        vm.onStart()
+        repo.data.value = families(plata, depto)
+        advanceUntilIdle()
+
+        assertEquals(before, vm.instance())
+        assertEquals("f-2", vm.activeId())
+    }
+
+    @Test
+    fun instanciaDeFamilia_cambiarDePestanaOAbrirUnaGestion_noCambia() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        val start = vm.instance()
+
+        vm.selectTab(MainDestination.Movements)
+        vm.selectTab(MainDestination.Home)
+        vm.openCategories()
+        vm.managementBack()
+        vm.openMovementCreate("c-food", MovementType.EXPENSE)
+        vm.managementBack()
+        advanceUntilIdle()
+
+        assertEquals(start, vm.instance())
+    }
+
+    @Test
+    fun instanciaDeFamilia_siLaFamiliaActivaDesaparece_cambiaAlPasarALaFavorita() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.selectFamily("f-2")
+        advanceUntilIdle()
+        val before = vm.instance()
+
+        repo.data.value = families(plata)
+        advanceUntilIdle()
+
+        assertEquals("f-1", vm.activeId())
+        assertEquals(before + 1, vm.instance())
+    }
+
+    @Test
+    fun instanciaDeFamilia_conLaCabeceraSinDatos_noSeCuenta_yAlRecuperarlaSigueIgual() = runTest {
+        val repo = FakeRepository().apply { onRefresh = { HeaderRefreshResult(families = HeaderFailure.Network) } }
+        val vm = create(repo)
+        assertEquals(0, vm.instance())
+
+        repo.data.value = families(plata, depto)
+        advanceUntilIdle()
+
+        assertEquals(0, vm.instance())
+    }
+
     // --- Rutas de movimientos (T-12) ---
 
     @Test
@@ -656,7 +757,80 @@ class MainViewModelTest {
         vm.openMovementCreate()
         advanceUntilIdle()
 
-        assertEquals(MovementRoute.Create, vm.route())
+        assertEquals(MovementRoute.Create(), vm.route())
+    }
+
+    @Test
+    fun movimiento_nuevoDesdeUnaCategoria_llevaLaCategoriaYElTipo() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        vm.openMovementCreate("c-food", MovementType.INCOME)
+        advanceUntilIdle()
+
+        assertEquals(MovementRoute.Create("c-food", MovementType.INCOME), vm.route())
+    }
+
+    @Test
+    fun movimiento_nuevoConElMas_sigueSinCategoriaNiTipo() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        vm.openMovementCreate()
+        advanceUntilIdle()
+
+        val route = vm.route() as MovementRoute.Create
+        assertNull(route.categoryId)
+        assertNull(route.type)
+    }
+
+    @Test
+    fun movimiento_variasPulsacionesSobreCategorias_abrenSoloUnFormulario() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+
+        vm.openMovementCreate("c-food", MovementType.EXPENSE)
+        vm.openMovementCreate("c-salary", MovementType.INCOME)
+        vm.openMovementCreate()
+        advanceUntilIdle()
+
+        assertEquals(MovementRoute.Create("c-food", MovementType.EXPENSE), vm.route())
+    }
+
+    @Test
+    fun movimiento_cadaAperturaDelAltaEsUnaInstanciaNueva_tambienDesdeUnaCategoria() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openMovementCreate("c-food", MovementType.EXPENSE)
+        advanceUntilIdle()
+        val first = vm.uiState.value.managementRouteInstance
+
+        vm.managementBack()
+        vm.openMovementCreate("c-food", MovementType.EXPENSE)
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.managementRouteInstance > first)
+    }
+
+    @Test
+    fun movimiento_atrasDesdeElAltaConCategoria_vuelveALasPestanasYConservaLaPestana() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openMovementCreate("c-food", MovementType.EXPENSE)
+        advanceUntilIdle()
+
+        vm.managementBack()
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        assertEquals(MainDestination.Home, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun movimiento_laCategoriaDeUnaFamiliaQueDesaparece_cierraElAlta() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.openMovementCreate("c-food", MovementType.EXPENSE)
+        advanceUntilIdle()
+
+        repo.data.value = families(depto)
+        advanceUntilIdle()
+
+        assertNull(vm.route())
     }
 
     @Test
@@ -706,7 +880,7 @@ class MainViewModelTest {
         vm.openMovementEdit("m-1")
         advanceUntilIdle()
 
-        assertEquals(MovementRoute.Create, vm.route())
+        assertEquals(MovementRoute.Create(), vm.route())
     }
 
     @Test
@@ -770,7 +944,7 @@ class MainViewModelTest {
         vm.openMovementDetail("m-1")
         advanceUntilIdle()
 
-        assertEquals(MovementRoute.Create, vm.route())
+        assertEquals(MovementRoute.Create(), vm.route())
     }
 
     @Test
@@ -787,7 +961,7 @@ class MainViewModelTest {
 
         assertEquals("f-1", vm.content().activeFamily.id)
         assertFalse(vm.uiState.value.selectorOpen)
-        assertEquals(MovementRoute.Create, vm.route())
+        assertEquals(MovementRoute.Create(), vm.route())
     }
 
     @Test

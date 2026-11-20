@@ -95,7 +95,8 @@ import java.time.YearMonth
  * y la sección por categoría del tipo activo, con «Gestionar» y una tarjeta por categoría. Los estados de carga y
  * error conservan el selector de mes, para poder cambiar de mes. Solo dibuja el estado recibido y avisa de lo que
  * toca la persona: [onCategoryClick] con el id de la categoría activa y el tipo activo, [onManageCategories] y
- * [onRetry]. Deja espacio al final para que el botón «+» no tape la última fila.
+ * [onRetry]. Deja [bottomSpace] al final: por defecto el necesario para que el botón «+» no tape la última fila; Inicio
+ * pone menos, porque debajo van los medios de pago.
  */
 @Composable
 fun DashboardContent(
@@ -108,6 +109,7 @@ fun DashboardContent(
     onCategoryClick: (categoryId: String, type: MovementType) -> Unit = { _, _ -> },
     onManageCategories: () -> Unit = {},
     onRetry: () -> Unit = {},
+    bottomSpace: Dp = DEFAULT_BOTTOM_SPACE,
 ) {
     Column(
         modifier = modifier.fillMaxWidth().testTag("dashboard_content"),
@@ -128,7 +130,7 @@ fun DashboardContent(
                 CategoriesSection(state.activeType, content.breakdown, onCategoryClick, onManageCategories)
             }
         }
-        Spacer(modifier = Modifier.height(BOTTOM_SPACE_FOR_FAB))
+        Spacer(modifier = Modifier.height(bottomSpace))
     }
 }
 
@@ -223,7 +225,7 @@ private fun CategoriesSection(
                 onClick = onManage,
                 modifier = Modifier
                     .heightIn(min = 48.dp)
-                    .testTag("dashboard_manage_categories")
+                    .testTag("home_manage_categories")
                     .semantics { contentDescription = manageDescription },
             ) {
                 Text(stringResource(R.string.categories_home_manage))
@@ -689,7 +691,8 @@ private fun CategoryAmount.displayColor(): Color =
 private val SIDE_BY_SIDE_MIN_WIDTH = 330.dp
 private val CATEGORY_MIN_CELL_WIDTH = 104.dp
 private val CATEGORY_GRID_SPACING = 8.dp
-private val BOTTOM_SPACE_FOR_FAB = 88.dp
+/** Espacio final por defecto: deja ver la última fila por encima del botón «+». */
+val DEFAULT_BOTTOM_SPACE = 88.dp
 private val MIN_CARD_AMOUNT_SIZE = 11.sp
 private const val AMOUNT_LINE_RESERVE = 1.15f
 private const val DIMMED_ALPHA = 0.55f
