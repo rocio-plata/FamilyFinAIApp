@@ -221,7 +221,6 @@
 
     <!-- Categorías y tags (005-categories). En la interfaz los tags se llaman "etiquetas", como en el mockup 006.
          Los límites (50 y 30) y los 15 iconos los pasa la interfaz desde CategoryValidation y CategoryIcons. -->
-    <string name="categories_home_title">Categorías</string>
     <string name="categories_home_manage">Gestionar</string>
     <string name="categories_home_manage_description">Gestionar categorías</string>
 
