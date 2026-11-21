@@ -3,9 +3,9 @@ package com.rocioplata.familyfinaiapp.ui.categories
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -433,10 +433,11 @@ private fun NameField(state: CategoryEditUiState.Form, onNameChange: (String) ->
 }
 
 /**
- * Selector de color (RF-15 de la 008): «Automático» (sin color, usa el de respaldo) y los 16 colores en una fila
- * desplazable, con una vista previa del icono en el color efectivo. El elegido se distingue por una marca y un
- * anillo, no solo por el tono, y se anuncia por su nombre como seleccionado.
+ * Selector de color (RF-15 de la 008): «Automático» (sin color, usa el de respaldo) y los 16 colores a la vista en
+ * una cuadrícula (cuatro columnas en un teléfono), con una vista previa del icono en el color efectivo. El elegido se
+ * distingue por una marca y un anillo, no solo por el tono, y se anuncia por su nombre como seleccionado.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorSelector(state: CategoryEditUiState.Form, onColorChange: (String?) -> Unit) {
     val effective = state.effectiveColor.displayColor()
@@ -483,38 +484,47 @@ private fun ColorSelector(state: CategoryEditUiState.Form, onColorChange: (Strin
                 .semantics { contentDescription = noneDescription }
                 .testTag("category_color_none"),
         )
-        // Al abrir, la fila se desplaza hasta el color elegido para que se vea; el ancho deja asomar el siguiente.
-        val swatchesScroll = rememberScrollState()
-        val swatchStepPx = with(LocalDensity.current) { (SWATCH_WIDTH + SWATCH_SPACING).roundToPx() }
-        LaunchedEffect(Unit) {
-            val selected = CategoryColors.options.indexOfFirst { it.key == state.color }
-            if (selected > 0) swatchesScroll.scrollTo(selected * swatchStepPx)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(swatchesScroll),
-            horizontalArrangement = Arrangement.spacedBy(SWATCH_SPACING),
-        ) {
-            CategoryColors.options.forEach { option ->
-                ColorSwatch(
-                    option = option,
-                    selected = state.color == option.key,
-                    enabled = !state.readOnly,
-                    onClick = { onColorChange(option.key) },
-                )
+        // Los 16 colores a la vista, sin desplazar: una cuadrícula que ocupa todo el ancho (cuatro columnas en un
+        // teléfono) y que con texto grande pasa a menos columnas en lugar de recortar.
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val minCell = SWATCH_MIN_WIDTH * LocalDensity.current.fontScale.coerceIn(1f, 2f)
+            val columns = ((maxWidth + SWATCH_SPACING) / (minCell + SWATCH_SPACING)).toInt().coerceAtLeast(1)
+            // Un dp menos: al redondear a píxeles, columnas de ancho exacto podrían no caber y la última pasaría a otra fila.
+            val cellWidth = (maxWidth - SWATCH_SPACING * (columns - 1)) / columns - 1.dp
+            FlowRow(
+                maxItemsInEachRow = columns,
+                horizontalArrangement = Arrangement.spacedBy(SWATCH_SPACING),
+                verticalArrangement = Arrangement.spacedBy(SWATCH_SPACING),
+                modifier = Modifier.fillMaxWidth().testTag("category_color_grid"),
+            ) {
+                CategoryColors.options.forEach { option ->
+                    ColorSwatch(
+                        option = option,
+                        selected = state.color == option.key,
+                        enabled = !state.readOnly,
+                        onClick = { onColorChange(option.key) },
+                        modifier = Modifier.width(cellWidth),
+                    )
+                }
             }
         }
     }
 }
 
-/** Un color del catálogo: círculo con su nombre debajo; al menos 48 dp de alto y ancho para tocarlo. */
+/** Un color del catálogo: círculo con su nombre debajo; al menos 48 dp de alto y de ancho para tocarlo. */
 @Composable
-private fun ColorSwatch(option: CategoryColorOption, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun ColorSwatch(
+    option: CategoryColorOption,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val name = stringResource(option.nameRes)
     val description = if (selected) stringResource(R.string.categories_icon_selected_description, name) else name
     val color = option.displayColor()
     Column(
-        modifier = Modifier
-            .width(SWATCH_WIDTH)
+        modifier = modifier
             .heightIn(min = 64.dp)
             // En solo lectura los colores se atenúan: no responden y no deben parecer activos.
             .alpha(if (enabled) 1f else DISABLED_ALPHA)
@@ -648,7 +658,8 @@ private fun IconCell(
 }
 
 private const val ICONS_PER_ROW = 5
-private val SWATCH_WIDTH = 64.dp
+// Con 88 dp caben cuatro por fila en un teléfono (4 × 4 = los 16 colores); con más ancho, más columnas.
+private val SWATCH_MIN_WIDTH = 88.dp
 private val SWATCH_SPACING = 4.dp
 private const val DISABLED_ALPHA = 0.6f
 

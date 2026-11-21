@@ -318,6 +318,38 @@ class DashboardContentTest {
 
     // --- Comparación (RF-06, CA-07) ---
 
+    private fun assertTitleAndVariationShareOneLine(type: MovementType) {
+        val down = MonthComparison(clp(1_120_450), clp(1_177_000), BigDecimal("-4.8"), ChangeDirection.DOWN, ChangeOutcome.FAVORABLE)
+        show(state(type = type, comparison = down))
+
+        val titleTop = top("dashboard_breakdown_title")
+        val titleBottom = bottom("dashboard_breakdown_title")
+        val chipTop = top("dashboard_variation")
+        val chipBottom = bottom("dashboard_variation")
+        assertTrue(
+            "$type: el indicador debe estar a la derecha del título",
+            left("dashboard_variation") >= left("dashboard_breakdown_title") + width("dashboard_breakdown_title"),
+        )
+        assertTrue(
+            "$type: título ($titleTop-$titleBottom) e indicador ($chipTop-$chipBottom) en líneas distintas",
+            chipTop < titleBottom && titleTop < chipBottom,
+        )
+    }
+
+    @Test
+    fun onAPhone_theExpensesTitleAndTheVariationShareOneLine() = assertTitleAndVariationShareOneLine(MovementType.EXPENSE)
+
+    @Test
+    fun onAPhone_theIncomeTitleAndTheVariationShareOneLine() = assertTitleAndVariationShareOneLine(MovementType.INCOME)
+
+    @Test
+    fun withTheTextAt200Percent_theVariationMovesBelowTheTitle() {
+        show(state(), fontScale = 2f)
+
+        assertTrue("con texto grande el indicador baja", top("dashboard_variation") >= bottom("dashboard_breakdown_title"))
+        rule.onNodeWithTag("dashboard_variation").assertIsDisplayed()
+    }
+
     @Test
     fun theVariationShowsSignAndText_andIsAnnouncedWithItsDirection() {
         show(state(comparison = downFavorable))

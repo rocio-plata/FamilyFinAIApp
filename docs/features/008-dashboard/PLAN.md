@@ -123,7 +123,7 @@ Señala impacto sobre modelos, contratos o componentes compartidos. -->
 | `ui/categories/CategoryColors.kt` | Crear | Catálogo de colores por clave (nombre accesible, color claro y oscuro) y `colorFor(category, posición)` con el respaldo por posición. | RF-14 |
 | `ui/theme/Color.kt` | Modificar | Valores claro/oscuro de la paleta de categoría (ver "Datos y contratos"). | RF-14 |
 | `ui/categories/CategoryEditViewModel.kt`, `CategoryEditUiState.kt` | Modificar | Color en el borrador, `setColor`, `hasChanges` y envío en alta y edición. | RF-15, CA-14 |
-| `ui/categories/CategoryEditContent.kt` | Modificar | Fila desplazable horizontal con los 16 colores (círculo y nombre) sobre la cuadrícula de iconos, como la sección "Icono y tonalidad" del mockup 006; el icono de vista previa usa el color. Solo lectura para Integrante y archivadas. | RF-15, CA-14 |
+| `ui/categories/CategoryEditContent.kt` | Modificar | Cuadrícula con los 16 colores a la vista (círculo y nombre; cuatro columnas en un teléfono, menos con texto grande) sobre la cuadrícula de iconos, como la sección "Icono y tonalidad" del mockup 006; el icono de vista previa usa el color. Solo lectura para Integrante y archivadas. | RF-15, CA-14 |
 | `ui/categories/CategoriesContent.kt` | Modificar | Icono de cada categoría en su color. | RF-14, CA-13 |
 | `domain/dashboard/DashboardCalculator.kt` (+ modelo `DashboardSummary`) | Crear | Reglas de negocio puras del dashboard (sin Android). | RF-02, RF-04 a RF-09, RF-13 |
 | `ui/dashboard/DashboardViewModel.kt`, `DashboardUiState.kt` | Crear | Mes, tipo activo, refrescos, estado `Loading`/`Error`/`Content`. | RF-01, RF-03, RF-13, CA-15 a CA-17 |

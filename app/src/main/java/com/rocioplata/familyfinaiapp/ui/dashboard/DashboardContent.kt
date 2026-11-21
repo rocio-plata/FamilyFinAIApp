@@ -30,7 +30,6 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.DonutLarge
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -435,19 +434,14 @@ private fun BreakdownCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 itemVerticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.DonutLarge,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        text = stringResource(type.breakdownTitleRes()),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.semantics { heading() }.testTag("dashboard_breakdown_title"),
-                    )
-                }
+                // El título y el indicador van en una sola línea en un teléfono (por eso el título no lleva icono y el
+                // indicador es compacto); si no caben, con texto grande o pantallas estrechas, el indicador pasa debajo.
+                Text(
+                    text = stringResource(type.breakdownTitleRes()),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() }.testTag("dashboard_breakdown_title"),
+                )
                 content.comparison?.let { VariationChip(it) }
             }
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -514,14 +508,15 @@ private fun VariationChip(comparison: MonthComparison) {
         modifier = Modifier.testTag("dashboard_variation").clearAndSetSemantics { contentDescription = description },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = tone, modifier = Modifier.size(18.dp))
+            Icon(imageVector = icon, contentDescription = null, tint = tone, modifier = Modifier.size(16.dp))
             Text(
                 text = stringResource(R.string.dashboard_variation_vs_previous, comparison.formattedVariation()),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.testTag("dashboard_variation_text"),
             )

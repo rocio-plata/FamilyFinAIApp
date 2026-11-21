@@ -27,6 +27,11 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -390,6 +395,54 @@ class CategoryEditContentTest {
         rule.onNodeWithText("Grafito").performScrollTo().assertIsDisplayed()
     }
 
+    private fun swatchBounds(key: String): Triple<Float, Float, Int> {
+        val node = rule.onNodeWithTag("category_color_$key").fetchSemanticsNode()
+        return Triple(node.positionInRoot.x, node.positionInRoot.y, node.size.width)
+    }
+
+    @Test
+    fun allSixteenColorsFitTheScreenWidth_withoutHorizontalScrolling_inFourRows() {
+        show(form())
+        rule.onNodeWithTag("category_color_grid").performScrollTo()
+
+        val rootWidth = rule.onRoot().fetchSemanticsNode().size.width
+        val bounds = allColors.map { swatchBounds(it.key) }
+        bounds.forEachIndexed { index, (x, _, w) ->
+            assertTrue("${allColors[index].key} se sale de la pantalla (x=$x, ancho=$w, pantalla=$rootWidth)", x >= 0f && x + w <= rootWidth)
+        }
+        // Filas completas de igual cantidad (la última puede tener menos) y sin un color suelto: en un teléfono, 4 × 4.
+        val perRow = bounds.groupBy { it.second }.toSortedMap().values.map { it.size }
+        assertEquals("los 16 colores en total", 16, perRow.sum())
+        assertTrue("filas desiguales: $perRow", perRow.dropLast(1).all { it == perRow.first() } && perRow.last() <= perRow.first())
+        assertTrue("al menos 3 por fila: $perRow", perRow.first() >= 3)
+        if (rootWidth >= 1000) assertEquals("en un teléfono, cuatro filas de cuatro", listOf(4, 4, 4, 4), perRow)
+    }
+
+    @Test
+    fun allSixteenColorsAreReachableWithoutSwipingSideways() {
+        show(form(color = "graphite"))
+
+        allColors.forEach { rule.onNodeWithTag("category_color_${it.key}").performScrollTo().assertIsDisplayed() }
+        rule.onNodeWithTag("category_color_graphite").assertIsSelected()
+    }
+
+    @Test
+    fun withTheTextAt200Percent_theColorGridUsesFewerColumns_andNothingLeavesTheScreen() {
+        rule.setContent {
+            val base = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(base.density, 2f)) {
+                FamilyFinAIAppTheme { Host(form(), Events()) }
+            }
+        }
+        rule.onNodeWithTag("category_color_grid").performScrollTo()
+
+        val rootWidth = rule.onRoot().fetchSemanticsNode().size.width
+        val bounds = allColors.map { swatchBounds(it.key) }
+        assertTrue("todos dentro del ancho", bounds.all { (x, _, w) -> x >= 0f && x + w <= rootWidth })
+        val perRow = bounds.groupBy { it.second }.values.map { it.size }
+        assertTrue("con texto grande hay menos de cuatro columnas ($perRow)", perRow.max() < 4)
+    }
+
     @Test
     fun withoutAColorTheAutomaticOptionIsTheSelectedOne() {
         show(form(color = null))
@@ -619,11 +672,12 @@ class CategoryEditContentTest {
     fun theTagListShowsActiveTagsThenArchivedOnesMarkedAndDimmed() {
         show(form())
 
-        rule.onNodeWithText("Etiquetas").assertIsDisplayed()
-        rule.onNodeWithText("3 activas").assertIsDisplayed()
+        rule.onNodeWithText("Etiquetas").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("3 activas").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Archivado").performScrollTo().assertIsDisplayed()
-        val lastActive = rule.onNodeWithTag("tag_row_t3").getBoundsInRoot().top
-        val archived = rule.onNodeWithTag("tag_row_t4").getBoundsInRoot().top
+        // Posiciones sin recortar por el área visible (el formulario se desplaza).
+        val lastActive = rule.onNodeWithTag("tag_row_t3").fetchSemanticsNode().positionInRoot.y
+        val archived = rule.onNodeWithTag("tag_row_t4").fetchSemanticsNode().positionInRoot.y
         assertTrue("el archivado va después de los activos", archived > lastActive)
     }
 
@@ -650,7 +704,7 @@ class CategoryEditContentTest {
     fun aSingleActiveTagUsesTheSingularForm() {
         show(form(tags = listOf(Tag("t1", "Uno", TagStatus.ACTIVE, 0))))
 
-        rule.onNodeWithText("1 activa").assertIsDisplayed()
+        rule.onNodeWithText("1 activa").performScrollTo().assertIsDisplayed()
         absent("tag_handle_t1")
     }
 
