@@ -37,6 +37,10 @@ val OnErrorContainer = Color(0xFF93000A)
 val Income = Color(0xFF2F9E74)
 val IncomeContainer = Color(0xFFE8F6EE)
 val Expense = Color(0xFFD9615B)
+
+// Relleno del indicador de variación: más oscuros para que el texto blanco tenga contraste suficiente.
+val IncomeStrong = Color(0xFF1E7556)
+val ExpenseStrong = Color(0xFFB23C37)
 val ExpenseContainer = Color(0xFFFDEEEC)
 val Warning = Color(0xFFD9822B)
 val WarningContainer = Color(0xFFFDF3E7)

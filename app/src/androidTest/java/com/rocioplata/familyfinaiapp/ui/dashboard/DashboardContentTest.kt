@@ -46,8 +46,10 @@ import com.rocioplata.familyfinaiapp.ui.categories.containsColorNear
 import com.rocioplata.familyfinaiapp.ui.movements.formatMonth
 import com.rocioplata.familyfinaiapp.ui.movements.formatted
 import com.rocioplata.familyfinaiapp.ui.theme.Expense
+import com.rocioplata.familyfinaiapp.ui.theme.ExpenseStrong
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 import com.rocioplata.familyfinaiapp.ui.theme.Income
+import com.rocioplata.familyfinaiapp.ui.theme.IncomeStrong
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -386,9 +388,9 @@ class DashboardContentTest {
     }
 
     @Test
-    fun theVariationIsGreenWhenFavorableAndRedWhenNot() {
+    fun theVariationIsGreenWhenFavorable() {
         show(state(comparison = downFavorable))
-        assertTrue("favorable sin verde", rule.onNodeWithTag("dashboard_variation").captureToImage().containsColorNear(Income))
+        assertTrue("favorable sin verde", rule.onNodeWithTag("dashboard_variation").captureToImage().containsColorNear(IncomeStrong))
     }
 
     @Test
@@ -396,7 +398,7 @@ class DashboardContentTest {
         val bad = MonthComparison(clp(150), clp(100), BigDecimal("50.0"), ChangeDirection.UP, ChangeOutcome.UNFAVORABLE)
         show(state(comparison = bad))
 
-        assertTrue("desfavorable sin rojo", rule.onNodeWithTag("dashboard_variation").captureToImage().containsColorNear(Expense))
+        assertTrue("desfavorable sin rojo", rule.onNodeWithTag("dashboard_variation").captureToImage().containsColorNear(ExpenseStrong))
     }
 
     // --- Gráfico (RF-04, CA-05) ---

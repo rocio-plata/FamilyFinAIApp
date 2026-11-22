@@ -83,8 +83,10 @@ import com.rocioplata.familyfinaiapp.ui.main.StaleDataBanner
 import com.rocioplata.familyfinaiapp.ui.movements.formatMonth
 import com.rocioplata.familyfinaiapp.ui.movements.formatted
 import com.rocioplata.familyfinaiapp.ui.theme.Expense
+import com.rocioplata.familyfinaiapp.ui.theme.ExpenseStrong
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 import com.rocioplata.familyfinaiapp.ui.theme.Income
+import com.rocioplata.familyfinaiapp.ui.theme.IncomeStrong
 import java.math.BigDecimal
 import java.time.YearMonth
 
@@ -481,14 +483,15 @@ private fun BreakdownCard(
     }
 }
 
-/** Indicador de comparación con el mes anterior (RF-06): flecha y texto con signo, verde, rojo o neutro. */
+/** Indicador de comparación con el mes anterior (RF-06): relleno sólido verde (favorable: gastos que bajan o ingresos que suben), rojo (desfavorable) o neutro, con flecha y texto con signo. */
 @Composable
 private fun VariationChip(comparison: MonthComparison) {
-    val tone = when (comparison.outcome) {
-        ChangeOutcome.FAVORABLE -> Income
-        ChangeOutcome.UNFAVORABLE -> Expense
-        ChangeOutcome.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
+    val fill = when (comparison.outcome) {
+        ChangeOutcome.FAVORABLE -> IncomeStrong
+        ChangeOutcome.UNFAVORABLE -> ExpenseStrong
+        ChangeOutcome.NEUTRAL -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
+    val content = if (comparison.outcome == ChangeOutcome.NEUTRAL) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
     val icon = when (comparison.direction) {
         ChangeDirection.UP -> Icons.AutoMirrored.Filled.TrendingUp
         ChangeDirection.DOWN -> Icons.AutoMirrored.Filled.TrendingDown
@@ -502,8 +505,7 @@ private fun VariationChip(comparison: MonthComparison) {
     }
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = tone.softBackground(),
-        border = BorderStroke(1.dp, tone),
+        color = fill,
         // La etiqueta va antes de `clearAndSetSemantics`: lo que se declara después se descarta.
         modifier = Modifier.testTag("dashboard_variation").clearAndSetSemantics { contentDescription = description },
     ) {
@@ -512,12 +514,13 @@ private fun VariationChip(comparison: MonthComparison) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = tone, modifier = Modifier.size(16.dp))
+            Icon(imageVector = icon, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
             Text(
                 text = stringResource(R.string.dashboard_variation_vs_previous, comparison.formattedVariation()),
                 style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = content,
                 modifier = Modifier.testTag("dashboard_variation_text"),
             )
         }
