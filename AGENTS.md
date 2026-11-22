@@ -184,6 +184,26 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   desaparece pasa al estado `Gone`, con "Volver al listado"). Los dos últimos tienen una clave de ViewModel por
   apertura de la ruta (`MainUiState.managementRouteInstance`), así que cada "+" empieza con un formulario nuevo.
   Todas las operaciones de cambio permiten una sola a la vez, con el indicador fijado antes de lanzar la corrutina.
+- **Dashboard** (`domain/dashboard`, `ui/dashboard`): se calcula **en la app** con los movimientos del mes
+  (no usa `GET /families/:id/dashboard`, decisión del 2026-11-19), así coincide con «Movimientos», funciona con la
+  copia local y se actualiza al instante. `DashboardCalculator` (puro, sin `Double`) da `monthTotals`,
+  `categoryBreakdown` (porcentajes con `BigDecimal`, 1 decimal `HALF_UP`) y `comparison`: en el mes en curso compara
+  del día 1 a hoy en ambos meses; en un mes pasado, meses completos; es nula (chip oculto) si el mes anterior es
+  nulo, de otra moneda o suma 0, y una variación que redondea a 0,0 % es `UNCHANGED/NEUTRAL`. El color del chip
+  sigue a `ChangeOutcome` (favorable: gastos que bajan o ingresos que suben = verde; desfavorable = rojo; sin
+  cambio = gris), no al signo; usa `IncomeStrong`/`ExpenseStrong` (`ui/theme/Color.kt`) con texto blanco.
+  `DashboardViewModel` combina los repositorios de movimientos y categorías con el mes y el tipo (solo en memoria)
+  en `StateFlow<DashboardUiState>`; su clave de ViewModel es
+  `main-<generación>-dashboard-<familia>-<activeFamilyInstance>`, de modo que cambiar de familia (también volver a la
+  anterior) empieza con un dashboard nuevo. El mes del dashboard es independiente del de Movimientos.
+  `DashboardContent` es stateless y `DonutChart` dibuja el gráfico. Ocupa el hueco `homeDashboardContent` de
+  `MainScreen` (nulo en los tests de UI) dentro de `HomeContent`, que ya no tiene la sección «Categorías»: la gestión
+  se abre con «Gestionar» en cada sección de categorías del dashboard.
+- **Color de categoría** (`ui/categories/CategoryColors.kt`, `ui/theme/Color.kt`): el backend guarda una clave de
+  paleta en `color` (1 a 40 caracteres, `null` para quitarla; BG-01 de la 008). La paleta tiene 16 claves con valores
+  claro/oscuro. Una clave nula o desconocida usa un color de respaldo estable por posición entre las categorías del
+  mismo tipo (las archivadas cuentan). `ColorUpdate` (`Unchanged`/`Remove`/`Set`) distingue no tocar, quitar y fijar en
+  `updateCategory`. El color se guarda en `categories_cache` y se aplica a memoria y caché tras un cambio correcto.
 - **Presentación**: `MainViewModel` combina el flujo del repositorio con estado local
   (familia activa solo en memoria, selector abierto, refresco en curso) en un
   `StateFlow<MainUiState>`; `FamiliesState` es un sealed interface
@@ -204,7 +224,8 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   la cabecera y la barra inferior, impiden cambiar de familia mientras están abiertas, se cierran
   si esa familia desaparece de la cabecera y se pierden si el proceso muere (se vuelve a Inicio).
   Las pantallas de un movimiento son también rutas en memoria (`MovementRoute.Create`, `Detail(id)` y
-  `Edit(id)`): el "+" de Inicio y de Movimientos abre `Create` y tocar una fila abre `Detail`; `Edit` solo se abre
+  `Edit(id)`): el "+" de Inicio y de Movimientos abre `Create` y tocar una fila abre `Detail`; `Create(categoryId, type)` también se abre desde una categoría del dashboard
+  (alta con categoría y tipo ya elegidos, solo si está activa); `Edit` solo se abre
   desde su `Detail` y atrás desde ella vuelve al detalle, mientras que `Create` y `Detail` vuelven a la pestaña de
   origen. Una edición que mueve el movimiento a otro mes cierra todo de una vez (`closeManagement()`), porque el
   detalle ya no lo encontraría. `MainViewModel.onInsufficientRole()` vuelve a consultar la cabecera cuando el
