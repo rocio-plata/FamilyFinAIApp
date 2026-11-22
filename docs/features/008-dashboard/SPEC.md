@@ -1,6 +1,7 @@
 # SPEC: Dashboard
 
 **Estado:** Aprobada <!-- Borrador | En revisión | Aprobada -->
+<!-- 2026-11-22: ampliación «Por medio de pago» (RF-16 a RF-18, CA-19 y CA-20), aprobada por la persona el 2026-11-22. Lo anterior (RF-01 a RF-15, CA-01 a CA-18) sigue aprobado y ya implementado. -->
 
 <!-- PARA LA PERSONA
 Copia esta plantilla como SPEC.md en una carpeta de la funcionalidad.
@@ -116,8 +117,23 @@ criterios, decisiones del plan y tareas. -->
 
 **Resto de Inicio**
 
-- **RF-12:** La sección "Medios de pago" se mantiene sin cambios, debajo de la
-  sección por categoría.
+- **RF-12:** La sección "Medios de pago" va debajo de la sección por categoría
+  y mantiene su título y su enlace "Gestionar"; su contenido es el de RF-16 a
+  RF-18.
+
+**Por medio de pago**
+
+- **RF-16:** Bajo el título "Medios de pago" se muestra cuántos medios incluye y
+  una cuadrícula con una tarjeta por medio de pago: icono, nombre y monto del
+  mes del tipo activo (gastos o ingresos), con el mismo aspecto y disposición
+  que las tarjetas de categoría. Cambiar el tipo activo cambia los montos.
+- **RF-17:** La sección incluye todos los medios de pago activos, también los
+  que no tienen movimientos del tipo activo en el mes, que se muestran
+  atenuados con $0. Los archivados solo aparecen si tienen movimientos en el
+  mes, marcados como archivados. Siguen el orden de la gestión de medios de
+  pago; los archivados que aparezcan van al final.
+- **RF-18:** Si hay movimientos del tipo activo sin medio de pago, una tarjeta
+  "Sin medio de pago" al final suma su monto; sin esos movimientos no aparece.
 
 **Datos**
 
@@ -149,7 +165,9 @@ adicionales, indícalo tras revisarlo con la persona. -->
 - Usar los endpoints de reportes del backend (`/dashboard`, `/reports/*`):
   quedan para Reportes (11), aunque `/dashboard` ya trae el desglose por
   categoría (BG-02 de `BACKEND_GAPS.md`).
-- Filtrar la pestaña "Movimientos" por categoría.
+- Filtrar la pestaña "Movimientos" por categoría o por medio de pago.
+- Porcentaje por medio de pago y gráfico por medio de pago: la sección solo
+  muestra importes.
 
 ## Flujo de usuario
 
@@ -181,6 +199,9 @@ y comportamiento, sin diseñar tablas, DTO, DAO ni almacenamiento. -->
   en "Movimientos".
 - Monto de una categoría: suma de los movimientos del mes del tipo activo con
   esa categoría.
+- Monto de un medio de pago: suma de los movimientos del mes del tipo activo
+  con ese medio de pago. La suma de todas las tarjetas de la sección (incluida
+  "Sin medio de pago") es igual al total del tipo activo.
 - Disponible = ingresos del mes − gastos del mes.
 - Variación = (total del tramo actual − total del tramo anterior) / total del
   tramo anterior. Si hoy es un día que el mes anterior no tiene (p. ej. 31),
@@ -252,6 +273,8 @@ Repite el formato según sea necesario. -->
 - **CA-16 · Sin conexión:** Dado un mes ya consultado, cuando abre Inicio sin conexión, entonces ve su dashboard desde la copia local, con aviso si tiene más de 24 h; un mes nunca consultado muestra error con "Reintentar", que al recuperar la conexión carga el mes.
 - **CA-17 · Estado:** Dado un mes pasado con ingresos activo, cuando gira la pantalla, pasa a segundo plano y vuelve, o cambia de pestaña y vuelve, entonces sigue en ese mes con ingresos activo; tras terminarse el proceso, vuelve al mes en curso con gastos.
 - **CA-18 · Cambio de familia:** Dado Inicio en un mes pasado, cuando cambia de familia activa, entonces ve el mes en curso de la nueva familia con gastos activo.
+- **CA-19 · RF-16/RF-17/RF-18:** Dado un mes con gastos pagados con dos medios de pago, otro medio activo sin movimientos, un medio archivado con movimientos y un gasto sin medio, entonces bajo "Medios de pago" ve una tarjeta por cada uno con su monto, el activo sin movimientos atenuado en $0, el archivado marcado y al final de los medios, y "Sin medio de pago" con su monto; la suma de las tarjetas es el total de gastos; al pasar a ingresos los montos son los de ingresos.
+- **CA-20 · RF-16/RF-17:** Dado un medio de pago archivado sin movimientos en el mes y un mes sin movimientos, entonces el archivado no aparece, los activos aparecen en $0 y no hay tarjeta "Sin medio de pago".
 
 ## Cómo se comprueba el comportamiento
 
@@ -279,6 +302,8 @@ No marques los criterios como superados durante la especificación. -->
 | CA-16 | Consultar un mes, quitar la conexión y reabrirlo; abrir un mes nunca consultado sin conexión y reconectar. | Copia local con aviso si es antigua; error con "Reintentar" que luego carga. |
 | CA-17 | Mes pasado e ingresos activo; girar, segundo plano, cambiar de pestaña; luego terminar el proceso y reabrir. | Se conservan mes y tipo; tras terminar el proceso, mes en curso con gastos. |
 | CA-18 | Mes pasado; cambiar de familia en la cabecera. | Mes en curso de la nueva familia, gastos activo. |
+| CA-19 | Mes con gastos con dos medios, un medio activo sin movimientos, uno archivado con movimientos y un gasto sin medio; tocar "Ingresos" y volver a "Gastos". | Una tarjeta por medio con su monto, $0 atenuado, archivado marcado al final, "Sin medio de pago"; suma igual al total; los montos cambian con el tipo. |
+| CA-20 | Medio archivado sin movimientos; mes sin movimientos. | Archivado ausente; activos en $0; sin "Sin medio de pago". |
 
 ## Decisiones pendientes
 
@@ -287,3 +312,5 @@ no queden pendientes funcionales ni restricciones por decidir. -->
 
 - Paleta de colores de categoría (cuántos y cuáles): se define en
   `docs/DESIGN.md` como parte del plan, a partir del mockup `006-category-edit.png`.
+- Icono de las tarjetas de medio de pago (RF-16), decidido el 2026-11-22: el medio de pago no tiene icono propio en el backend, así que todos usan un mismo icono de «medio de pago» y «Sin medio de pago» usa otro.
+- Tocar la tarjeta de un medio de pago (RF-16), decidido el 2026-11-22: no hace nada (a diferencia de las categorías, RF-11).

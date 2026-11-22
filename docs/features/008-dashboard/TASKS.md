@@ -137,6 +137,51 @@ indicación. Los tests JVM van en `app/src/test/…` y los de UI en
   - **Hecho cuando:** documentos coherentes con lo implementado.
   - **Evidencia:** Revisión documental (sin compilación, solo documentos). `AGENTS.md`: nuevas entradas «Dashboard» y «Color de categoría» antes de «Presentación» y `Create(categoryId, type)` desde el dashboard en «Navegación». `docs/ROADMAP.md`: 008 pasa a «Hecha» con la nota de que T-16 quedó sin verificar. `BACKEND_GAPS.md`: sección «Observado en ejecución». Nombres citados comprobados en el código: `DashboardCalculator`, `DashboardViewModel`, `DashboardContent`, `DonutChart`, `homeDashboardContent`, `activeFamilyInstance`, `MovementRoute.Create(categoryId, type)`, `CategoryColors.kt`, `IncomeStrong`/`ExpenseStrong`. Depende de T-16: ya registrada. Tabla de estado por criterio completada abajo.
 
+## Montos por medio de pago (ampliación aprobada el 2026-11-22)
+
+- [ ] **T-18 · Cálculo por medio de pago**
+  - **Cubre:** RF-16, RF-17, RF-18 (CA-19, CA-20) · **Depende de:** —
+  - **Alcance:** `domain/dashboard/PaymentMethodBreakdown.kt` (crear): `PaymentMethodAmount(method: PaymentMethod?, amount: Money)` (nulo = «Sin medio de pago»; `isArchived`, `hasAmount`) y `PaymentMethodBreakdown(total, entries)` con `count`. `DashboardCalculator.paymentMethodBreakdown(movements, methods, type, currency)`: activos en el orden del repositorio (también en $0), archivados solo con monto al final, «Sin medio de pago» el último y solo si su monto es mayor que cero; el total incluye todos los movimientos del tipo. Sin `Double`.
+  - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.dashboard.DashboardCalculatorTest"` con casos nuevos: dos medios con monto, activo en $0, archivado con monto al final, archivado sin monto ausente, gasto sin medio, mes vacío (activos en $0 y sin «Sin medio»), cambio de tipo, suma de tarjetas = total y movimiento con un medio que no está en la lista (cuenta en el total, sin tarjeta).
+  - **Hecho cuando:** los tests nuevos y los existentes del calculador pasan.
+  - **Evidencia:** —
+- [ ] **T-19 · Medios de pago en el estado del dashboard**
+  - **Cubre:** RF-16, RF-17 (CA-19, CA-20) · **Depende de:** T-18
+  - **Alcance:** `DashboardViewModel` recibe `PaymentMethodsRepository` y agrupa los datos de origen (mes, categorías y medios) antes de combinarlos con mes, tipo y refresco; `refreshAll()` también llama a `paymentMethods.refresh(familyId)` (su fallo no impide ver los totales). `DashboardContentState.Content.paymentMethods: PaymentMethodBreakdown?`, nulo mientras los medios no tengan datos. `DashboardScreen` pasa `container.paymentMethodsRepository`. Actualizar los sitios que construyen el ViewModel y `Content`.
+  - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.ui.dashboard.DashboardViewModelTest"` con `FakePaymentMethods` de `Fakes.kt`: medios sin datos → `paymentMethods` nulo y totales visibles; medios con datos; cambio de tipo cambia los montos; llamada a `refresh` de medios al iniciar, al volver a primer plano y al recuperar conexión; fallo de medios sin efecto en los totales.
+  - **Hecho cuando:** los tests nuevos y los existentes del ViewModel pasan.
+  - **Evidencia:** —
+- [ ] **T-20 · Sección «Medios de pago» del dashboard**
+  - **Cubre:** RF-16, RF-17, RF-18 (CA-19, CA-20) · **Depende de:** T-19
+  - **Alcance:** `DashboardContent.kt`: tarjeta de importe común extraída de `CategoryCard` (icono con tono, nombre, «Archivada», monto, atenuación, una sola unidad accesible), rejilla compartida y `PaymentMethodsSection` bajo `CategoriesSection` (título como encabezado, contador, «Gestionar» con la etiqueta `home_manage_payment_methods`, estados cargando, vacío y contenido); un único icono para los medios y otro para «Sin medio de pago»; las tarjetas de medio no se pueden tocar. Parámetro `onManagePaymentMethods`. `strings.xml` y `DashboardTexts.kt`: título, plural del contador, cargando, vacío, «Sin medio de pago», «Archivado» y descripciones accesibles. Sin colores nuevos ni hexadecimales en pantalla. Previews.
+  - **Validación:** `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.rocioplata.familyfinaiapp.ui.dashboard.DashboardContentTest` con casos nuevos: una tarjeta por medio con nombre y monto, activo en $0 atenuado, archivado marcado y sin toque, «Sin medio de pago», contador, descripción accesible, estado cargando y vacío, «Gestionar» llama a su callback; y los casos de categorías sin cambios. Con texto grande la rejilla no corta nada.
+  - **Hecho cuando:** los tests pasan y las previews se ven bien en claro y oscuro. No dejar la app desinstalada del emulador de la persona al terminar.
+  - **Evidencia:** —
+- [ ] **T-21 · Medios de pago en Inicio**
+  - **Cubre:** RF-12, RF-16 (CA-10, CA-19) · **Depende de:** T-20
+  - **Alcance:** `HomeContent.kt`: la fila «Medios de pago» solo se dibuja sin `dashboardContent`. `MainScreen.kt`: `DashboardScreen` recibe `onManagePaymentMethods = viewModel::openPaymentMethods`; la sobrecarga stateless sigue igual para los tests sin dashboard. `TestMainHost` solo si hace falta.
+  - **Validación:** `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.package=com.rocioplata.familyfinaiapp.ui.main` (`MainScreenTest` con la fila sin dashboard, `MainScreenBehaviorTest`) y `MainViewModelTest`: «Gestionar» de medios sigue abriendo su gestión desde Inicio.
+  - **Hecho cuando:** los tests pasan y Inicio muestra la sección una sola vez.
+  - **Evidencia:** —
+- [ ] **T-22 · Comprobaciones automáticas completas**
+  - **Cubre:** CA-19, CA-20 y regresión · **Depende de:** T-21
+  - **Alcance:** compilación, tests JVM, lint y tests instrumentados completos.
+  - **Validación:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` y `./gradlew :app:connectedDebugAndroidTest`; lint sin avisos nuevos respecto a los 24 de T-15. Si se usa el emulador de la persona, reinstalar la app con `installDebug` al terminar (el runner la desinstala).
+  - **Hecho cuando:** todo pasa o cada fallo queda registrado con su causa.
+  - **Evidencia:** —
+- [ ] **T-23 · Pruebas manuales de medios de pago**
+  - **Cubre:** CA-19, CA-20 · **Depende de:** T-22
+  - **Alcance:** emulador con el backend local y datos de prueba de la persona: montos por medio frente al total y a «Movimientos» en dos meses; gastos e ingresos; medio archivado con movimientos; movimiento sin medio si es posible; alta, edición y borrado reflejados; «Gestionar» abre la gestión de medios; modo avión; modo oscuro y texto al 200 %.
+  - **Validación:** pasos manuales con resultado observado y capturas.
+  - **Hecho cuando:** cada escenario tiene resultado o motivo de bloqueo.
+  - **Evidencia:** —
+- [ ] **T-24 · Documentación de la ampliación**
+  - **Cubre:** RF-12, RF-16 a RF-18 (CA-19, CA-20) · **Depende de:** T-23
+  - **Alcance:** `AGENTS.md` (entrada «Dashboard»: sección por medio de pago, `paymentMethodBreakdown`, `HomeContent` sin la fila cuando hay dashboard; entrada de medios de pago al día), `docs/ROADMAP.md`, `BACKEND_GAPS.md` (sin brechas nuevas, lo observado) y la tabla «Estado de verificación por criterio» con CA-19 y CA-20.
+  - **Validación:** revisión documental: cada criterio con evidencia o marcado como no verificado; rutas y nombres citados existen.
+  - **Hecho cuando:** documentos coherentes con lo implementado.
+  - **Evidencia:** —
+
 ## Cobertura de criterios
 
 | Criterio | Tareas |
@@ -159,6 +204,8 @@ indicación. Los tests JVM van en `app/src/test/…` y los de UI en
 | CA-16 | T-09, T-12, T-16 |
 | CA-17 | T-09, T-14, T-16 |
 | CA-18 | T-14, T-16 |
+| CA-19 | T-18 a T-23 |
+| CA-20 | T-18, T-20, T-22, T-23 |
 
 ## Estado de verificación por criterio
 

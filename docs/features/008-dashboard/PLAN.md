@@ -3,6 +3,7 @@
 **SPEC de referencia:** `docs/features/008-dashboard/SPEC.md`
 **Versión de la spec revisada:** aprobada el 2026-11-19 (rama `feature/008-dashboard`, sin commit todavía)
 **Estado:** Aprobado <!-- Borrador | En revisión | Aprobado -->
+<!-- 2026-11-22: se añade al final la sección «Ampliación: montos por medio de pago» (RF-16 a RF-18, CA-19 y CA-20), aprobada por la persona el 2026-11-22. El resto del plan sigue aprobado e implementado. -->
 
 <!-- PARA LA PERSONA
 Copia esta plantilla como PLAN.md junto a la SPEC.md aprobada.
@@ -350,3 +351,63 @@ Escribe Ninguna en las decisiones pendientes cuando estén resueltas. -->
   - *Clave del dashboard por instancia de familia:* deja ViewModels antiguos en el `ViewModelStore` hasta
     terminar la sesión, igual que ya ocurre con los formularios de movimiento; su coste es despreciable.
 - **Decisiones pendientes:** Ninguna. La paleta de 16 colores quedó confirmada el 2026-11-19.
+
+## Ampliación: montos por medio de pago (RF-16 a RF-18, CA-19, CA-20)
+
+**Spec revisada:** aprobada el 2026-11-22 (decisiones: tipo activo, lista «como categorías», tarjetas, un icono para todos los medios y otro para «Sin medio de pago», tocar la tarjeta no hace nada).
+
+### Contexto verificado
+
+- Hoy «Medios de pago» es solo una fila de título con «Gestionar» en `HomeContent` (`ManageSectionRow`, etiqueta `home_manage_payment_methods`), debajo del hueco del dashboard.
+- `Movement.paymentMethodId` es `String?` (`domain/movements/Movement.kt`): puede haber movimientos sin medio.
+- `PaymentMethod(id, name, status ACTIVE|DEPRECATED)` no tiene icono ni color. `PaymentMethodsRepository.paymentMethods(familyId)` emite `PaymentMethodsData(paymentMethods: List?, isStale)` en el orden del backend y tiene `refresh(familyId)`; ya está en `AppContainer` y la lista incluye los archivados (un solo `GET …?includeDeprecated=true`).
+- `material-icons-extended` ya es dependencia: no se añade ninguna (los iconos se eligen al implementar, p. ej. `CreditCard` y `HelpOutline`).
+- `CategoryCard` y `CategoryGrid` de `DashboardContent.kt` ya resuelven el aspecto, la atenuación, el estado «Archivada», la altura de fila y el texto grande; se reutilizan.
+
+### Solución propuesta
+
+1. **Dominio.** `DashboardCalculator.paymentMethodBreakdown(movements, methods, type, currency)` devuelve un `PaymentMethodBreakdown(total: Money, entries: List<PaymentMethodAmount>)`. `PaymentMethodAmount(method: PaymentMethod?, amount: Money)` con `method == null` para «Sin medio de pago». Orden: activos en el orden del repositorio, archivados con monto al final, y «Sin medio de pago» el último y solo si su monto es mayor que cero. Los archivados sin monto no entran (RF-17). Aritmética con `Money`, sin `Double`. Sin gráfico ni porcentaje.
+2. **ViewModel.** `DashboardViewModel` recibe `PaymentMethodsRepository` y lo combina con lo que ya combina; como `combine` tipado llega a cinco flujos, los datos de origen se agrupan primero (mes, categorías y medios) en un contenedor y luego se combinan con mes, tipo y estado de refresco. `DashboardContentState.Content` gana `paymentMethods: PaymentMethodBreakdown?`, nulo mientras los medios no tengan datos (la sección muestra «Cargando…» y los totales se ven igual, como con las categorías). `refreshAll()` también llama a `paymentMethods.refresh(familyId)`; su fallo no impide ver los totales. Un fallo de rol (`NotAllowed`) sigue viniendo solo de movimientos.
+3. **UI.** `DashboardContent` recibe `onManagePaymentMethods` y dibuja `PaymentMethodsSection` bajo `CategoriesSection`: título «Medios de pago» (encabezado accesible), contador, «Gestionar» (conserva la etiqueta `home_manage_payment_methods` y su descripción) y la cuadrícula. La tarjeta de categoría se generaliza en una tarjeta de importe común (icono con tono, nombre, «Archivada», monto, atenuación) a la que la categoría añade su acción de toque y el medio no. El lector de pantalla lo lee como una unidad («Tarjeta de crédito, $12.000», «… archivado …», «Sin medio de pago, …»). Tono neutro de la paleta existente (sin colores nuevos ni valores hexadecimales en pantalla). Estados: cargando, vacío («No hay medios de pago…» con invitación a «Gestionar») y contenido.
+4. **Inicio.** `HomeContent` deja de dibujar la fila «Medios de pago» cuando hay dashboard (la sección pasa al propio dashboard); sin `dashboardContent` conserva la fila actual, que es lo que usan los tests de `MainScreen` sin dashboard. `MainScreen` pasa `onManagePaymentMethods` a `DashboardScreen`, que lo pasa a `DashboardContent`.
+5. **Sin cambios** en red, caché, repositorios ni backend: se usan los datos que ya existen.
+
+### Componentes afectados
+
+| Componente o ruta | Acción | Cambio y responsabilidad | Requisito |
+| --- | --- | --- | --- |
+| `domain/dashboard/PaymentMethodBreakdown.kt` | Crear | `PaymentMethodAmount` y `PaymentMethodBreakdown` (total, tarjetas, contador). | RF-16 a RF-18 |
+| `domain/dashboard/DashboardCalculator.kt` | Modificar | `paymentMethodBreakdown(...)`. | RF-16 a RF-18 |
+| `ui/dashboard/DashboardViewModel.kt`, `DashboardUiState.kt` | Modificar | Repositorio de medios, refresco y `Content.paymentMethods`. | RF-16, RF-17 |
+| `ui/dashboard/DashboardScreen.kt` | Modificar | Pasar `container.paymentMethodsRepository` y `onManagePaymentMethods`. | RF-12 |
+| `ui/dashboard/DashboardContent.kt` | Modificar | `PaymentMethodsSection`, tarjeta común y rejilla compartida. | RF-16 a RF-18 |
+| `ui/dashboard/DashboardTexts.kt`, `res/values/strings.xml` | Modificar | Títulos, contador (plural), vacío, cargando, «Sin medio de pago», descripciones accesibles. | RF-16 a RF-18 |
+| `ui/main/HomeContent.kt`, `ui/main/MainScreen.kt` | Modificar | La fila «Medios de pago» solo sin dashboard; conexión de «Gestionar». | RF-12 |
+| `AGENTS.md`, `docs/ROADMAP.md`, `BACKEND_GAPS.md` | Modificar | Arquitectura del dashboard; sin brechas nuevas. | — |
+
+### Estrategia de validación
+
+| Criterio | Método y test | Entorno y datos | Evidencia prevista |
+| --- | --- | --- | --- |
+| CA-19 | `DashboardCalculatorTest` (dos medios, activo en $0, archivado con monto al final, gasto sin medio, suma = total, cambio de tipo); `DashboardViewModelTest` (cambio de tipo; medios sin datos → `paymentMethods` nulo; fallo de medios no impide totales); `DashboardContentTest` (tarjetas, atenuada, «Archivada», «Sin medio de pago», descripción, sin toque) | Falsos de `Fakes.kt`; reloj fijo | Tests verdes |
+| CA-20 | `DashboardCalculatorTest` (archivado sin monto ausente; mes vacío: activos en $0 y sin «Sin medio»); `DashboardContentTest` (vacío) | Datos de la spec | Tests verdes |
+| RF-12 | `MainScreenTest` (fila con «Gestionar» sin dashboard) y `DashboardContentTest` («Gestionar» llama a su callback); manual: abre la gestión de medios | Emulador | Tests verdes; paso manual |
+| Regresión | `DashboardContentTest`, `DashboardViewModelTest`, `MainScreenTest`, `MainScreenBehaviorTest`; `lintDebug` sin avisos nuevos | — | Mismos resultados que T-15 |
+
+Manual en emulador con el backend local: crear movimientos con distintos medios (y uno archivado), comprobar que la suma de tarjetas coincide con el total y con «Movimientos»; modo oscuro y texto al 200 %. Comandos: los de `AGENTS.md`.
+
+### Orden de implementación
+
+1. Modelo y `paymentMethodBreakdown` con `DashboardCalculatorTest`. Comprobación: tests verdes.
+2. `DashboardViewModel` y estado, con sus tests (depende de 1).
+3. Tarjeta común y `PaymentMethodsSection` con `DashboardContentTest` (depende de 2).
+4. Integración en `HomeContent` y `MainScreen`, con tests de `ui/main` (depende de 3).
+5. Cierre: `assembleDebug`, `testDebugUnitTest`, `lintDebug`, `connectedDebugAndroidTest` (sin dejar la app desinstalada del emulador de la persona), prueba manual, `AGENTS.md`, `ROADMAP.md` y evidencias en `TASKS.md`.
+
+### Riesgos y decisiones pendientes
+
+- *Movimiento con un medio que no está en la lista* (lista desactualizada): cuenta en el total pero no aparece en una tarjeta, igual que con las categorías; con datos al día no ocurre (un medio con movimientos no se puede eliminar, solo archivar). Se cubre con un test y no se muestra nada especial; la regla «la suma de las tarjetas es el total» de la spec vale con datos al día.
+- *Una petición más al refrescar:* `GET` de medios de pago junto al de categorías; ya está en caché y se refresca con la misma política de 24 h.
+- *Refactor de la tarjeta de categoría:* riesgo de cambiar su aspecto o sus etiquetas de test; los tests existentes de categorías (`dashboard_category_*`) son la red de seguridad y no cambian.
+- *Texto grande:* la rejilla compartida ya se adapta; se revisa con el 200 % en la prueba manual.
+- **Decisiones pendientes:** Ninguna.
