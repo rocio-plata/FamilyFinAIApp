@@ -3,6 +3,7 @@ package com.rocioplata.familyfinaiapp.ui.dashboard
 import com.rocioplata.familyfinaiapp.domain.dashboard.CategoryBreakdown
 import com.rocioplata.familyfinaiapp.domain.dashboard.MonthComparison
 import com.rocioplata.familyfinaiapp.domain.dashboard.MonthTotals
+import com.rocioplata.familyfinaiapp.domain.dashboard.PaymentMethodBreakdown
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import java.math.BigDecimal
 import java.time.YearMonth
@@ -34,6 +35,11 @@ sealed interface DashboardContentState {
         /** La última descarga completa del mes tiene más de 24 h (CA-16). */
         val isStale: Boolean,
         val isRefreshing: Boolean,
+        /**
+         * Reparto por medio de pago del tipo activo (RF-16 a RF-18). Nulo mientras los medios de pago de la familia no
+         * tengan datos (cargando o fallo): los totales se ven igual y la sección espera.
+         */
+        val paymentMethods: PaymentMethodBreakdown? = null,
     ) : DashboardContentState
 }
 

@@ -13,9 +13,13 @@ import com.rocioplata.familyfinaiapp.domain.movements.MovementFailure
 import com.rocioplata.familyfinaiapp.domain.movements.MovementResult
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import com.rocioplata.familyfinaiapp.domain.movements.MovementsData
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethod
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodStatus
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodsData
 import com.rocioplata.familyfinaiapp.ui.movements.FakeCategories
 import com.rocioplata.familyfinaiapp.ui.movements.FakeConnectivity
 import com.rocioplata.familyfinaiapp.ui.movements.FakeMovements
+import com.rocioplata.familyfinaiapp.ui.movements.FakePaymentMethods
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -63,6 +67,9 @@ class DashboardViewModelTest {
     private val old = category("c-old", CategoryType.EXPENSE, CategoryStatus.DEPRECATED)
     private val salary = category("c-salary", CategoryType.INCOME)
 
+    private val card = PaymentMethod("m-card", "Tarjeta", PaymentMethodStatus.ACTIVE)
+    private val cash = PaymentMethod("m-cash", "Efectivo", PaymentMethodStatus.ACTIVE)
+
     private fun mov(
         id: String,
         type: MovementType,
@@ -91,6 +98,7 @@ class DashboardViewModelTest {
     private class Rig(
         val movements: FakeMovements,
         val categories: FakeCategories,
+        val paymentMethods: FakePaymentMethods,
         val connectivity: FakeConnectivity,
         val vm: DashboardViewModel,
         val insufficientRole: () -> Int,
@@ -106,6 +114,7 @@ class DashboardViewModelTest {
     ): Rig {
         val movements = FakeMovements()
         val categories = FakeCategories().apply { data.value = CategoriesData(listOf(food, transport, old, salary)) }
+        val paymentMethods = FakePaymentMethods().apply { data.value = PaymentMethodsData(listOf(card, cash)) }
         if (withData) {
             movements.flowOf(nov).value = MovementsData(november)
             movements.flowOf(oct).value = MovementsData(october)
@@ -114,11 +123,12 @@ class DashboardViewModelTest {
         val connectivity = FakeConnectivity()
         var insufficient = 0
         val vm = DashboardViewModel(
-            movements, categories, "f-1", currency, dates, connectivity, onInsufficientRole = { insufficient++ },
+            movements, categories, paymentMethods, "f-1", currency, dates, connectivity,
+            onInsufficientRole = { insufficient++ },
         )
         backgroundScope.launch { vm.uiState.collect {} }
         advanceUntilIdle()
-        return Rig(movements, categories, connectivity, vm) { insufficient }
+        return Rig(movements, categories, paymentMethods, connectivity, vm) { insufficient }
     }
 
     private fun money(amount: Long) = Money(amount, "CLP")
@@ -227,6 +237,85 @@ class DashboardViewModelTest {
         assertEquals(oct, rig.state.month)
     }
 
+    // --- Medios de pago (RF-16, RF-17, CA-19, CA-20) ---
+
+    @Test
+    fun losMediosDePago_sumanLosMovimientosDelMesYDelTipoActivo() = runTest {
+        val rig = create()
+
+        val gastos = rig.content.paymentMethods!!
+        assertEquals(listOf<String?>("m-card", "m-cash"), gastos.entries.map { it.method?.id })
+        assertEquals(money(50_900), gastos.entries[0].amount)
+        assertEquals(money(0), gastos.entries[1].amount)
+        assertEquals(money(50_900), gastos.total)
+
+        rig.vm.selectType(MovementType.INCOME)
+        advanceUntilIdle()
+
+        val ingresos = rig.content.paymentMethods!!
+        assertEquals(money(1_200_000), ingresos.entries[0].amount)
+        assertEquals(money(1_200_000), ingresos.total)
+    }
+
+    @Test
+    fun losMediosDePago_siguenElMesMostrado() = runTest {
+        val rig = create()
+
+        rig.vm.previousMonth()
+        advanceUntilIdle()
+
+        // Los gastos de octubre (150.000) se pagaron con la tarjeta.
+        assertEquals(money(150_000), rig.content.paymentMethods!!.entries[0].amount)
+        assertEquals(money(150_000), rig.content.paymentMethods!!.total)
+    }
+
+    @Test
+    fun sinDatosDeMediosDePago_laSeccionEsperaPeroLosTotalesSeVen() = runTest {
+        val rig = create { _, _ -> }
+        rig.paymentMethods.data.value = PaymentMethodsData()
+        advanceUntilIdle()
+
+        assertNull(rig.content.paymentMethods)
+        assertEquals(money(50_900), rig.content.totals.expenses)
+        assertNotNull(rig.content.breakdown)
+    }
+
+    @Test
+    fun cuandoLosMediosLlegan_laSeccionSeActualiza() = runTest {
+        val rig = create()
+        rig.paymentMethods.data.value = PaymentMethodsData()
+        advanceUntilIdle()
+        assertNull(rig.content.paymentMethods)
+
+        rig.paymentMethods.data.value = PaymentMethodsData(listOf(card, cash))
+        advanceUntilIdle()
+
+        assertEquals(2, rig.content.paymentMethods?.count)
+    }
+
+    @Test
+    fun siFallaElRefrescoDeMedios_losTotalesSeVenIgual() = runTest {
+        val rig = create { _, _ -> }
+        rig.paymentMethods.refreshFails = true
+
+        rig.vm.retry()
+        advanceUntilIdle()
+
+        assertEquals(money(50_900), rig.content.totals.expenses)
+        assertNotNull(rig.content.paymentMethods)
+    }
+
+    @Test
+    fun unMovimientoNuevoSeReflejaEnElMedio() = runTest {
+        val rig = create()
+        val extra = mov("m-extra", MovementType.EXPENSE, 1_000, day = 10).copy(paymentMethodId = "m-cash")
+
+        rig.movements.flowOf(nov).value = MovementsData(november + extra)
+        advanceUntilIdle()
+
+        assertEquals(money(1_000), rig.content.paymentMethods!!.entries[1].amount)
+    }
+
     // --- Refrescos (RF-13, CA-16) ---
 
     @Test
@@ -236,6 +325,7 @@ class DashboardViewModelTest {
         assertEquals(setOf(nov, oct), rig.movements.refreshed.toSet())
         assertEquals(2, rig.movements.refreshed.size)
         assertEquals(1, rig.categories.refreshes)
+        assertEquals(1, rig.paymentMethods.refreshes)
     }
 
     @Test
@@ -272,6 +362,7 @@ class DashboardViewModelTest {
 
         assertEquals(4, rig.movements.refreshed.size)
         assertEquals(2, rig.categories.refreshes)
+        assertEquals(2, rig.paymentMethods.refreshes)
     }
 
     @Test
@@ -518,7 +609,8 @@ class DashboardViewModelTest {
             flowOf(oct).value = MovementsData(october)
         }
         val categories = FakeCategories().apply { data.value = CategoriesData(listOf(food, salary)) }
-        val vm = DashboardViewModel(movements, categories, "f-1", "CLP", dates, FakeConnectivity())
+        val methods = FakePaymentMethods().apply { data.value = PaymentMethodsData(listOf(card)) }
+        val vm = DashboardViewModel(movements, categories, methods, "f-1", "CLP", dates, FakeConnectivity())
 
         vm.previousMonth()
         vm.selectType(MovementType.INCOME)

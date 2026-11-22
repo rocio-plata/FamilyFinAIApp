@@ -13,6 +13,8 @@ import com.rocioplata.familyfinaiapp.domain.movements.MovementResult
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import com.rocioplata.familyfinaiapp.domain.movements.MovementsData
 import com.rocioplata.familyfinaiapp.domain.movements.MovementsRepository
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodsData
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -31,7 +33,7 @@ import java.time.YearMonth
 /**
  * Estado del dashboard de Inicio de una familia (RF-01 a RF-09, RF-13): mes mostrado (independiente del de la
  * pestaña «Movimientos»), tipo activo y el resumen calculado con los movimientos del mes y del anterior y con las
- * categorías, todo de los repositorios y sin llamadas propias: lo que se registre, edite o elimine se refleja solo
+ * categorías y medios de pago, todo de los repositorios y sin llamadas propias: lo que se registre, edite o elimine se refleja solo
  * porque esos repositorios actualizan sus cachés. Mes y tipo viven aquí y sobreviven a la recreación; se crea con
  * una clave que incluye la sesión, la familia y las veces que cambió la familia activa, así que cambiar de familia
  * o de usuario nunca reutiliza su estado (CA-17, CA-18). No se guarda nada al terminar el proceso.
@@ -40,6 +42,7 @@ import java.time.YearMonth
 class DashboardViewModel(
     private val movements: MovementsRepository,
     private val categories: CategoriesRepository,
+    private val paymentMethods: PaymentMethodsRepository,
     private val familyId: String,
     /** Moneda de la familia; solo se usa para el resumen de un mes sin movimientos. */
     private val currency: String?,
@@ -61,13 +64,19 @@ class DashboardViewModel(
         ) { current, previous -> MonthData(shown, current, previous) }
     }
 
-    val uiState: StateFlow<DashboardUiState> = combine(
+    // Los datos de origen se agrupan primero: `combine` tipado admite cinco flujos y aquí son seis.
+    private val sources = combine(
         monthData,
         categories.categories(familyId),
+        paymentMethods.paymentMethods(familyId),
+    ) { data, categoryData, methodData -> Sources(data, categoryData, methodData) }
+
+    val uiState: StateFlow<DashboardUiState> = combine(
+        sources,
         month,
         activeType,
         refreshState,
-    ) { data, categoryData, shown, type, refresh -> buildState(data, categoryData, shown, type, refresh) }
+    ) { origin, shown, type, refresh -> buildState(origin, shown, type, refresh) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialState())
 
     init {
@@ -110,8 +119,9 @@ class DashboardViewModel(
 
     private fun refreshAll() {
         refreshMonths(month.value)
-        // Las categorías salen del mismo repositorio que la gestión; su fallo no impide ver los totales.
+        // Categorías y medios de pago salen de los mismos repositorios que su gestión; su fallo no impide ver los totales.
         viewModelScope.launch { categories.refresh(familyId) }
+        viewModelScope.launch { paymentMethods.refresh(familyId) }
     }
 
     // El mes mostrado y su anterior: este último solo sirve para el indicador de comparación (RF-06).
@@ -145,27 +155,26 @@ class DashboardViewModel(
     )
 
     private fun buildState(
-        data: MonthData,
-        categoryData: CategoriesData,
+        origin: Sources,
         shown: YearMonth,
         type: MovementType,
         refresh: RefreshState,
     ): DashboardUiState {
         val content = when {
             // Al cambiar de mes el flujo del anterior puede emitir una vez más: no se mezclan.
-            data.month != shown -> DashboardContentState.Loading
-            else -> buildContent(data, categoryData, type, refresh, shown)
+            origin.month.month != shown -> DashboardContentState.Loading
+            else -> buildContent(origin, type, refresh, shown)
         }
         return DashboardUiState(shown, canGoNext(shown), shown == dates.currentMonth(), type, content)
     }
 
     private fun buildContent(
-        data: MonthData,
-        categoryData: CategoriesData,
+        origin: Sources,
         type: MovementType,
         refresh: RefreshState,
         shown: YearMonth,
     ): DashboardContentState {
+        val data = origin.month
         val rows = data.current.movements ?: return when {
             shown in refresh.inFlight || shown !in refresh.results -> DashboardContentState.Loading
             refresh.results.getValue(shown) is MovementResult.Failure -> DashboardContentState.Error
@@ -180,8 +189,11 @@ class DashboardViewModel(
         return DashboardContentState.Content(
             totals = totals,
             percentOfIncome = totals.percentOfIncome(type),
-            breakdown = categoryData.categories?.let {
+            breakdown = origin.categories.categories?.let {
                 DashboardCalculator.categoryBreakdown(rows, it, type, moneyCurrency)
+            },
+            paymentMethods = origin.paymentMethods.paymentMethods?.let {
+                DashboardCalculator.paymentMethodBreakdown(rows, it, type, moneyCurrency)
             },
             comparison = DashboardCalculator.comparison(
                 current = rows,
@@ -196,6 +208,8 @@ class DashboardViewModel(
             isRefreshing = shown in refresh.inFlight,
         )
     }
+
+    private data class Sources(val month: MonthData, val categories: CategoriesData, val paymentMethods: PaymentMethodsData)
 
     private data class MonthData(val month: YearMonth, val current: MovementsData, val previous: MovementsData)
 

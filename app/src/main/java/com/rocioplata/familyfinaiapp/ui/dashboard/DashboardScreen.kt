@@ -40,6 +40,7 @@ fun DashboardScreen(
                 DashboardViewModel(
                     movements = container.movementsRepository,
                     categories = container.categoriesRepository,
+                    paymentMethods = container.paymentMethodsRepository,
                     familyId = familyId,
                     currency = currency,
                     dates = container.movementDates,

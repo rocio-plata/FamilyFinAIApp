@@ -3,6 +3,8 @@ package com.rocioplata.familyfinaiapp.domain.dashboard
 import com.rocioplata.familyfinaiapp.domain.money.Money
 import com.rocioplata.familyfinaiapp.domain.movements.Movement
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethod
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -14,10 +16,10 @@ import java.time.LocalDate
 class DashboardCalculatorTest {
     private var nextId = 0
 
-    private fun movement(type: MovementType, amount: Long, currency: String = "CLP", categoryId: String = "c-1") =
+    private fun movement(type: MovementType, amount: Long, currency: String = "CLP", categoryId: String = "c-1", paymentMethodId: String? = "p-1") =
         Movement(
             id = "m-${nextId++}", type = type, amount = Money(amount, currency), categoryId = categoryId, tagId = null,
-            paymentMethodId = "p-1", title = "x", note = null, date = LocalDate.of(2026, 10, 5), recordedBy = "u-1",
+            paymentMethodId = paymentMethodId, title = "x", note = null, date = LocalDate.of(2026, 10, 5), recordedBy = "u-1",
             createdAt = Instant.EPOCH,
         )
 
@@ -187,5 +189,135 @@ class DashboardCalculatorTest {
             val forbidden = file.readLines().filter { it.startsWith("import android") || it.startsWith("import io.ktor") }
             assertTrue("${file.name} importa ${forbidden}", forbidden.isEmpty())
         }
+    }
+
+    // --- Por medio de pago (RF-16 a RF-18, CA-19, CA-20) ---
+
+    private fun method(id: String, status: PaymentMethodStatus = PaymentMethodStatus.ACTIVE) = PaymentMethod(id, "Medio $id", status)
+
+    private fun spent(amount: Long, methodId: String?) = movement(MovementType.EXPENSE, amount, paymentMethodId = methodId)
+
+    private fun byMethod(movements: List<Movement>, methods: List<PaymentMethod>, type: MovementType = MovementType.EXPENSE) =
+        DashboardCalculator.paymentMethodBreakdown(movements, methods, type, "CLP")
+
+    private fun PaymentMethodBreakdown.ids() = entries.map { it.method?.id }
+
+    @Test
+    fun medios_cadaUnoSumaSusMovimientosDelTipo() {
+        val result = byMethod(
+            listOf(spent(100, "a"), spent(250, "a"), spent(40, "b"), movement(MovementType.INCOME, 9_000, paymentMethodId = "a")),
+            listOf(method("a"), method("b")),
+        )
+
+        assertEquals(listOf<String?>("a", "b"), result.ids())
+        assertEquals(Money(350, "CLP"), result.entries[0].amount)
+        assertEquals(Money(40, "CLP"), result.entries[1].amount)
+        assertEquals(Money(390, "CLP"), result.total)
+    }
+
+    @Test
+    fun medios_conIngresosActivos_sumanSoloIngresos() {
+        val result = byMethod(
+            listOf(spent(100, "a"), movement(MovementType.INCOME, 9_000, paymentMethodId = "b")),
+            listOf(method("a"), method("b")),
+            MovementType.INCOME,
+        )
+
+        assertEquals(Money(0, "CLP"), result.entries[0].amount)
+        assertEquals(Money(9_000, "CLP"), result.entries[1].amount)
+        assertEquals(Money(9_000, "CLP"), result.total)
+    }
+
+    @Test
+    fun medios_activoSinMovimientos_apareceEnCero() {
+        val result = byMethod(listOf(spent(100, "a")), listOf(method("a"), method("b")))
+
+        assertEquals(listOf<String?>("a", "b"), result.ids())
+        assertEquals(Money(0, "CLP"), result.entries[1].amount)
+        assertTrue(!result.entries[1].hasAmount)
+    }
+
+    @Test
+    fun medios_siguenElOrdenDeLaLista_noElDelMonto() {
+        val result = byMethod(listOf(spent(900, "c"), spent(1, "a")), listOf(method("c"), method("b"), method("a")))
+
+        assertEquals(listOf<String?>("c", "b", "a"), result.ids())
+    }
+
+    @Test
+    fun medios_archivadoConMonto_vaAlFinalYMarcado() {
+        val result = byMethod(
+            listOf(spent(500, "old"), spent(10, "b")),
+            listOf(method("old", PaymentMethodStatus.DEPRECATED), method("a"), method("b")),
+        )
+
+        assertEquals(listOf<String?>("a", "b", "old"), result.ids())
+        assertTrue(result.entries.last().isArchived)
+        assertTrue(!result.entries.first().isArchived)
+    }
+
+    @Test
+    fun medios_archivadoSinMonto_noAparece() {
+        val result = byMethod(
+            listOf(spent(10, "a"), movement(MovementType.INCOME, 700, paymentMethodId = "old")),
+            listOf(method("old", PaymentMethodStatus.DEPRECATED), method("a")),
+        )
+
+        // Solo tiene un ingreso: con gastos activos no tiene monto.
+        assertEquals(listOf<String?>("a"), result.ids())
+    }
+
+    @Test
+    fun medios_movimientoSinMedio_sumaEnSinMedioDePagoAlFinal() {
+        val result = byMethod(
+            listOf(spent(100, "a"), spent(30, null), spent(20, null)),
+            listOf(method("a"), method("old", PaymentMethodStatus.DEPRECATED)),
+        )
+
+        assertEquals(listOf<String?>("a", null), result.ids())
+        assertTrue(result.entries.last().isUnassigned)
+        assertEquals(Money(50, "CLP"), result.entries.last().amount)
+    }
+
+    @Test
+    fun medios_sinMovimientosSinMedio_noHayTarjetaSinMedio() {
+        val result = byMethod(listOf(spent(100, "a")), listOf(method("a")))
+
+        assertTrue(result.entries.none { it.isUnassigned })
+    }
+
+    @Test
+    fun medios_sinMovimientosVaciaElMes() {
+        val result = byMethod(emptyList(), listOf(method("a"), method("b"), method("old", PaymentMethodStatus.DEPRECATED)))
+
+        assertEquals(listOf<String?>("a", "b"), result.ids())
+        assertEquals(Money(0, "CLP"), result.total)
+        assertTrue(result.entries.none { it.hasAmount })
+        assertEquals(2, result.count)
+    }
+
+    @Test
+    fun medios_sinMediosNiMovimientos_noTieneTarjetas() {
+        val result = byMethod(emptyList(), emptyList())
+
+        assertEquals(0, result.count)
+        assertEquals(Money(0, "CLP"), result.total)
+    }
+
+    @Test
+    fun medios_laSumaDeLasTarjetasEsElTotal_conDatosAlDia() {
+        val movements = listOf(spent(100, "a"), spent(250, "old"), spent(40, null), spent(5, "b"))
+        val result = byMethod(movements, listOf(method("a"), method("b"), method("old", PaymentMethodStatus.DEPRECATED)))
+
+        assertEquals(result.total, Money(result.entries.sumOf { it.amount.amountMinor }, "CLP"))
+        assertEquals(Money(395, "CLP"), result.total)
+    }
+
+    @Test
+    fun medios_movimientoDeUnMedioQueNoEstaEnLaLista_cuentaEnElTotalSinTarjeta() {
+        val result = byMethod(listOf(spent(100, "a"), spent(70, "desconocido")), listOf(method("a")))
+
+        assertEquals(listOf<String?>("a"), result.ids())
+        assertEquals(Money(170, "CLP"), result.total)
     }
 }

@@ -7,6 +7,8 @@ import com.rocioplata.familyfinaiapp.domain.money.Money
 import com.rocioplata.familyfinaiapp.domain.money.sum
 import com.rocioplata.familyfinaiapp.domain.movements.Movement
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethod
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodStatus
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -62,6 +64,31 @@ object DashboardCalculator {
             all.filter { it.isArchived && it.hasAmount }
         val total = ofType.map { it.amount }.sum(currency)
         return CategoryBreakdown(total, entries, segmentsOf(entries, total))
+    }
+
+    /**
+     * Reparto por medio de pago del tipo [type] (RF-16 a RF-18). Los medios activos aparecen todos, también los que no
+     * tienen movimientos en el mes (con monto cero), en el orden de [methods], que es el del backend; después, los
+     * archivados con movimientos en el mes y, al final, «Sin medio de pago» si hay movimientos sin medio. Un archivado
+     * sin movimientos no aparece.
+     *
+     * [currency] es la de los movimientos (ver [monthTotals]). Un movimiento de un medio que no está en [methods] (lista
+     * desactualizada) cuenta en [PaymentMethodBreakdown.total] pero no tiene tarjeta, igual que con las categorías.
+     */
+    fun paymentMethodBreakdown(
+        movements: List<Movement>,
+        methods: List<PaymentMethod>,
+        type: MovementType,
+        currency: String,
+    ): PaymentMethodBreakdown {
+        val ofType = movements.filter { it.type == type }
+        val amounts = ofType.groupBy { it.paymentMethodId }.mapValues { (_, list) -> list.map { it.amount }.sum(currency) }
+        val all = methods.map { PaymentMethodAmount(it, amounts[it.id] ?: Money.zero(currency)) }
+        val unassigned = PaymentMethodAmount(null, amounts[null] ?: Money.zero(currency))
+        val entries = all.filter { it.method?.status == PaymentMethodStatus.ACTIVE } +
+            all.filter { it.isArchived && it.hasAmount } +
+            listOfNotNull(unassigned.takeIf { it.hasAmount })
+        return PaymentMethodBreakdown(ofType.map { it.amount }.sum(currency), entries)
     }
 
     private fun segmentsOf(entries: List<CategoryAmount>, total: Money): List<ChartSegment> {
