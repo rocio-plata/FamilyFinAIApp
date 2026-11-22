@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -610,6 +611,11 @@ private fun IconSelector(state: CategoryEditUiState.Form, onIconChange: (String?
                     onClick = { onIconChange(option.key) },
                     modifier = Modifier.weight(1f),
                 )
+            }
+            // Si la última fila queda incompleta, los huecos mantienen el ancho de las celdas (sin ellos
+            // las últimas se estirarían a todo el ancho).
+            repeat((ICONS_PER_ROW - CategoryIcons.options.size % ICONS_PER_ROW) % ICONS_PER_ROW) {
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }

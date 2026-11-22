@@ -220,7 +220,7 @@
     <string name="payment_methods_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
 
     <!-- Categorías y tags (005-categories). En la interfaz los tags se llaman "etiquetas", como en el mockup 006.
-         Los límites (50 y 30) y los 15 iconos los pasa la interfaz desde CategoryValidation y CategoryIcons. -->
+         Los límites (50 y 30) y los iconos los pasa la interfaz desde CategoryValidation y CategoryIcons. -->
     <string name="categories_home_manage">Gestionar</string>
     <string name="categories_home_manage_description">Gestionar categorías</string>
 
@@ -315,6 +315,53 @@
     <string name="categories_icon_school">Educación</string>
     <string name="categories_icon_pets">Mascotas</string>
     <string name="categories_icon_card_giftcard">Regalo</string>
+    <string name="categories_icon_fastfood">Comida rápida</string>
+    <string name="categories_icon_local_pizza">Pizza</string>
+    <string name="categories_icon_cake">Pastel</string>
+    <string name="categories_icon_local_bar">Bar</string>
+    <string name="categories_icon_icecream">Helado</string>
+    <string name="categories_icon_weekend">Muebles</string>
+    <string name="categories_icon_build">Reparaciones</string>
+    <string name="categories_icon_cleaning_services">Limpieza</string>
+    <string name="categories_icon_kitchen">Cocina</string>
+    <string name="categories_icon_lightbulb">Luz</string>
+    <string name="categories_icon_water_drop">Agua</string>
+    <string name="categories_icon_wifi">Internet</string>
+    <string name="categories_icon_tv">Televisión</string>
+    <string name="categories_icon_smartphone">Celular</string>
+    <string name="categories_icon_directions_bus">Bus</string>
+    <string name="categories_icon_train">Tren</string>
+    <string name="categories_icon_two_wheeler">Moto</string>
+    <string name="categories_icon_local_gas_station">Bencina</string>
+    <string name="categories_icon_local_parking">Estacionamiento</string>
+    <string name="categories_icon_directions_bike">Bicicleta</string>
+    <string name="categories_icon_local_pharmacy">Farmacia</string>
+    <string name="categories_icon_spa">Bienestar</string>
+    <string name="categories_icon_psychology">Psicología</string>
+    <string name="categories_icon_movie">Cine</string>
+    <string name="categories_icon_music_note">Música</string>
+    <string name="categories_icon_sports_esports">Videojuegos</string>
+    <string name="categories_icon_menu_book">Libros</string>
+    <string name="categories_icon_brush">Arte</string>
+    <string name="categories_icon_celebration">Fiesta</string>
+    <string name="categories_icon_park">Parque</string>
+    <string name="categories_icon_checkroom">Ropa</string>
+    <string name="categories_icon_shopping_bag">Compras</string>
+    <string name="categories_icon_store">Tienda</string>
+    <string name="categories_icon_laptop">Computador</string>
+    <string name="categories_icon_child_care">Niños</string>
+    <string name="categories_icon_toys">Juguetes</string>
+    <string name="categories_icon_family_restroom">Familia</string>
+    <string name="categories_icon_account_balance">Banco</string>
+    <string name="categories_icon_savings">Ahorros</string>
+    <string name="categories_icon_payments">Pagos</string>
+    <string name="categories_icon_credit_card">Tarjeta</string>
+    <string name="categories_icon_receipt">Boleta</string>
+    <string name="categories_icon_trending_up">Inversiones</string>
+    <string name="categories_icon_work">Trabajo</string>
+    <string name="categories_icon_account_balance_wallet">Billetera</string>
+    <string name="categories_icon_volunteer_activism">Donaciones</string>
+    <string name="categories_icon_security">Seguros</string>
 
     <string name="categories_archive_action">Archivar</string>
     <string name="categories_delete_action">Eliminar</string>
@@ -400,6 +447,16 @@
     <string name="dashboard_category_card_description">%1$s, %2$s</string>
     <string name="dashboard_category_card_archived_description">%1$s, %2$s, archivada</string>
     <string name="dashboard_category_card_action">Registrar un movimiento en %1$s</string>
+    <plurals name="dashboard_payment_methods_count">
+        <item quantity="one">%d medio de pago</item>
+        <item quantity="other">%d medios de pago</item>
+    </plurals>
+    <string name="dashboard_payment_methods_loading">Cargando medios de pago…</string>
+    <string name="dashboard_payment_methods_empty">No hay medios de pago activos. Créalos con «Gestionar».</string>
+    <string name="dashboard_payment_method_none">Sin medio de pago</string>
+    <string name="dashboard_payment_method_archived">Archivado</string>
+    <string name="dashboard_payment_method_card_description">%1$s, %2$s</string>
+    <string name="dashboard_payment_method_card_archived_description">%1$s, %2$s, archivado</string>
     <string name="dashboard_empty_month">No hay movimientos este mes. Registra uno con el botón «+».</string>
     <string name="dashboard_loading">Cargando el resumen del mes…</string>
     <string name="dashboard_error">No se pudo cargar el resumen del mes</string>

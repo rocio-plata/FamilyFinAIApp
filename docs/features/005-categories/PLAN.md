@@ -117,7 +117,10 @@ cambia nada más de la cabecera.
 
 **Catálogo de iconos.** `ui/categories/CategoryIcons.kt` asocia claves
 estables (las que guarda el backend) a iconos de `material-icons-extended`.
-Clave ausente o desconocida → icono genérico (RF-03). Las 15 claves
+Clave ausente o desconocida → icono genérico (RF-03). **El 2026-11-22, a petición de la
+persona, se añadieron 47 claves más (62 en total; ver `CategoryIcons.kt`, con el mismo
+formato `snake_case` del nombre de Material Icons y ≤ 40 caracteres) detrás de las 15
+originales, que no cambian.** Las 15 claves originales
 (confirmadas; nombres de Material Icons), en el orden del mockup 006: `shopping_cart`, `restaurant`,
 `local_cafe`, `medical_services`, `home`, `directions_car`, `local_shipping`,
 `bolt`, `flight`, `fitness_center`, `sports_soccer`, `beach_access`, `school`,

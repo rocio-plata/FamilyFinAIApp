@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.unit.width
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -500,11 +501,23 @@ class CategoryEditContentTest {
     }
 
     @Test
-    fun theCatalogShowsAll15Icons() {
+    fun theCatalogShowsEveryIcon() {
         show(form())
 
         CategoryIcons.options.forEach { rule.onNodeWithTag("category_icon_${it.key}").assertExists() }
-        assertEquals(15, CategoryIcons.options.size)
+        assertEquals(62, CategoryIcons.options.size)
+    }
+
+    @Test
+    fun theLastIncompleteRowKeepsTheSameCellWidth() {
+        show(form())
+
+        val first = rule.onNodeWithTag("category_icon_${CategoryIcons.options.first().key}")
+            .performScrollTo().getBoundsInRoot()
+        val last = rule.onNodeWithTag("category_icon_${CategoryIcons.options.last().key}")
+            .performScrollTo().getBoundsInRoot()
+
+        assertEquals(first.width.value, last.width.value, 1f)
     }
 
     // --- Archivar y eliminar (CA-11, CA-12) ---

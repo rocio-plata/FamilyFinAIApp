@@ -92,8 +92,10 @@ criterios, decisiones del plan y tareas. -->
 - **RF-10:** En edición se pueden cambiar el nombre y el icono (incluido
   quitarlo); se guardan con la acción "Guardar". El tipo se muestra pero no
   puede cambiarse.
-- **RF-11:** El icono se elige de un catálogo de 15 iconos (los del mockup
-  `006-category-edit.png`).
+- **RF-11:** El icono se elige de un catálogo de iconos: los 15 del mockup
+  `006-category-edit.png` y, a petición de la persona (2026-11-22), 47 más
+  agrupados por tema (comida, hogar, transporte, salud, ocio, ropa, familia y
+  finanzas), 62 en total. Las claves de los 15 originales no cambian.
 
 **Archivar y eliminar categorías (solo Propietario)**
 
