@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -27,6 +28,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.rocioplata.familyfinaiapp.domain.categories.Category
@@ -40,6 +42,10 @@ import com.rocioplata.familyfinaiapp.domain.dashboard.ChartSegment
 import com.rocioplata.familyfinaiapp.domain.dashboard.MonthComparison
 import com.rocioplata.familyfinaiapp.domain.dashboard.MonthTotals
 import com.rocioplata.familyfinaiapp.domain.money.Money
+import com.rocioplata.familyfinaiapp.domain.dashboard.PaymentMethodAmount
+import com.rocioplata.familyfinaiapp.domain.dashboard.PaymentMethodBreakdown
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethod
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodStatus
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryColors
 import com.rocioplata.familyfinaiapp.ui.categories.containsColorNear
@@ -71,6 +77,7 @@ class DashboardContentTest {
         val types = mutableListOf<MovementType>()
         val categoryClicks = mutableListOf<Pair<String, MovementType>>()
         var manage = 0
+        var managePayments = 0
         var retry = 0
     }
 
@@ -108,6 +115,7 @@ class DashboardContentTest {
         isStale: Boolean = false,
         isRefreshing: Boolean = false,
         categoriesAvailable: Boolean = true,
+        paymentMethods: PaymentMethodBreakdown? = null,
     ): DashboardUiState {
         val totals = MonthTotals(clp(income), clp(expenses))
         val segments = if (withSegments) {
@@ -121,6 +129,7 @@ class DashboardContentTest {
                 totals = totals, percentOfIncome = totals.percentOfIncome(type),
                 breakdown = if (categoriesAvailable) CategoryBreakdown(totals.totalOf(type), entries, segments) else null,
                 comparison = comparison, isMonthEmpty = !withSegments, isStale = isStale, isRefreshing = isRefreshing,
+                paymentMethods = paymentMethods,
             ),
         )
     }
@@ -149,6 +158,7 @@ class DashboardContentTest {
                             onSelectType = { events.types += it },
                             onCategoryClick = { id, type -> events.categoryClicks += id to type },
                             onManageCategories = { events.manage++ },
+                            onManagePaymentMethods = { events.managePayments++ },
                             onRetry = { events.retry++ },
                             modifier = Modifier.padding(16.dp),
                         )
@@ -656,6 +666,131 @@ class DashboardContentTest {
 
         val spare = bottom("dashboard_content") - bottom(card("c4"))
         assertTrue("sin espacio para el botón «+» ($spare px)", spare >= 80 * rule.density.density)
+    }
+
+    // --- Medios de pago (RF-16 a RF-18, CA-19, CA-20) ---
+
+    private fun method(id: String, name: String, status: PaymentMethodStatus = PaymentMethodStatus.ACTIVE) =
+        PaymentMethod(id, name, status)
+
+    private val card = PaymentMethodAmount(method("p1", "Tarjeta de crédito"), clp(520_000))
+    private val cash = PaymentMethodAmount(method("p2", "Efectivo"), clp(80_450))
+    private val unused = PaymentMethodAmount(method("p3", "Cuenta vista"), clp(0))
+    private val oldMethod = PaymentMethodAmount(method("p4", "Tarjeta antigua", PaymentMethodStatus.DEPRECATED), clp(30_000))
+    private val noMethod = PaymentMethodAmount(null, clp(12_000))
+
+    private fun methods(vararg entries: PaymentMethodAmount) =
+        PaymentMethodBreakdown(clp(entries.sumOf { it.amount.amountMinor }), entries.toList())
+
+    private fun methodCard(id: String) = "dashboard_payment_method_$id"
+
+    @Test
+    fun theMethodsSectionShowsTitleCountAndOneCardPerMethodWithItsAmount() {
+        show(state(paymentMethods = methods(card, cash, unused)))
+
+        rule.onNodeWithTag("dashboard_payment_methods_title").performScrollTo().assert(hasText("Medios de pago"))
+        rule.onNodeWithTag("dashboard_payment_methods_count", useUnmergedTree = true).assert(hasText("3 medios de pago"))
+        rule.onAllNodesWithTag("dashboard_payment_method_amount", useUnmergedTree = true).assertCountEquals(3)
+        assertEquals("Tarjeta de crédito, ${clp(520_000).formatted()}", description(methodCard("p1")))
+        assertEquals("Efectivo, ${clp(80_450).formatted()}", description(methodCard("p2")))
+        rule.onAllNodesWithTag("dashboard_payment_method_amount", useUnmergedTree = true)[0].assert(hasText(clp(520_000).formatted()))
+    }
+
+    @Test
+    fun theCountUsesTheSingularForOneMethod() {
+        show(state(paymentMethods = methods(card)))
+
+        rule.onNodeWithTag("dashboard_payment_methods_count", useUnmergedTree = true).assert(hasText("1 medio de pago"))
+    }
+
+    @Test
+    fun theMethodsSectionComesBelowTheCategories() {
+        show(state(paymentMethods = methods(card)))
+
+        assertTrue(top("dashboard_payment_methods") >= bottom("dashboard_categories"))
+    }
+
+    @Test
+    fun aMethodWithZeroIsDimmed() {
+        show(state(paymentMethods = methods(card, unused)))
+
+        rule.onNodeWithTag(methodCard("p1")).performScrollTo()
+        val normal = darkest(rule.onNodeWithTag(methodCard("p1")).captureToImage())
+        val dimmed = darkest(rule.onNodeWithTag(methodCard("p3")).captureToImage())
+        assertTrue("el de cero no se ve atenuado ($dimmed frente a $normal)", dimmed > normal + 0.1f)
+        assertEquals("Cuenta vista, ${clp(0).formatted()}", description(methodCard("p3")))
+    }
+
+    @Test
+    fun anArchivedMethodIsMarkedAndAnnounced() {
+        show(state(paymentMethods = methods(card, oldMethod)))
+
+        rule.onNodeWithTag("dashboard_payment_method_archived", useUnmergedTree = true).performScrollTo().assert(hasText("Archivado"))
+        assertEquals("Tarjeta antigua, ${clp(30_000).formatted()}, archivado", description(methodCard("p4")))
+    }
+
+    @Test
+    fun theUnassignedCardIsNamedWithoutAMethod() {
+        show(state(paymentMethods = methods(card, noMethod)))
+
+        rule.onNodeWithTag(methodCard("none")).performScrollTo()
+        assertEquals("Sin medio de pago, ${clp(12_000).formatted()}", description(methodCard("none")))
+    }
+
+    @Test
+    fun theMethodCardsCannotBeTapped() {
+        show(state(paymentMethods = methods(card, oldMethod, noMethod)))
+
+        rule.onNodeWithTag(methodCard("p1")).performScrollTo().assertHasNoClickAction()
+        rule.onNodeWithTag(methodCard("p4")).assertHasNoClickAction()
+        rule.onNodeWithTag(methodCard("none")).assertHasNoClickAction()
+    }
+
+    @Test
+    fun manageInTheMethodsSectionIsReported() {
+        val events = show(state(paymentMethods = methods(card)))
+
+        rule.onNodeWithTag("home_manage_payment_methods").performScrollTo().assertIsEnabled().performClick()
+
+        assertEquals(1, events.managePayments)
+        assertEquals(0, events.manage)
+    }
+
+    @Test
+    fun whileTheMethodsHaveNoData_theTotalsShowAndTheSectionWaits() {
+        show(state(paymentMethods = null))
+
+        rule.onNodeWithTag("dashboard_payment_methods_loading").performScrollTo().assert(hasText("Cargando medios de pago…"))
+        rule.onNodeWithTag("dashboard_breakdown_card").assertIsDisplayed()
+        absent("dashboard_payment_method_grid")
+        absent("dashboard_payment_methods_count")
+    }
+
+    @Test
+    fun withoutAnyMethod_theSectionInvitesToCreateThemAndManageStaysAvailable() {
+        show(state(paymentMethods = PaymentMethodBreakdown(clp(0), emptyList())))
+
+        rule.onNodeWithTag("dashboard_payment_methods_empty").performScrollTo()
+            .assert(hasText("No hay medios de pago activos. Créalos con «Gestionar»."))
+        rule.onNodeWithTag("home_manage_payment_methods").assertIsEnabled()
+        absent("dashboard_payment_method_grid")
+    }
+
+    @Test
+    fun theMethodCardsFitWithLargeText() {
+        show(state(paymentMethods = methods(card, cash, unused, oldMethod, noMethod)), fontScale = 2f)
+
+        rule.onNodeWithTag(methodCard("p1")).performScrollTo()
+        assertNotCut("dashboard_payment_method_amount")
+    }
+
+    @Test
+    fun theMethodsSectionKeepsThreeColumnsOnAPhone() {
+        show(state(paymentMethods = methods(card, cash, unused)), width = 360)
+
+        rule.onNodeWithTag(methodCard("p1")).performScrollTo()
+        assertEquals(top(methodCard("p1")), top(methodCard("p3")), 1f)
+        assertTrue(left(methodCard("p3")) > left(methodCard("p2")))
     }
 
     // --- Estados (CA-15, CA-16) ---

@@ -69,8 +69,9 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     viewModelKey = "${viewModelKey ?: "main"}-dashboard-${family.id}-${uiState.activeFamilyInstance}",
                     onCategoryClick = { categoryId, type -> viewModel.openMovementCreate(categoryId, type) },
                     onManageCategories = viewModel::openCategories,
+                    onManagePaymentMethods = viewModel::openPaymentMethods,
                     onInsufficientRole = viewModel::onInsufficientRole,
-                    // Debajo van los medios de pago: el espacio para el botón «+» lo deja Inicio al final.
+                    // El espacio para el botón «+» lo deja Inicio al final.
                     bottomSpace = 16.dp,
                     modifier = contentModifier,
                 )

@@ -325,9 +325,10 @@ class MainScreenTest {
         composeTestRule.onNodeWithText("Medios de pago").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("home_manage_payment_methods").assertIsDisplayed()
         val paymentTop = composeTestRule.onNodeWithText("Medios de pago").fetchSemanticsNode().positionInRoot.y
-        val dashboard = composeTestRule.onNodeWithTag("dashboard_content").fetchSemanticsNode()
-        val dashboardBottom = dashboard.positionInRoot.y + dashboard.size.height
-        assertTrue("«Medios de pago» debe estar debajo del dashboard", paymentTop >= dashboardBottom)
+        val categories = composeTestRule.onNodeWithTag("dashboard_categories").fetchSemanticsNode()
+        val categoriesBottom = categories.positionInRoot.y + categories.size.height
+        assertTrue("«Medios de pago» debe estar debajo de las categorías", paymentTop >= categoriesBottom)
+        composeTestRule.onAllNodesWithText("Medios de pago").assertCountEquals(1)
         composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
     }
 

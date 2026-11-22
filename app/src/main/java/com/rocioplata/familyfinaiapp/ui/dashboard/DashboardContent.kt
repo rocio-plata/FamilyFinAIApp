@@ -1,5 +1,6 @@
 package com.rocioplata.familyfinaiapp.ui.dashboard
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,8 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.CreditCardOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,8 +76,12 @@ import com.rocioplata.familyfinaiapp.domain.dashboard.ChangeOutcome
 import com.rocioplata.familyfinaiapp.domain.dashboard.ChartSegment
 import com.rocioplata.familyfinaiapp.domain.dashboard.MonthComparison
 import com.rocioplata.familyfinaiapp.domain.dashboard.MonthTotals
+import com.rocioplata.familyfinaiapp.domain.dashboard.PaymentMethodAmount
+import com.rocioplata.familyfinaiapp.domain.dashboard.PaymentMethodBreakdown
 import com.rocioplata.familyfinaiapp.domain.money.Money
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethod
+import com.rocioplata.familyfinaiapp.domain.paymentmethods.PaymentMethodStatus
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryColors
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryIcons
 import com.rocioplata.familyfinaiapp.ui.categories.displayColor
@@ -93,10 +100,10 @@ import java.time.YearMonth
 /**
  * Cuerpo del dashboard de Inicio, sin estado propio (RF-01 a RF-11): el selector de mes con «Mes actual», la
  * tarjeta de desglose (Gastos e Ingresos, lo disponible, la comparación con el mes anterior y el gráfico circular)
- * y la sección por categoría del tipo activo, con «Gestionar» y una tarjeta por categoría. Los estados de carga y
+ * la sección por categoría del tipo activo, con «Gestionar» y una tarjeta por categoría, y debajo la de medios de pago con una tarjeta por medio (RF-16 a RF-18). Los estados de carga y
  * error conservan el selector de mes, para poder cambiar de mes. Solo dibuja el estado recibido y avisa de lo que
- * toca la persona: [onCategoryClick] con el id de la categoría activa y el tipo activo, [onManageCategories] y
- * [onRetry]. Deja [bottomSpace] al final: por defecto el necesario para que el botón «+» no tape la última fila; Inicio
+ * toca la persona: [onCategoryClick] con el id de la categoría activa y el tipo activo, [onManageCategories],
+ * [onManagePaymentMethods] y [onRetry]. Deja [bottomSpace] al final: por defecto el necesario para que el botón «+» no tape la última fila; Inicio
  * pone menos, porque debajo van los medios de pago.
  */
 @Composable
@@ -109,6 +116,7 @@ fun DashboardContent(
     modifier: Modifier = Modifier,
     onCategoryClick: (categoryId: String, type: MovementType) -> Unit = { _, _ -> },
     onManageCategories: () -> Unit = {},
+    onManagePaymentMethods: () -> Unit = {},
     onRetry: () -> Unit = {},
     bottomSpace: Dp = DEFAULT_BOTTOM_SPACE,
 ) {
@@ -129,6 +137,7 @@ fun DashboardContent(
                 BreakdownCard(state.activeType, content, onSelectType)
                 if (content.isMonthEmpty) EmptyMonthMessage()
                 CategoriesSection(state.activeType, content.breakdown, onCategoryClick, onManageCategories)
+                PaymentMethodsSection(content.paymentMethods, onManagePaymentMethods)
             }
         }
         Spacer(modifier = Modifier.height(bottomSpace))
@@ -192,72 +201,125 @@ private fun CategoriesSection(
     onCategoryClick: (String, MovementType) -> Unit,
     onManage: () -> Unit,
 ) {
-    val manageDescription = stringResource(R.string.categories_home_manage_description)
     Column(modifier = Modifier.fillMaxWidth().testTag("dashboard_categories"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            itemVerticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Con texto grande el contador pasa a la línea de abajo en lugar de partirse.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                itemVerticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(type.categoriesTitleRes()),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.semantics { heading() }.testTag("dashboard_categories_title"),
-                )
-                if (breakdown != null && breakdown.count > 0) {
-                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                        Text(
-                            text = pluralStringResource(R.plurals.dashboard_categories_count, breakdown.count, breakdown.count),
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp).testTag("dashboard_categories_count"),
-                        )
-                    }
-                }
-            }
-            TextButton(
-                onClick = onManage,
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .testTag("home_manage_categories")
-                    .semantics { contentDescription = manageDescription },
-            ) {
-                Text(stringResource(R.string.categories_home_manage))
-            }
-        }
+        SectionHeader(
+            title = stringResource(type.categoriesTitleRes()),
+            titleTag = "dashboard_categories_title",
+            count = breakdown?.count?.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.dashboard_categories_count, it, it) },
+            countTag = "dashboard_categories_count",
+            manageTag = "home_manage_categories",
+            manageDescription = stringResource(R.string.categories_home_manage_description),
+            onManage = onManage,
+        )
         when {
-            breakdown == null -> Text(
-                text = stringResource(R.string.dashboard_categories_loading),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("dashboard_categories_loading"),
-            )
-            breakdown.entries.isEmpty() -> Text(
-                text = stringResource(type.noCategoriesRes()),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("dashboard_categories_empty"),
-            )
-            else -> CategoryGrid(type, breakdown.entries, onCategoryClick)
+            breakdown == null -> SectionMessage(R.string.dashboard_categories_loading, "dashboard_categories_loading")
+            breakdown.entries.isEmpty() -> SectionMessage(type.noCategoriesRes(), "dashboard_categories_empty")
+            else -> CardGrid("dashboard_category_grid", breakdown.entries) { entry, cell ->
+                CategoryCard(entry, type, onCategoryClick, cell)
+            }
         }
     }
 }
 
 /**
- * Cuadrícula adaptativa: tantas columnas como caben con un ancho mínimo por tarjeta (tres en un teléfono normal);
- * con texto grande el ancho mínimo crece y quedan menos columnas, hasta una sola, para que nada se corte. Va dentro de
- * un contenedor que se desplaza, así que no usa una cuadrícula perezosa.
+ * Sección «Medios de pago» (RF-16 a RF-18): título, contador, «Gestionar» y una tarjeta por medio con su monto del mes
+ * en el tipo activo. Las tarjetas no se pueden tocar.
+ */
+@Composable
+private fun PaymentMethodsSection(breakdown: PaymentMethodBreakdown?, onManage: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().testTag("dashboard_payment_methods"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionHeader(
+            title = stringResource(R.string.payment_methods_home_title),
+            titleTag = "dashboard_payment_methods_title",
+            count = breakdown?.count?.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.dashboard_payment_methods_count, it, it) },
+            countTag = "dashboard_payment_methods_count",
+            manageTag = "home_manage_payment_methods",
+            manageDescription = stringResource(R.string.payment_methods_home_manage_description),
+            onManage = onManage,
+        )
+        when {
+            breakdown == null -> SectionMessage(R.string.dashboard_payment_methods_loading, "dashboard_payment_methods_loading")
+            breakdown.entries.isEmpty() -> SectionMessage(R.string.dashboard_payment_methods_empty, "dashboard_payment_methods_empty")
+            else -> CardGrid("dashboard_payment_method_grid", breakdown.entries) { entry, cell ->
+                PaymentMethodCard(entry, cell)
+            }
+        }
+    }
+}
+
+/**
+ * Título de una sección con su contador y «Gestionar». Con texto grande el contador pasa a la línea de abajo en lugar de
+ * partirse y «Gestionar» a la siguiente.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CategoryGrid(type: MovementType, entries: List<CategoryAmount>, onCategoryClick: (String, MovementType) -> Unit) {
+private fun SectionHeader(
+    title: String,
+    titleTag: String,
+    count: String?,
+    countTag: String,
+    manageTag: String,
+    manageDescription: String,
+    onManage: () -> Unit,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.semantics { heading() }.testTag(titleTag),
+            )
+            if (count != null) {
+                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    Text(
+                        text = count,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp).testTag(countTag),
+                    )
+                }
+            }
+        }
+        TextButton(
+            onClick = onManage,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .testTag(manageTag)
+                .semantics { contentDescription = manageDescription },
+        ) {
+            Text(stringResource(R.string.categories_home_manage))
+        }
+    }
+}
+
+/** Texto de una sección que aún no tiene tarjetas que mostrar (cargando o vacía). */
+@Composable
+private fun SectionMessage(@StringRes text: Int, tag: String) {
+    Text(
+        text = stringResource(text),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.testTag(tag),
+    )
+}
+
+/**
+ * Cuadrícula adaptativa: tantas columnas como caben con un ancho mínimo por tarjeta (tres en un teléfono normal);
+ * con texto grande el ancho mínimo crece y quedan menos columnas, hasta una sola, para que nada se corte. Va dentro de
+ * un contenedor que se desplaza, así que no usa una cuadrícula perezosa. [card] dibuja cada elemento con el modificador de su celda.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> CardGrid(tag: String, items: List<T>, card: @Composable (item: T, cell: Modifier) -> Unit) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val minCell = CATEGORY_MIN_CELL_WIDTH * LocalDensity.current.fontScale.coerceIn(1f, 2f)
         val columns = ((maxWidth + CATEGORY_GRID_SPACING) / (minCell + CATEGORY_GRID_SPACING)).toInt().coerceAtLeast(1)
@@ -267,11 +329,9 @@ private fun CategoryGrid(type: MovementType, entries: List<CategoryAmount>, onCa
             maxItemsInEachRow = columns,
             horizontalArrangement = Arrangement.spacedBy(CATEGORY_GRID_SPACING),
             verticalArrangement = Arrangement.spacedBy(CATEGORY_GRID_SPACING),
-            modifier = Modifier.fillMaxWidth().testTag("dashboard_category_grid"),
+            modifier = Modifier.fillMaxWidth().testTag(tag),
         ) {
-            entries.forEach { entry ->
-                CategoryCard(entry, type, onCategoryClick, Modifier.width(cellWidth).fillMaxRowHeight())
-            }
+            items.forEach { item -> card(item, Modifier.width(cellWidth).fillMaxRowHeight()) }
         }
     }
 }
@@ -289,8 +349,6 @@ private fun CategoryCard(
     modifier: Modifier = Modifier,
 ) {
     val category = entry.category
-    val tone = entry.displayColor()
-    val icon = CategoryIcons.displayOf(category.icon)
     val formatted = entry.amount.formatted()
     val description = stringResource(
         if (entry.isArchived) R.string.dashboard_category_card_archived_description else R.string.dashboard_category_card_description,
@@ -298,47 +356,110 @@ private fun CategoryCard(
         formatted,
     )
     val action = stringResource(R.string.dashboard_category_card_action, category.name)
-    // La etiqueta y la acción van antes de `clearAndSetSemantics`: lo que se declara después se descarta.
     val tagged = modifier.testTag("dashboard_category_${category.id}")
     val interactive = if (entry.isArchived) {
         tagged
     } else {
         tagged.clickable(onClickLabel = action, role = Role.Button) { onCategoryClick(category.id, type) }
     }
+    AmountCard(
+        name = category.name,
+        icon = CategoryIcons.displayOf(category.icon).icon,
+        tone = entry.displayColor(),
+        formattedAmount = formatted,
+        isArchived = entry.isArchived,
+        archivedLabel = stringResource(R.string.dashboard_category_archived),
+        isDimmed = !entry.hasAmount,
+        description = description,
+        archivedTag = "dashboard_category_archived",
+        amountTag = "dashboard_category_amount",
+        modifier = interactive,
+    )
+}
+
+/**
+ * Tarjeta de un medio de pago (RF-16 a RF-18): el mismo aspecto que la de categoría, con un único icono para todos los
+ * medios y otro para «Sin medio de pago». Las de monto cero se atenúan, los archivados llevan «Archivado» y ninguna se
+ * puede tocar.
+ */
+@Composable
+private fun PaymentMethodCard(entry: PaymentMethodAmount, modifier: Modifier = Modifier) {
+    val name = entry.method?.name ?: stringResource(R.string.dashboard_payment_method_none)
+    val formatted = entry.amount.formatted()
+    val description = stringResource(
+        if (entry.isArchived) R.string.dashboard_payment_method_card_archived_description else R.string.dashboard_payment_method_card_description,
+        name,
+        formatted,
+    )
+    AmountCard(
+        name = name,
+        icon = if (entry.isUnassigned) Icons.Filled.CreditCardOff else Icons.Filled.CreditCard,
+        tone = if (entry.isUnassigned) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+        formattedAmount = formatted,
+        isArchived = entry.isArchived,
+        archivedLabel = stringResource(R.string.dashboard_payment_method_archived),
+        isDimmed = !entry.hasAmount,
+        description = description,
+        archivedTag = "dashboard_payment_method_archived",
+        amountTag = "dashboard_payment_method_amount",
+        modifier = modifier.testTag("dashboard_payment_method_${entry.method?.id ?: "none"}"),
+    )
+}
+
+/**
+ * Tarjeta de importe común a categorías y medios de pago: icono con su tono, nombre en hasta dos líneas, «Archivada» o
+ * «Archivado» si corresponde y el monto del mes. Una sola unidad para el lector de pantalla, con [description]. Las
+ * etiquetas de test y la acción de toque las pone quien la usa en [modifier], antes de `clearAndSetSemantics`: lo que se
+ * declara después se descarta.
+ */
+@Composable
+private fun AmountCard(
+    name: String,
+    icon: ImageVector,
+    tone: Color,
+    formattedAmount: String,
+    isArchived: Boolean,
+    archivedLabel: String,
+    isDimmed: Boolean,
+    description: String,
+    archivedTag: String,
+    amountTag: String,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = if (entry.isArchived) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLowest,
+        color = if (isArchived) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = interactive.clearAndSetSemantics { contentDescription = description },
+        modifier = modifier.clearAndSetSemantics { contentDescription = description },
     ) {
         Column(
             modifier = Modifier
                 .padding(horizontal = 8.dp, vertical = 12.dp)
-                .alpha(if (entry.hasAmount) 1f else DIMMED_ALPHA),
+                .alpha(if (isDimmed) DIMMED_ALPHA else 1f),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Surface(shape = RoundedCornerShape(12.dp), color = tone.softBackground(), modifier = Modifier.size(40.dp)) {
                 Icon(
-                    imageVector = icon.icon,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = tone,
                     modifier = Modifier.padding(8.dp),
                 )
             }
             Text(
-                text = category.name,
+                text = name,
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
-            if (entry.isArchived) {
+            if (isArchived) {
                 Text(
-                    text = stringResource(R.string.dashboard_category_archived),
+                    text = archivedLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("dashboard_category_archived"),
+                    modifier = Modifier.testTag(archivedTag),
                 )
             }
             val amountStyle = MaterialTheme.typography.titleSmall
@@ -349,13 +470,13 @@ private fun CategoryCard(
             val lineHeight = with(LocalDensity.current) { amountStyle.lineHeight.toDp() }
             Box(modifier = Modifier.fillMaxWidth().heightIn(min = lineHeight * AMOUNT_LINE_RESERVE), contentAlignment = Alignment.Center) {
                 Text(
-                    text = formatted,
+                    text = formattedAmount,
                     style = amountStyle,
                     maxLines = 1,
                     softWrap = false,
                     autoSize = TextAutoSize.StepBased(minFontSize = MIN_CARD_AMOUNT_SIZE, maxFontSize = amountStyle.fontSize),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().wrapContentHeight(unbounded = true).testTag("dashboard_category_amount"),
+                    modifier = Modifier.fillMaxWidth().wrapContentHeight(unbounded = true).testTag(amountTag),
                 )
             }
         }
@@ -727,9 +848,19 @@ private fun previewState(
             percentOfIncome = totals.percentOfIncome(type),
             breakdown = CategoryBreakdown(totals.totalOf(type), listOf(food, health, other), segments),
             comparison = comparison, isMonthEmpty = !withSegments, isStale = false, isRefreshing = false,
+            paymentMethods = previewPaymentMethods(totals.totalOf(type)),
         ),
     )
 }
+
+private fun previewPaymentMethods(total: Money) = PaymentMethodBreakdown(
+    total,
+    listOf(
+        PaymentMethodAmount(PaymentMethod("p1", "Tarjeta de crédito", PaymentMethodStatus.ACTIVE), Money(total.amountMinor * 3 / 4, total.currency)),
+        PaymentMethodAmount(PaymentMethod("p2", "Efectivo", PaymentMethodStatus.ACTIVE), Money(total.amountMinor / 4, total.currency)),
+        PaymentMethodAmount(PaymentMethod("p3", "Cuenta vista", PaymentMethodStatus.ACTIVE), Money(0, total.currency)),
+    ),
+)
 
 @Composable
 private fun PreviewHost(state: DashboardUiState) {

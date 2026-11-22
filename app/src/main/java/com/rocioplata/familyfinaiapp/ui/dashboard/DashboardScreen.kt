@@ -15,7 +15,7 @@ import com.rocioplata.familyfinaiapp.FamilyFinApp
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 
 /**
- * Entrada con estado del dashboard de Inicio de [familyId] (RF-01 a RF-11): crea su ViewModel y vuelve a actualizar los
+ * Entrada con estado del dashboard de Inicio de [familyId] (RF-01 a RF-11 y RF-16 a RF-18): crea su ViewModel y vuelve a actualizar los
  * datos al volver a primer plano. [viewModelKey] debe incluir la sesión, la familia y las veces que cambió la familia
  * activa (`main-<generación>-dashboard-<familia>-<instancia>`): así el mes y el tipo se conservan al girar la pantalla,
  * al pasar a segundo plano y al cambiar de pestaña, y cambiar de familia o de usuario empieza en el mes en curso con
@@ -28,6 +28,7 @@ fun DashboardScreen(
     viewModelKey: String,
     onCategoryClick: (categoryId: String, type: MovementType) -> Unit,
     onManageCategories: () -> Unit,
+    onManagePaymentMethods: () -> Unit,
     onInsufficientRole: () -> Unit,
     modifier: Modifier = Modifier,
     bottomSpace: Dp = DEFAULT_BOTTOM_SPACE,
@@ -61,6 +62,7 @@ fun DashboardScreen(
         onSelectType = viewModel::selectType,
         onCategoryClick = onCategoryClick,
         onManageCategories = onManageCategories,
+        onManagePaymentMethods = onManagePaymentMethods,
         onRetry = viewModel::retry,
         bottomSpace = bottomSpace,
         modifier = modifier,

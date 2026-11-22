@@ -32,11 +32,11 @@ import com.rocioplata.familyfinaiapp.ui.dashboard.DEFAULT_BOTTOM_SPACE
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
 /**
- * Cuerpo de Inicio (RF-01 y RF-12 de la 008): el dashboard de la familia activa, en [dashboardContent], y debajo la
- * sección «Medios de pago» (RF-01 de 006) con su enlace «Gestionar». Todo en un contenedor que se desplaza, con
- * espacio al final para que el botón «+» no tape la última fila. «Gestionar» categorías vive en el propio dashboard.
- * Sin [dashboardContent] (no hay familia activa que mostrar) solo queda lo que no depende de ella; un callback nulo
- * oculta su sección.
+ * Cuerpo de Inicio (RF-01 y RF-12 de la 008): el dashboard de la familia activa, en [dashboardContent], que incluye las
+ * secciones de categorías y de medios de pago con su «Gestionar». Todo en un contenedor que se desplaza, con espacio
+ * al final para que el botón «+» no tape la última fila. Sin [dashboardContent] (no hay familia activa que mostrar)
+ * solo queda la fila «Medios de pago» (RF-01 de 006) con su enlace «Gestionar», que no depende de ella; un callback
+ * nulo oculta su sección.
  */
 @Composable
 fun HomeContent(
@@ -48,7 +48,8 @@ fun HomeContent(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("home_content"),
     ) {
         dashboardContent?.invoke(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp))
-        if (onManagePaymentMethods != null) {
+        // Con dashboard, «Medios de pago» es una sección suya (RF-16 a RF-18); sin él queda solo el título con «Gestionar».
+        if (onManagePaymentMethods != null && dashboardContent == null) {
             ManageSectionRow(
                 title = stringResource(R.string.payment_methods_home_title),
                 manageDescription = stringResource(R.string.payment_methods_home_manage_description),

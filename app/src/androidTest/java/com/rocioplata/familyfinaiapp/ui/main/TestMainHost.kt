@@ -110,6 +110,7 @@ fun TestMainHost(
                             onSelectType = {},
                             onCategoryClick = { id, type -> state = state.copy(managementRoute = MovementRoute.Create(id, type)) },
                             onManageCategories = { state = state.copy(managementRoute = CategoriesRoute.List) },
+                            onManagePaymentMethods = { state = state.copy(managementRoute = PaymentMethodsRoute) },
                             bottomSpace = 16.dp,
                         )
                     }
