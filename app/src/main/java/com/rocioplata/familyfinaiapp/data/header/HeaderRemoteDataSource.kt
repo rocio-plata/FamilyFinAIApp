@@ -35,7 +35,7 @@ class HeaderRemoteDataSource(
                     ?: return@get RemoteResult.Failure(HeaderFailure.InvalidData)
                 // Una moneda desconocida se trata como ausente: la app no puede registrar movimientos sin ella.
                 val currency = dto.defaultCurrency?.takeIf { Money.isKnown(it) }
-                Family(dto.familyId, dto.name, role, currency)
+                Family(dto.familyId, dto.name, role, currency, dto.memberCount)
             }
             RemoteResult.Success(families)
         }
@@ -96,6 +96,7 @@ class HeaderRemoteDataSource(
         val name: String,
         val role: String,
         val defaultCurrency: String? = null,
+        val memberCount: Int? = null,
     )
 
     @Serializable

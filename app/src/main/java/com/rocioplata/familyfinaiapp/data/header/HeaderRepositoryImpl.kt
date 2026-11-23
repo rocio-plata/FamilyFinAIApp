@@ -27,6 +27,12 @@ class HeaderRepositoryImpl(
     private val remote: HeaderRemoteDataSource,
     private val local: HeaderLocalDataSource,
     private val sessionProvider: SessionProvider,
+    /**
+     * Recibe los identificadores de las familias vigentes cada vez que el backend entrega la lista o se aplica un cambio
+     * local a ella (RF-23 de la 009): así otros repositorios olvidan lo guardado de las que ya no están. Se llama fuera
+     * del candado de escritura; nunca por un fallo, por la caché ni al terminar la sesión.
+     */
+    private val onFamiliesKnown: suspend (Set<String>) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
 ) : HeaderRepository {
     private val state = MutableStateFlow(HeaderData())
@@ -38,6 +44,11 @@ class HeaderRepositoryImpl(
     private val storageLock = Mutex()
     private var clearEpoch = 0
 
+    // Se suben con cada cambio local de ese recurso: un refresco que empezó antes descarta lo que trae de él, porque
+    // desharía el cambio (por ejemplo, una familia recién creada desaparecería hasta el refresco siguiente).
+    private var familiesVersion = 0
+    private var invitationsVersion = 0
+
     override val header: Flow<HeaderData> = state
 
     override suspend fun refresh(): HeaderRefreshResult = mutex.withLock {
@@ -46,11 +57,34 @@ class HeaderRepositoryImpl(
         } catch (e: SessionUnavailableException) {
             return failAll(e.failure.toHeaderFailure())
         }
-        val epoch = storageLock.withLock {
+        val start = storageLock.withLock {
             loadCache(session.userId)
-            clearEpoch
+            Start(clearEpoch, familiesVersion, invitationsVersion)
         }
-        fetch(session, epoch)
+        fetch(session, start)
+    }
+
+    override suspend fun addFamily(family: Family) = changeFamilies { list ->
+        if (list.any { it.id == family.id }) list.map { if (it.id == family.id) family else it } else list + family
+    }
+
+    override suspend fun removeFamily(familyId: String) = changeFamilies { list -> list.filterNot { it.id == familyId } }
+
+    override suspend fun setFamilyOrder(orderedIds: List<String>) = changeFamilies { list ->
+        val ordered = orderedIds.distinct().mapNotNull { id -> list.firstOrNull { it.id == id } }
+        ordered + list.filter { family -> ordered.none { it.id == family.id } }
+    }
+
+    override suspend fun updateFamily(familyId: String, change: (Family) -> Family) = changeFamilies { list ->
+        list.map { if (it.id == familyId) change(it) else it }
+    }
+
+    override suspend fun setPendingInvitations(count: Int) = storageLock.withLock {
+        val userId = currentUserIdOrNull() ?: return@withLock
+        invitationsVersion++
+        val now = clock()
+        local.savePendingInvitations(userId, now, count)
+        state.update { build(invitations = Timed(count, now), current = it) }
     }
 
     // No espera a un refresco en curso: subir `clearEpoch` hace que ese refresco descarte lo que
@@ -80,7 +114,29 @@ class HeaderRepositoryImpl(
         )
     }
 
-    private suspend fun fetch(session: Session, epoch: Int): HeaderRefreshResult = coroutineScope {
+    // Aplica un cambio a la lista de familias ya cargada, conservando su `savedAt`.
+    private suspend fun changeFamilies(change: (List<Family>) -> List<Family>) {
+        val known = storageLock.withLock {
+            val current = state.value.families ?: return@withLock null
+            val userId = currentUserIdOrNull() ?: return@withLock null
+            familiesVersion++
+            val updated = Timed(change(current.value), current.savedAtMillis)
+            local.saveFamilies(userId, updated.savedAtMillis, updated.value)
+            state.update { build(families = updated, current = it) }
+            updated.value.map { it.id }.toSet()
+        }
+        known?.let { onFamiliesKnown(it) }
+    }
+
+    private suspend fun currentUserIdOrNull(): String? = try {
+        sessionProvider.current().userId
+    } catch (e: SessionUnavailableException) {
+        null
+    }
+
+    private class Start(val epoch: Int, val familiesVersion: Int, val invitationsVersion: Int)
+
+    private suspend fun fetch(session: Session, start: Start): HeaderRefreshResult = coroutineScope {
         val families = async { remote.families() }
         val invitations = async { remote.pendingInvitations() }
         val profile = async { remote.displayName() }
@@ -90,14 +146,16 @@ class HeaderRepositoryImpl(
         val profileResult = profile.await()
         val now = clock()
 
-        storageLock.withLock {
+        val known = storageLock.withLock {
             // Si se borró la caché mientras se esperaba la red, no se guarda nada (RF-09).
-            if (epoch != clearEpoch) return@withLock
-            if (familiesResult is RemoteResult.Success) {
+            if (start.epoch != clearEpoch) return@withLock null
+            var knownFamilies: Set<String>? = null
+            if (familiesResult is RemoteResult.Success && start.familiesVersion == familiesVersion) {
                 local.saveFamilies(session.userId, now, familiesResult.value)
                 state.update { build(families = Timed(familiesResult.value, now), current = it) }
+                knownFamilies = familiesResult.value.map { it.id }.toSet()
             }
-            if (invitationsResult is RemoteResult.Success) {
+            if (invitationsResult is RemoteResult.Success && start.invitationsVersion == invitationsVersion) {
                 local.savePendingInvitations(session.userId, now, invitationsResult.value)
                 state.update { build(invitations = Timed(invitationsResult.value, now), current = it) }
             }
@@ -105,7 +163,9 @@ class HeaderRepositoryImpl(
                 local.saveDisplayName(session.userId, now, profileResult.value)
                 state.update { build(name = Timed(profileResult.value, now), current = it) }
             }
+            knownFamilies
         }
+        known?.let { onFamiliesKnown(it) }
 
         HeaderRefreshResult(
             families = (familiesResult as? RemoteResult.Failure)?.failure,

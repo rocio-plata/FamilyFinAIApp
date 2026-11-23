@@ -17,19 +17,19 @@ verificado.
 
 ## Cabecera
 
-- [ ] **T-01 · Número de miembros de la familia**
+- [x] **T-01 · Número de miembros de la familia**
   - **Cubre:** RF-01 (CA-01) · **Depende de:** —
   - **Alcance:** `domain/header/Family.kt`: `memberCount: Int? = null`. `HeaderRemoteDataSource` lo lee de `GET /me/families`; `HeaderLocalDataSource` lo guarda como campo opcional sin cambiar `schemaVersion`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.header.*"`: leído, ausente, ida y vuelta en caché y copia anterior sin el campo. `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** los tests pasan y la app compila sin cambios visibles.
   - **Evidencia:** —
-- [ ] **T-02 · Cambios locales de las familias y del contador**
+- [x] **T-02 · Cambios locales de las familias y del contador**
   - **Cubre:** RF-01, RF-02, RF-05, RF-09, RF-12, RF-13, RF-19, RF-20 · **Depende de:** T-01
   - **Alcance:** `HeaderRepository` y su implementación: añadir una familia al final (o actualizarla si ya está), quitarla, fijar el orden, actualizar rol, moneda o número de miembros, y fijar el contador de invitaciones; en memoria y caché, conservando `savedAt` y comprobando que la sesión sigue siendo la misma. Versión por recurso: un refresco que empezó antes de un cambio descarta ese recurso. Adaptar el falso de `MainViewModelTest`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.header.HeaderRepositoryImplTest"`: cada operación (memoria, caché, `savedAt`); sin datos cargados; un refresco en curso no deshace un alta, una baja ni el contador, y sí actualiza los demás recursos; `clear()` durante un cambio. Regresión: `session.SessionEndDuringHeaderRefreshTest` y `ui.main.MainViewModelTest`.
   - **Hecho cuando:** los tests pasan.
   - **Evidencia:** —
-- [ ] **T-03 · Aviso de las familias vigentes**
+- [x] **T-03 · Aviso de las familias vigentes**
   - **Cubre:** RF-23 (CA-27) · **Depende de:** T-02
   - **Alcance:** `HeaderRepositoryImpl` recibe un callback con los identificadores vigentes, llamado tras cada lista recibida del backend o cambio local aplicado, fuera del candado de escritura; nunca por un fallo, por la caché ni tras `clear()`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.header.HeaderRepositoryImplTest"`: se llama con éxito y con cambio local; no con fallo, caché, lista descartada por versión o época ni `clear()`.
@@ -226,16 +226,16 @@ verificado.
   - **Alcance:** Con el backend local y dos cuentas de prueba: pasos manuales del plan, códigos reales del backend (anotados en `BACKEND_GAPS.md`), modo avión y segundo plano; inspección de `members_cache` y de los almacenes tras perder una familia. Borrar los datos de prueba al terminar.
   - **Validación:** tabla por criterio con resultado y captura. CA-14 como Integrante requiere BG-01; CA-21 y el caso vencida de CA-25, solo si se ajusta la fecha en la base local.
   - **Hecho cuando:** cada criterio está verificado o marcado como no verificado con su motivo.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL; suite JVM completa: 1207 tests, 0 fallos, 0 errores, 0 omitidos (suma de `app/build/test-results/testDebugUnitTest`, de esta ejecución). `HeaderRepositoryImplTest` 36 (8 nuevos para el aviso: lo recibe con un refresco correcto y con cada cambio local; no lo recibe sin lista cargada ni sin sesión, con fallo de red, con la caché, con el contador, cuando fallan solo las familias, cuando la lista se descarta por un cambio local, tras un `clear` durante el refresco, ni tras `clear`; y un aviso suspendido no retiene el candado). Repetido `HeaderRepositoryImplTest` 3 veces más con `--rerun` (sin fallos en ninguna) para descartar carreras. `HeaderRepositoryImpl` recibe `onFamiliesKnown: suspend (Set<String>) -> Unit = {}` antes de `clock`, así que las llamadas existentes no cambian; se invoca fuera de `storageLock`. Todavía no está conectado a ningún repositorio (T-06). No se ejecutó `lintDebug` ni la suite instrumentada en esta sección.
 - [ ] **T-31 · Accesibilidad manual**
   - **Cubre:** CA-32 · **Depende de:** T-29
   - **Alcance:** TalkBack y fuente máxima en selector, crear, «Mi familia», invitar e invitaciones; modo oscuro.
   - **Validación:** lista de pantallas con resultado.
   - **Hecho cuando:** el resultado está registrado, incluido lo que el entorno no permita.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "…data.header.*" --tests "…ui.main.MainViewModelTest" --tests "…session.SessionEndDuringHeaderRefreshTest"` → BUILD SUCCESSFUL; `HeaderRepositoryImplTest` 28 (14 nuevos: alta al final con `savedAt` conservado y sigue marcada como antigua, alta de una existente sin duplicar, baja, orden con desconocidas y no mencionadas, actualización de rol, moneda y miembros, sin lista cargada, contador sin lista de familias, sin sesión, tras `clear`, y un refresco en curso que no deshace un alta, una baja ni el contador pero sí actualiza los demás recursos; uno posterior a un cambio manda el backend). `MainViewModelTest` 68 y `SessionEndDuringHeaderRefreshTest` 1, sin cambios de comportamiento (el falso implementa las operaciones nuevas sin efecto). `HeaderRepository` gana `addFamily`, `removeFamily`, `setFamilyOrder`, `updateFamily` y `setPendingInvitations`; `HeaderRepositoryImpl` aplica cada cambio bajo `storageLock` a memoria y caché y mantiene una versión por recurso (`familiesVersion`, `invitationsVersion`) que el refresco compara al guardar. Sin lista de familias cargada o sin sesión, los cambios de familias no hacen nada; el contador se fija igualmente (es un dato nuevo).
 - [ ] **T-32 · Documentación final**
   - **Cubre:** — · **Depende de:** T-30, T-31
   - **Alcance:** `AGENTS.md` (capas, rutas, borrado de familias perdidas, versión por recurso, claves con moneda), `docs/ROADMAP.md`, `README.md` y `BACKEND_GAPS.md`. `CLAUDE.md` no se toca. El contrato solo si el backend publica BG-01.
   - **Validación:** revisar referencias y que cada CA apunte a su evidencia.
   - **Hecho cuando:** los documentos coinciden con lo implementado.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.header.*" :app:assembleDebug` → BUILD SUCCESSFUL; `HeaderRemoteDataSourceTest` 13 (1 nuevo: `memberCount` ausente o nulo; el de éxito ahora lee 3 y 2), `HeaderLocalDataSourceTest` 11 (2 nuevos: ida y vuelta con `memberCount` y copia anterior sin el campo), 0 fallos (leído de `app/build/test-results/testDebugUnitTest`, de esta ejecución). `Family.memberCount: Int? = null`; el remoto lo lee de `GET /me/families` y la caché lo guarda como campo opcional sin cambiar `schemaVersion = 1`. Sin cambios visibles.

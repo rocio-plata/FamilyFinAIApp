@@ -88,15 +88,22 @@ class HeaderLocalDataSource(
     )
 
     @Serializable
-    // `currency` es opcional: las copias guardadas antes de añadirlo no lo tienen y se leen sin moneda.
-    private data class FamilyJson(val id: String, val name: String, val role: String, val currency: String? = null) {
+    // `currency` y `memberCount` son opcionales: las copias guardadas antes de añadirlos se leen sin ellos.
+    private data class FamilyJson(
+        val id: String,
+        val name: String,
+        val role: String,
+        val currency: String? = null,
+        val memberCount: Int? = null,
+    ) {
         fun toDomainOrNull(): Family? {
             val parsed = FamilyRole.entries.firstOrNull { it.name == role } ?: return null
-            return Family(id, name, parsed, currency)
+            return Family(id, name, parsed, currency, memberCount)
         }
 
         companion object {
-            fun from(family: Family) = FamilyJson(family.id, family.name, family.role.name, family.currency)
+            fun from(family: Family) =
+                FamilyJson(family.id, family.name, family.role.name, family.currency, family.memberCount)
         }
     }
 

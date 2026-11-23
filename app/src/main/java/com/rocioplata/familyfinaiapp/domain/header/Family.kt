@@ -9,4 +9,6 @@ data class Family(
      * Nula si el backend no la envió o la copia guardada es anterior a este campo.
      */
     val currency: String? = null,
+    /** Cuántas personas la forman; nulo si el backend no lo envió o la copia guardada es anterior a este campo. */
+    val memberCount: Int? = null,
 )

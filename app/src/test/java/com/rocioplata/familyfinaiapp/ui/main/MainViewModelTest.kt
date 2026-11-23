@@ -51,6 +51,12 @@ class MainViewModelTest {
         override suspend fun clear() {
             data.value = HeaderData()
         }
+
+        override suspend fun addFamily(family: Family) = Unit
+        override suspend fun removeFamily(familyId: String) = Unit
+        override suspend fun setFamilyOrder(orderedIds: List<String>) = Unit
+        override suspend fun updateFamily(familyId: String, change: (Family) -> Family) = Unit
+        override suspend fun setPendingInvitations(count: Int) = Unit
     }
 
     private class FakeConnectivity : ConnectivityObserver {
