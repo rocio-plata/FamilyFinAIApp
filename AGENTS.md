@@ -199,6 +199,16 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   `DashboardContent` es stateless y `DonutChart` dibuja el gráfico. Ocupa el hueco `homeDashboardContent` de
   `MainScreen` (nulo en los tests de UI) dentro de `HomeContent`, que ya no tiene la sección «Categorías»: la gestión
   se abre con «Gestionar» en cada sección de categorías del dashboard.
+  **Por medio de pago** (RF-16 a RF-18): bajo las categorías, `PaymentMethodsSection` muestra una tarjeta por medio con
+  su monto del mes del tipo activo, calculada con `DashboardCalculator.paymentMethodBreakdown`
+  (`PaymentMethodBreakdown`/`PaymentMethodAmount`): activos siempre (en $0 atenuados), archivados solo con monto y al
+  final, y «Sin medio de pago» (`method == null`) al final si hay movimientos sin medio (el formulario de alta no lo
+  permite; protege datos que no vengan de esta app). Un movimiento de un medio que no está en la lista cuenta en el
+  total pero no tiene tarjeta, como con las categorías. `DashboardViewModel` recibe también `PaymentMethodsRepository`
+  y la refresca con las categorías (su fallo no impide ver los totales); `Content.paymentMethods` es nulo mientras no
+  haya datos. Las tarjetas (`AmountCard`, común con la de categoría, y `CardGrid`) no se pueden tocar y usan un único
+  icono para los medios y otro para «Sin medio de pago». `HomeContent` solo dibuja su fila «Medios de pago» con
+  «Gestionar» cuando no hay `dashboardContent`; con él, esa sección es del dashboard (`onManagePaymentMethods`).
 - **Color de categoría** (`ui/categories/CategoryColors.kt`, `ui/theme/Color.kt`): el backend guarda una clave de
   paleta en `color` (1 a 40 caracteres, `null` para quitarla; BG-01 de la 008). La paleta tiene 16 claves con valores
   claro/oscuro. Una clave nula o desconocida usa un color de respaldo estable por posición entre las categorías del

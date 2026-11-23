@@ -169,18 +169,18 @@ indicación. Los tests JVM van en `app/src/test/…` y los de UI en
   - **Validación:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` y `./gradlew :app:connectedDebugAndroidTest`; lint sin avisos nuevos respecto a los 24 de T-15. Si se usa el emulador de la persona, reinstalar la app con `installDebug` al terminar (el runner la desinstala).
   - **Hecho cuando:** todo pasa o cada fallo queda registrado con su causa.
   - **Evidencia:** (2026-11-22) **JVM y lint.** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --rerun-tasks` → BUILD SUCCESSFUL; suite JVM completa: 57 clases, 1182 tests, 0 fallos, 0 errores, 0 omitidos (suma de `app/build/test-results/testDebugUnitTest`, de esta ejecución con `--rerun-tasks`). `app/build/reports/lint-results-debug.xml`: **24 avisos, 0 errores, 0 fatales, los mismos de la línea base** (versiones de dependencias y de Gradle, `OldTargetApi`, `RedundantLabel`, `LockedOrientationActivity`, `DiscouragedApi` y `UnusedResources` de `auth_message_logout_needs_connection`, de la funcionalidad de acceso); ningún aviso nuevo. **Instrumentados.** `./gradlew :app:connectedDebugAndroidTest` (suite completa) en el AVD `Pixel_9` sin ventana → BUILD SUCCESSFUL en 9 min 10 s; **386 tests, 0 fallos, 0 errores, 1 omitido** (el `AuthWiringTest` que ya venía omitido; leídos de `app/build/outputs/androidTest-results/connected`): `DashboardContentTest` 69, `CategoryEditContentTest` 70, `PaymentMethodsContentTest` 43, `MovementFormContentTest` 37, `CategoriesContentTest` 35, `MainScreenTest` 31, `MovementDetailContentTest` 26, `AuthScreenTest` 21, `MovementsContentTest` 19, `BrandIdentityTest` 14, `SessionStoreTest` 8, `MainScreenBehaviorTest` 7, `AppRootTest` 4, `ExampleInstrumentedTest` 1 y `AuthWiringTest` 1 (omitido). No se usó el emulador de la persona para esta suite (la instalación con `installDebug` conserva sus datos), así que no se desinstaló su app.
-- [ ] **T-23 · Pruebas manuales de medios de pago**
+- [x] **T-23 · Pruebas manuales de medios de pago**
   - **Cubre:** CA-19, CA-20 · **Depende de:** T-22
   - **Alcance:** emulador con el backend local y datos de prueba de la persona: montos por medio frente al total y a «Movimientos» en dos meses; gastos e ingresos; medio archivado con movimientos; movimiento sin medio si es posible; alta, edición y borrado reflejados; «Gestionar» abre la gestión de medios; modo avión; modo oscuro y texto al 200 %.
   - **Validación:** pasos manuales con resultado observado y capturas.
   - **Hecho cuando:** cada escenario tiene resultado o motivo de bloqueo.
-  - **Evidencia:** —
-- [ ] **T-24 · Documentación de la ampliación**
+  - **Evidencia (2026-11-22):** **Ejecutado por el agente en el AVD `Medium_Phone_API_37.0` con `adb`** (capturas en el directorio temporal de la sesión, no versionadas), con los datos de la persona y sin crear ni borrar nada: (1) *Montos frente al total*: en noviembre con Gastos, Efectivo CLP 20.656 + Tarjeta de Crédito CLP 12.567 = CLP 33.223 = total de gastos; con Ingresos, Tarjeta de Crédito CLP 130.000 = total de ingresos; los medios sin movimientos (Tarjeta de Débito, Transferencia) salen atenuados en CLP 0 y el contador dice «4 medios de pago». (2) *Modo oscuro*: tarjetas, iconos, título y «Gestionar» legibles. (3) *Texto al 200 %*: la sección pasa a una columna con cada tarjeta entera y sin cortes; se recorta la barra inferior, que no es de la 008. (4) *Modo avión* con el mes ya visto: la sección se mantiene igual desde la copia local, sin error. (5) *Proceso terminado* (`am kill`; `pidof` vacío): al abrir vuelve a noviembre y Gastos, con los montos correctos. Los ajustes del emulador quedaron como estaban (texto 1,0, tema claro, sin modo avión). **Hecho por la persona** (reportado en el chat: «todo funcionando correctamente», sin capturas ni pasos escritos): movimiento nuevo con un medio y ver que su monto sube; cambiar el medio de un movimiento (edición) y ver que el monto pasa de una tarjeta a otra; eliminarlo; archivar un medio con movimientos del mes y ver su tarjeta «Archivado» al final; comprobar «Gestionar» de la sección. **No verificable desde la app:** un movimiento sin medio de pago (el formulario lo exige, y la persona confirmó que así debe ser); la tarjeta «Sin medio de pago» (RF-18) se mantiene como protección ante datos que no vengan de esta app y solo está cubierta por tests JVM y de UI.
+- [x] **T-24 · Documentación de la ampliación**
   - **Cubre:** RF-12, RF-16 a RF-18 (CA-19, CA-20) · **Depende de:** T-23
   - **Alcance:** `AGENTS.md` (entrada «Dashboard»: sección por medio de pago, `paymentMethodBreakdown`, `HomeContent` sin la fila cuando hay dashboard; entrada de medios de pago al día), `docs/ROADMAP.md`, `BACKEND_GAPS.md` (sin brechas nuevas, lo observado) y la tabla «Estado de verificación por criterio» con CA-19 y CA-20.
   - **Validación:** revisión documental: cada criterio con evidencia o marcado como no verificado; rutas y nombres citados existen.
   - **Hecho cuando:** documentos coherentes con lo implementado.
-  - **Evidencia:** —
+  - **Evidencia:** Revisión documental (sin compilación, solo documentos). `AGENTS.md`: la entrada «Dashboard» incluye la sección por medio de pago (`DashboardCalculator.paymentMethodBreakdown`, `PaymentMethodBreakdown`/`PaymentMethodAmount`, `DashboardViewModel` con el repositorio de medios, `Content.paymentMethods`, tarjeta común `AmountCard`, tarjetas sin toque, icono único y «Sin medio de pago») y explica que `HomeContent` solo dibuja la fila «Medios de pago» cuando no hay dashboard. `docs/ROADMAP.md`: nota de la 008 con la ampliación. `BACKEND_GAPS.md`: sin brechas nuevas (la ampliación usa los datos existentes). Tabla «Estado de verificación por criterio» con CA-19 y CA-20. Nombres citados comprobados en el código: `paymentMethodBreakdown`, `PaymentMethodBreakdown`, `PaymentMethodAmount`, `AmountCard`, `CardGrid`, `SectionHeader`, `PaymentMethodsSection`, `homeDashboardContent`, `onManagePaymentMethods`. SPEC y PLAN de la 008 en «Aprobada/Aprobado», coherentes con T-18 a T-23.
 
 ## Cobertura de criterios
 
@@ -209,7 +209,7 @@ indicación. Los tests JVM van en `app/src/test/…` y los de UI en
 
 ## Estado de verificación por criterio
 
-<!-- Completada en T-17 con lo realmente ejecutado. JVM/UI: T-15 (1163 JVM, 367 instrumentados, 0 fallos) y `DashboardContentTest` 57/57 tras el cambio del chip (T-16). -->
+<!-- Completada en T-17 con lo realmente ejecutado. JVM/UI: T-15 (1163 JVM, 367 instrumentados, 0 fallos), `DashboardContentTest` 57/57 tras el cambio del chip (T-16) y, tras la ampliación de medios de pago, 1182 JVM y 386 instrumentados con 0 fallos (T-22). -->
 
 | Criterio | JVM | UI | Manual | Estado |
 | --- | :-: | :-: | :-: | --- |
@@ -220,3 +220,5 @@ indicación. Los tests JVM van en `app/src/test/…` y los de UI en
 | CA-15, CA-16 | sí | sí | agente + capturas | Verificados: mes visto, no visto con «Reintentar», reconexión |
 | CA-17 | sí | — | agente + capturas | Verificado: `am kill` vuelve a Inicio del mes en curso |
 | CA-18 | sí | — | persona (sin detalle) | Cambio de familia sin evidencia propia; TalkBack sin verificar |
+| CA-19 | sí | sí | agente + capturas + persona | Verificado: montos frente al total en Gastos e Ingresos, atenuado, oscuro, 200 %, avión y `am kill`; alta, edición, borrado y archivado reportados por la persona (sin capturas) |
+| CA-20 | sí | sí | agente + capturas | Verificado en la parte visible (activos en $0); archivado sin monto y mes vacío solo por tests |

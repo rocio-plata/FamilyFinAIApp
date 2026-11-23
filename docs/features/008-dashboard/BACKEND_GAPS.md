@@ -15,3 +15,4 @@ Verificado contra `docs/backend/api-contract.md` (§3.4.2, §3.6 y §6.2) y
   dashboard). Quitarlo con `null` y el comportamiento sin conexión los probó la persona en la T-16 sin
   diferencias reportadas; el error `FINANCIAL_TRACKING.INVALID_CATEGORY_COLOR` no se provocó.
 - **BG-02 y BG-03:** no se usan en la 008, así que no se observaron.
+- **Montos por medio de pago (RF-16 a RF-18):** usa el listado de medios de pago y los movimientos que ya existen; no hay brechas nuevas.
