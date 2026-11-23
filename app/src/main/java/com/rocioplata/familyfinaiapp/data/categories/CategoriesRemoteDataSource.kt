@@ -5,6 +5,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
@@ -63,11 +64,13 @@ class CategoriesRemoteDataSource(
         type: CategoryType,
         name: String,
         icon: String?,
+        color: String? = null,
     ): CategoryResult<Category> {
         val body = buildJsonObject {
             put("type", type.name)
             put("name", name)
             if (icon != null) put("icon", icon)
+            if (color != null) put("color", color)
         }
         return send(HttpStatusCode.Created, request = {
             client.post { categoriesUrl(familyId); jsonBody(body) }
@@ -77,12 +80,16 @@ class CategoriesRemoteDataSource(
         }
     }
 
-    /** Solo se envían los campos modificados; [IconUpdate.Remove] envía `newIcon: null` explícito. */
+    /**
+     * Solo se envían los campos modificados; [IconUpdate.Remove] y [ColorUpdate.Remove] envían `newIcon` o
+     * `newColor` como `null` explícito.
+     */
     suspend fun updateCategory(
         familyId: String,
         categoryId: String,
         newName: String?,
         icon: IconUpdate,
+        color: ColorUpdate = ColorUpdate.Unchanged,
     ): CategoryResult<Unit> {
         val body = buildJsonObject {
             if (newName != null) put("newName", newName)
@@ -90,6 +97,11 @@ class CategoriesRemoteDataSource(
                 IconUpdate.Unchanged -> Unit
                 IconUpdate.Remove -> put("newIcon", JsonNull)
                 is IconUpdate.Set -> put("newIcon", icon.key)
+            }
+            when (color) {
+                ColorUpdate.Unchanged -> Unit
+                ColorUpdate.Remove -> put("newColor", JsonNull)
+                is ColorUpdate.Set -> put("newColor", color.key)
             }
         }
         return sendDiscardingBody(HttpStatusCode.OK) {
@@ -245,7 +257,7 @@ class CategoriesRemoteDataSource(
         val categoryType = CategoryType.entries.firstOrNull { it.name == type } ?: return null
         val categoryStatus = CategoryStatus.entries.firstOrNull { it.name == status } ?: return null
         val domainTags = tags.map { it.toDomain() ?: return null }
-        return Category(id, categoryType, name, icon, categoryStatus, domainTags)
+        return Category(id, categoryType, name, icon, categoryStatus, domainTags, color)
     }
 
     private fun TagDto.toDomain(): Tag? {
@@ -259,6 +271,7 @@ class CategoriesRemoteDataSource(
         val type: String,
         val name: String,
         val icon: String? = null,
+        val color: String? = null,
         val status: String,
         val tags: List<TagDto> = emptyList(),
     )

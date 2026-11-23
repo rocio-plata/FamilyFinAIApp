@@ -72,12 +72,21 @@ class MovementFormViewModel(
      * de destino puede no estar cargado), así que se vuelve directamente al listado. Por defecto, igual que [onClose].
      */
     private val onMovedToAnotherMonth: () -> Unit = onClose,
+    /**
+     * Tipo y categoría con los que empieza un alta (RF-11 de la 008): una tarjeta de categoría del dashboard abre el
+     * formulario ya con ellos, con la fecha de hoy. Si la categoría no está activa (o no es del tipo) cuando se cargan
+     * las categorías, el formulario queda sin categoría. Son lo que el descarte da por «sin cambios». Se ignoran al editar.
+     */
+    private val initialType: MovementType = MovementType.EXPENSE,
+    private val initialCategoryId: String? = null,
 ) : ViewModel() {
     private val familyCurrency: String? = currency?.takeIf { Money.isKnown(it) }
     private val isEdit = movementId != null
     private val today: LocalDate = dates.today()
 
-    private val fields = MutableStateFlow(Fields(date = today))
+    private val fields = MutableStateFlow(
+        if (isEdit) Fields(date = today) else Fields(type = initialType, categoryId = initialCategoryId, date = today),
+    )
 
     // Mes del movimiento al abrir la edición, para saber si el guardado lo mueve a otro mes.
     private var initialMonth: YearMonth? = null
@@ -416,7 +425,7 @@ class MovementFormViewModel(
         }
         val proposal = proposedPaymentMethod(lastUsedPaymentMethodId.value, currentState().paymentMethods)
         return current.amountText.isNotEmpty() || current.title.isNotBlank() || current.note.isNotBlank() ||
-            current.type != MovementType.EXPENSE || current.categoryId != null || current.date != today ||
+            current.type != initialType || current.categoryId != initialCategoryId || current.date != today ||
             (current.paymentMethodId != null && current.paymentMethodId != proposal)
     }
 

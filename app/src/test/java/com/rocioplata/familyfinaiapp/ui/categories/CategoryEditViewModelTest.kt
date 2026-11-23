@@ -7,6 +7,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
@@ -33,8 +34,13 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CategoryEditViewModelTest {
-    private data class Create(val type: CategoryType, val name: String, val icon: String?)
-    private data class Update(val id: String, val newName: String?, val icon: IconUpdate)
+    private data class Create(val type: CategoryType, val name: String, val icon: String?, val color: String? = null)
+    private data class Update(
+        val id: String,
+        val newName: String?,
+        val icon: IconUpdate,
+        val color: ColorUpdate = ColorUpdate.Unchanged,
+    )
 
     private class FakeRepository : CategoriesRepository {
         val data = MutableStateFlow(CategoriesData())
@@ -43,7 +49,7 @@ class CategoryEditViewModelTest {
         var refreshes = 0
         var gate: CompletableDeferred<Unit>? = null
         var createResult: (Create) -> CategoryResult<Category> = {
-            CategoryResult.Success(Category("c-new", it.type, it.name, it.icon, CategoryStatus.ACTIVE, emptyList()))
+            CategoryResult.Success(Category("c-new", it.type, it.name, it.icon, CategoryStatus.ACTIVE, emptyList(), it.color))
         }
         var updateResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
         val archives = mutableListOf<String>()
@@ -61,15 +67,15 @@ class CategoryEditViewModelTest {
             return CategoryResult.Success(Unit)
         }
 
-        override suspend fun createCategory(familyId: String, type: CategoryType, name: String, icon: String?): CategoryResult<Category> {
-            val request = Create(type, name, icon)
+        override suspend fun createCategory(familyId: String, type: CategoryType, name: String, icon: String?, color: String?): CategoryResult<Category> {
+            val request = Create(type, name, icon, color)
             creates += request
             gate?.await()
             return createResult(request)
         }
 
-        override suspend fun updateCategory(familyId: String, categoryId: String, newName: String?, icon: IconUpdate): CategoryResult<Unit> {
-            updates += Update(categoryId, newName, icon)
+        override suspend fun updateCategory(familyId: String, categoryId: String, newName: String?, icon: IconUpdate, color: ColorUpdate): CategoryResult<Unit> {
+            updates += Update(categoryId, newName, icon, color)
             gate?.await()
             val result = updateResult
             if (result is CategoryResult.Success) {
@@ -84,6 +90,11 @@ class CategoryEditViewModelTest {
                                     IconUpdate.Unchanged -> category.icon
                                     IconUpdate.Remove -> null
                                     is IconUpdate.Set -> icon.key
+                                },
+                                color = when (color) {
+                                    ColorUpdate.Unchanged -> category.color
+                                    ColorUpdate.Remove -> null
+                                    is ColorUpdate.Set -> color.key
                                 },
                             )
                         }
@@ -525,6 +536,203 @@ class CategoryEditViewModelTest {
         submit(vm)
 
         assertEquals(listOf(Update("c-1", "Comida", IconUpdate.Set("home"))), repo.updates)
+    }
+
+    // --- Color (RF-14, RF-15 de la 008) ---
+
+    private val comidaConColor = comida.copy(color = "coral")
+
+    @Test
+    fun alta_conColor_loEnviaYElColorCuentaComoCambio() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+        assertFalse(vm.form().hasUnsavedChanges)
+        assertNull(vm.form().color)
+
+        vm.setColor("plum")
+        advanceUntilIdle()
+        assertEquals("plum", vm.form().color)
+        assertEquals("plum", vm.form().effectiveColor.key)
+        assertTrue(vm.form().hasUnsavedChanges)
+
+        type(vm, "Casa")
+        submit(vm)
+
+        assertEquals(listOf(Create(CategoryType.EXPENSE, "Casa", null, "plum")), repo.creates)
+    }
+
+    @Test
+    fun alta_sinColor_envíaColorNuloYQuitarloDeshaceElCambio() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+        vm.setColor("plum")
+        vm.setColor(null)
+        advanceUntilIdle()
+        assertFalse(vm.form().hasUnsavedChanges)
+        type(vm, "Casa")
+
+        submit(vm)
+
+        assertEquals(listOf(Create(CategoryType.EXPENSE, "Casa", null, null)), repo.creates)
+    }
+
+    @Test
+    fun edicion_cambiarSoloElColor_activaGuardar_yEnviaSoloElColor() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+        assertFalse(vm.form().canSubmit)
+        vm.setColor("coral")
+        advanceUntilIdle()
+        assertTrue(vm.form().hasUnsavedChanges)
+        assertTrue(vm.form().canSubmit)
+
+        submit(vm)
+
+        assertEquals(listOf(Update("c-1", null, IconUpdate.Unchanged, ColorUpdate.Set("coral"))), repo.updates)
+        assertEquals("coral", vm.form().color)
+        assertFalse(vm.form().hasUnsavedChanges)
+        assertNull(vm.form().event)
+    }
+
+    @Test
+    fun edicion_quitarElColor_enviaRemove() = runTest {
+        val repo = repoWith(comidaConColor)
+        val vm = create(repo, categoryId = "c-1")
+        assertEquals("coral", vm.form().color)
+        vm.setColor(null)
+        advanceUntilIdle()
+
+        submit(vm)
+
+        assertEquals(listOf(Update("c-1", null, IconUpdate.Unchanged, ColorUpdate.Remove)), repo.updates)
+        assertNull(vm.form().color)
+    }
+
+    @Test
+    fun edicion_nombreIconoYColorJuntos() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+        type(vm, "Comida")
+        vm.setIcon("home")
+        vm.setColor("plum")
+        advanceUntilIdle()
+
+        submit(vm)
+
+        assertEquals(listOf(Update("c-1", "Comida", IconUpdate.Set("home"), ColorUpdate.Set("plum"))), repo.updates)
+    }
+
+    @Test
+    fun edicion_cambiarNombreSinTocarElColor_noEnviaElColor() = runTest {
+        val repo = repoWith(comidaConColor)
+        val vm = create(repo, categoryId = "c-1")
+        type(vm, "Comida")
+
+        submit(vm)
+
+        assertEquals(listOf(Update("c-1", "Comida", IconUpdate.Unchanged, ColorUpdate.Unchanged)), repo.updates)
+    }
+
+    @Test
+    fun edicion_volverAlColorGuardado_noEsCambio_yNoLlamaAlBackend() = runTest {
+        val repo = repoWith(comidaConColor)
+        val vm = create(repo, categoryId = "c-1")
+        vm.setColor("plum")
+        advanceUntilIdle()
+        assertTrue(vm.form().hasUnsavedChanges)
+
+        vm.setColor("coral")
+        advanceUntilIdle()
+        assertFalse(vm.form().hasUnsavedChanges)
+        submit(vm)
+
+        assertTrue(repo.updates.isEmpty())
+    }
+
+    @Test
+    fun edicion_sinConexion_informaYConservaElColorElegido() = runTest {
+        val repo = repoWith(comida).apply { updateResult = CategoryResult.Failure(CategoryFailure.Offline) }
+        val vm = create(repo, categoryId = "c-1")
+        vm.setColor("coral")
+        advanceUntilIdle()
+
+        submit(vm)
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.Offline), vm.form().event)
+        assertEquals("coral", vm.form().color)
+        assertTrue(vm.form().hasUnsavedChanges)
+        assertFalse(vm.form().isBusy)
+    }
+
+    @Test
+    fun color_enSoloLectura_seIgnora() = runTest {
+        val member = create(repoWith(comida), categoryId = "c-1", canManage = false)
+        member.setColor("coral")
+        advanceUntilIdle()
+        assertNull(member.form().color)
+        assertFalse(member.form().hasUnsavedChanges)
+
+        val archived = repoWith(gimnasio)
+        val archivedVm = create(archived, categoryId = "c-2")
+        archivedVm.setColor("coral")
+        advanceUntilIdle()
+        assertNull(archivedVm.form().color)
+        assertTrue(archived.updates.isEmpty())
+    }
+
+    @Test
+    fun color_fueraDeLaPaleta_seIgnora() = runTest {
+        val vm = create(repoWith(comida), categoryId = "c-1")
+
+        vm.setColor("fucsia_99")
+        advanceUntilIdle()
+
+        assertNull(vm.form().color)
+        assertFalse(vm.form().hasUnsavedChanges)
+    }
+
+    @Test
+    fun colorGuardadoDesconocido_seConserva_usaElRespaldo_yNoCuentaComoCambio() = runTest {
+        val repo = repoWith(comida.copy(color = "fucsia_99"))
+        val vm = create(repo, categoryId = "c-1")
+
+        assertEquals("fucsia_99", vm.form().color)
+        assertEquals("sage", vm.form().effectiveColor.key)
+        assertFalse(vm.form().hasUnsavedChanges)
+        type(vm, "Comida")
+        submit(vm)
+
+        assertEquals(listOf(Update("c-1", "Comida", IconUpdate.Unchanged, ColorUpdate.Unchanged)), repo.updates)
+    }
+
+    @Test
+    fun colorEfectivo_sinElegir_esElDeRespaldoDeSuPosicionEntreLasDeSuTipo() = runTest {
+        val ingreso = Category("c-i", CategoryType.INCOME, "Sueldo", null, CategoryStatus.ACTIVE, emptyList())
+        val segundoGasto = Category("c-3", CategoryType.EXPENSE, "Casa", null, CategoryStatus.ACTIVE, emptyList())
+        val repo = repoWith(comida, ingreso, segundoGasto)
+
+        // Edición: «Casa» es la segunda categoría de gasto; el ingreso de en medio no cuenta.
+        val edit = create(repo, categoryId = "c-3")
+        assertEquals("amber", edit.form().effectiveColor.key)
+        assertNull(edit.form().color)
+
+        // Alta: la nueva ocupará el último lugar de su tipo.
+        val newExpense = create(repo)
+        assertEquals("slate", newExpense.form().effectiveColor.key)
+        newExpense.setType(CategoryType.INCOME)
+        advanceUntilIdle()
+        assertEquals("amber", newExpense.form().effectiveColor.key)
+    }
+
+    @Test
+    fun colorEfectivo_elegidoGanaAlRespaldo() = runTest {
+        val vm = create(repoWith(comida), categoryId = "c-1")
+        assertEquals("sage", vm.form().effectiveColor.key)
+
+        vm.setColor("coral")
+        advanceUntilIdle()
+
+        assertEquals("coral", vm.form().effectiveColor.key)
     }
 
     @Test

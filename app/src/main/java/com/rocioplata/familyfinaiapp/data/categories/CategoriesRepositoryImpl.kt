@@ -9,6 +9,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
@@ -145,9 +146,10 @@ class CategoriesRepositoryImpl(
         type: CategoryType,
         name: String,
         icon: String?,
+        color: String?,
     ): CategoryResult<Category> = change(
         familyId,
-        request = { remote.createCategory(familyId, type, name, icon) },
+        request = { remote.createCategory(familyId, type, name, icon, color) },
         apply = { categories, created -> categories + created },
     )
 
@@ -156,9 +158,10 @@ class CategoriesRepositoryImpl(
         categoryId: String,
         newName: String?,
         icon: IconUpdate,
+        color: ColorUpdate,
     ): CategoryResult<Unit> = change(
         familyId,
-        request = { remote.updateCategory(familyId, categoryId, newName, icon) },
+        request = { remote.updateCategory(familyId, categoryId, newName, icon, color) },
         apply = { categories, _ ->
             categories.updateCategory(categoryId) {
                 it.copy(
@@ -167,6 +170,11 @@ class CategoriesRepositoryImpl(
                         IconUpdate.Unchanged -> it.icon
                         IconUpdate.Remove -> null
                         is IconUpdate.Set -> icon.key
+                    },
+                    color = when (color) {
+                        ColorUpdate.Unchanged -> it.color
+                        ColorUpdate.Remove -> null
+                        is ColorUpdate.Set -> color.key
                     },
                 )
             }

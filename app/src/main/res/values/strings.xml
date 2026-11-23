@@ -220,8 +220,7 @@
     <string name="payment_methods_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
 
     <!-- Categorías y tags (005-categories). En la interfaz los tags se llaman "etiquetas", como en el mockup 006.
-         Los límites (50 y 30) y los 15 iconos los pasa la interfaz desde CategoryValidation y CategoryIcons. -->
-    <string name="categories_home_title">Categorías</string>
+         Los límites (50 y 30) y los iconos los pasa la interfaz desde CategoryValidation y CategoryIcons. -->
     <string name="categories_home_manage">Gestionar</string>
     <string name="categories_home_manage_description">Gestionar categorías</string>
 
@@ -277,6 +276,26 @@
     <string name="categories_type_income">Ingreso</string>
     <string name="categories_type_locked_hint">El tipo no se puede cambiar una vez creada la categoría.</string>
 
+    <string name="categories_color_sage">Salvia</string>
+    <string name="categories_color_amber">Ámbar</string>
+    <string name="categories_color_slate">Pizarra</string>
+    <string name="categories_color_coral">Coral</string>
+    <string name="categories_color_plum">Ciruela</string>
+    <string name="categories_color_olive">Oliva</string>
+    <string name="categories_color_ocean">Océano</string>
+    <string name="categories_color_rose">Rosa</string>
+    <string name="categories_color_sand">Arena</string>
+    <string name="categories_color_indigo">Índigo</string>
+    <string name="categories_color_brick">Ladrillo</string>
+    <string name="categories_color_teal">Turquesa</string>
+    <string name="categories_color_lavender">Lavanda</string>
+    <string name="categories_color_mustard">Mostaza</string>
+    <string name="categories_color_mauve">Malva</string>
+    <string name="categories_color_graphite">Grafito</string>
+    <string name="categories_color_section_title">Color</string>
+    <string name="categories_color_none">Automático</string>
+    <string name="categories_color_none_description">Color automático</string>
+    <string name="categories_color_preview_description">Vista previa del icono en %1$s</string>
     <string name="categories_icon_section_title">Icono</string>
     <string name="categories_icon_available_count" tools:ignore="PluralsCandidate">%1$d disponibles</string>
     <string name="categories_icon_none">Sin icono</string>
@@ -296,6 +315,53 @@
     <string name="categories_icon_school">Educación</string>
     <string name="categories_icon_pets">Mascotas</string>
     <string name="categories_icon_card_giftcard">Regalo</string>
+    <string name="categories_icon_fastfood">Comida rápida</string>
+    <string name="categories_icon_local_pizza">Pizza</string>
+    <string name="categories_icon_cake">Pastel</string>
+    <string name="categories_icon_local_bar">Bar</string>
+    <string name="categories_icon_icecream">Helado</string>
+    <string name="categories_icon_weekend">Muebles</string>
+    <string name="categories_icon_build">Reparaciones</string>
+    <string name="categories_icon_cleaning_services">Limpieza</string>
+    <string name="categories_icon_kitchen">Cocina</string>
+    <string name="categories_icon_lightbulb">Luz</string>
+    <string name="categories_icon_water_drop">Agua</string>
+    <string name="categories_icon_wifi">Internet</string>
+    <string name="categories_icon_tv">Televisión</string>
+    <string name="categories_icon_smartphone">Celular</string>
+    <string name="categories_icon_directions_bus">Bus</string>
+    <string name="categories_icon_train">Tren</string>
+    <string name="categories_icon_two_wheeler">Moto</string>
+    <string name="categories_icon_local_gas_station">Bencina</string>
+    <string name="categories_icon_local_parking">Estacionamiento</string>
+    <string name="categories_icon_directions_bike">Bicicleta</string>
+    <string name="categories_icon_local_pharmacy">Farmacia</string>
+    <string name="categories_icon_spa">Bienestar</string>
+    <string name="categories_icon_psychology">Psicología</string>
+    <string name="categories_icon_movie">Cine</string>
+    <string name="categories_icon_music_note">Música</string>
+    <string name="categories_icon_sports_esports">Videojuegos</string>
+    <string name="categories_icon_menu_book">Libros</string>
+    <string name="categories_icon_brush">Arte</string>
+    <string name="categories_icon_celebration">Fiesta</string>
+    <string name="categories_icon_park">Parque</string>
+    <string name="categories_icon_checkroom">Ropa</string>
+    <string name="categories_icon_shopping_bag">Compras</string>
+    <string name="categories_icon_store">Tienda</string>
+    <string name="categories_icon_laptop">Computador</string>
+    <string name="categories_icon_child_care">Niños</string>
+    <string name="categories_icon_toys">Juguetes</string>
+    <string name="categories_icon_family_restroom">Familia</string>
+    <string name="categories_icon_account_balance">Banco</string>
+    <string name="categories_icon_savings">Ahorros</string>
+    <string name="categories_icon_payments">Pagos</string>
+    <string name="categories_icon_credit_card">Tarjeta</string>
+    <string name="categories_icon_receipt">Boleta</string>
+    <string name="categories_icon_trending_up">Inversiones</string>
+    <string name="categories_icon_work">Trabajo</string>
+    <string name="categories_icon_account_balance_wallet">Billetera</string>
+    <string name="categories_icon_volunteer_activism">Donaciones</string>
+    <string name="categories_icon_security">Seguros</string>
 
     <string name="categories_archive_action">Archivar</string>
     <string name="categories_delete_action">Eliminar</string>
@@ -348,4 +414,51 @@
     <string name="categories_error_invalid_data">Recibimos datos inesperados. Inténtalo de nuevo.</string>
     <string name="categories_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
     <string name="categories_error_reorder_failed">No se pudo guardar el nuevo orden. Se restauró el anterior.</string>
+
+    <!-- Dashboard de Inicio (008) -->
+    <string name="dashboard_month_previous">Mes anterior</string>
+    <string name="dashboard_month_next">Mes siguiente</string>
+    <string name="dashboard_current_month">Mes actual</string>
+    <string name="dashboard_type_expenses">Gastos</string>
+    <string name="dashboard_type_income">Ingresos</string>
+    <string name="dashboard_type_tile_description">%1$s, %2$s</string>
+    <string name="dashboard_type_tile_selected_description">%1$s, %2$s, seleccionado</string>
+    <string name="dashboard_available">Disponible</string>
+    <string name="dashboard_breakdown_title_expenses">Desglose de gastos</string>
+    <string name="dashboard_breakdown_title_income">Desglose de ingresos</string>
+    <string name="dashboard_variation_vs_previous">%1$s vs mes anterior</string>
+    <string name="dashboard_variation_up_description">Subió %1$s respecto del mes anterior</string>
+    <string name="dashboard_variation_down_description">Bajó %1$s respecto del mes anterior</string>
+    <string name="dashboard_variation_unchanged_description">Sin cambios respecto del mes anterior</string>
+    <string name="dashboard_chart_total">TOTAL</string>
+    <string name="dashboard_chart_received">%1$s recibido</string>
+    <string name="dashboard_chart_description_expenses">Gastos del mes, total %1$s</string>
+    <string name="dashboard_chart_description_income">Ingresos del mes, total %1$s</string>
+    <string name="dashboard_categories_title_expenses">Gastos por categoría</string>
+    <string name="dashboard_categories_title_income">Ingresos por categoría</string>
+    <plurals name="dashboard_categories_count">
+        <item quantity="one">%d categoría</item>
+        <item quantity="other">%d categorías</item>
+    </plurals>
+    <string name="dashboard_categories_loading">Cargando categorías…</string>
+    <string name="dashboard_categories_empty_expenses">No hay categorías de gasto activas.</string>
+    <string name="dashboard_categories_empty_income">No hay categorías de ingreso activas.</string>
+    <string name="dashboard_category_archived">Archivada</string>
+    <string name="dashboard_category_card_description">%1$s, %2$s</string>
+    <string name="dashboard_category_card_archived_description">%1$s, %2$s, archivada</string>
+    <string name="dashboard_category_card_action">Registrar un movimiento en %1$s</string>
+    <plurals name="dashboard_payment_methods_count">
+        <item quantity="one">%d medio de pago</item>
+        <item quantity="other">%d medios de pago</item>
+    </plurals>
+    <string name="dashboard_payment_methods_loading">Cargando medios de pago…</string>
+    <string name="dashboard_payment_methods_empty">No hay medios de pago activos. Créalos con «Gestionar».</string>
+    <string name="dashboard_payment_method_none">Sin medio de pago</string>
+    <string name="dashboard_payment_method_archived">Archivado</string>
+    <string name="dashboard_payment_method_card_description">%1$s, %2$s</string>
+    <string name="dashboard_payment_method_card_archived_description">%1$s, %2$s, archivado</string>
+    <string name="dashboard_empty_month">No hay movimientos este mes. Registra uno con el botón «+».</string>
+    <string name="dashboard_loading">Cargando el resumen del mes…</string>
+    <string name="dashboard_error">No se pudo cargar el resumen del mes</string>
+    <string name="dashboard_retry">Reintentar</string>
 </resources>

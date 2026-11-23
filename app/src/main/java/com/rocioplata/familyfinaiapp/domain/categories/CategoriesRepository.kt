@@ -9,6 +9,13 @@ sealed interface IconUpdate {
     data class Set(val key: String) : IconUpdate
 }
 
+/** Cambio del color en una edición; `Remove` envía `null` explícito al backend. */
+sealed interface ColorUpdate {
+    data object Unchanged : ColorUpdate
+    data object Remove : ColorUpdate
+    data class Set(val key: String) : ColorUpdate
+}
+
 interface CategoriesRepository {
     /** Datos vigentes de la familia: caché válida y, tras cada refresco o cambio correcto, los del backend. */
     fun categories(familyId: String): Flow<CategoriesData>
@@ -21,6 +28,7 @@ interface CategoriesRepository {
         type: CategoryType,
         name: String,
         icon: String?,
+        color: String? = null,
     ): CategoryResult<Category>
 
     /** Solo se envían los campos modificados: `newName` nulo y `Unchanged` los omiten. */
@@ -29,6 +37,7 @@ interface CategoriesRepository {
         categoryId: String,
         newName: String?,
         icon: IconUpdate,
+        color: ColorUpdate = ColorUpdate.Unchanged,
     ): CategoryResult<Unit>
 
     suspend fun deprecateCategory(familyId: String, categoryId: String): CategoryResult<Unit>

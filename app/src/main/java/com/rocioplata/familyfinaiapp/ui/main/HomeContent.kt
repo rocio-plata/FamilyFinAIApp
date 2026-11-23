@@ -1,46 +1,55 @@
 package com.rocioplata.familyfinaiapp.ui.main
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.rocioplata.familyfinaiapp.R
+import com.rocioplata.familyfinaiapp.ui.dashboard.DEFAULT_BOTTOM_SPACE
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
 /**
- * Cuerpo de Inicio: la sección «Medios de pago» (RF-01 de 006) justo encima de «Categorías» (RF-01 de 005),
- * cada una con su enlace «Gestionar» a la derecha, y el texto «Inicio · Familia» (RF-08 de 002), sin
- * cuadrícula ni importes. Un callback nulo oculta su sección (no hay familia activa que gestionar).
+ * Cuerpo de Inicio (RF-01 y RF-12 de la 008): el dashboard de la familia activa, en [dashboardContent], que incluye las
+ * secciones de categorías y de medios de pago con su «Gestionar». Todo en un contenedor que se desplaza, con espacio
+ * al final para que el botón «+» no tape la última fila. Sin [dashboardContent] (no hay familia activa que mostrar)
+ * solo queda la fila «Medios de pago» (RF-01 de 006) con su enlace «Gestionar», que no depende de ella; un callback
+ * nulo oculta su sección.
  */
 @Composable
 fun HomeContent(
     modifier: Modifier = Modifier,
-    familyName: String? = null,
-    onManageCategories: (() -> Unit)? = null,
     onManagePaymentMethods: (() -> Unit)? = null,
+    dashboardContent: (@Composable (Modifier) -> Unit)? = null,
 ) {
-    Column(modifier = modifier.fillMaxSize().testTag("home_content")) {
-        if (onManagePaymentMethods != null) {
+    Column(
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("home_content"),
+    ) {
+        dashboardContent?.invoke(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp))
+        // Con dashboard, «Medios de pago» es una sección suya (RF-16 a RF-18); sin él queda solo el título con «Gestionar».
+        if (onManagePaymentMethods != null && dashboardContent == null) {
             ManageSectionRow(
                 title = stringResource(R.string.payment_methods_home_title),
                 manageDescription = stringResource(R.string.payment_methods_home_manage_description),
@@ -48,20 +57,7 @@ fun HomeContent(
                 manageTag = "home_manage_payment_methods",
             )
         }
-        if (onManageCategories != null) {
-            ManageSectionRow(
-                title = stringResource(R.string.categories_home_title),
-                manageDescription = stringResource(R.string.categories_home_manage_description),
-                onManage = onManageCategories,
-                manageTag = "home_manage_categories",
-            )
-        }
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text(
-                text = tabTitle(MainDestination.Home, familyName),
-                style = MaterialTheme.typography.titleLarge,
-            )
-        }
+        Spacer(modifier = Modifier.height(DEFAULT_BOTTOM_SPACE))
     }
 }
 
@@ -83,6 +79,7 @@ private fun ManageSectionRow(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.semantics { heading() },
         )
         TextButton(
@@ -111,7 +108,7 @@ fun HomeFab(modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
 @Composable
 private fun HomeContentPreview() {
     FamilyFinAIAppTheme {
-        HomeContent(familyName = "Familia Plata", onManageCategories = {}, onManagePaymentMethods = {})
+        HomeContent(onManagePaymentMethods = {})
     }
 }
 

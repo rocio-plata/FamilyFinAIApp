@@ -27,7 +27,7 @@ import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 @Composable
 fun MovementRoutePlaceholder(route: MovementRoute, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val (tag, title) = when (route) {
-        MovementRoute.Create -> "movement_create_screen" to R.string.movement_create_title
+        is MovementRoute.Create -> "movement_create_screen" to R.string.movement_create_title
         is MovementRoute.Detail -> "movement_detail_screen" to R.string.movement_detail_title
         is MovementRoute.Edit -> "movement_edit_screen" to R.string.movement_edit_title
     }
@@ -54,5 +54,5 @@ fun MovementRoutePlaceholder(route: MovementRoute, onBack: () -> Unit, modifier:
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun MovementRoutePlaceholderPreview() {
-    FamilyFinAIAppTheme { MovementRoutePlaceholder(MovementRoute.Create, onBack = {}) }
+    FamilyFinAIAppTheme { MovementRoutePlaceholder(MovementRoute.Create(), onBack = {}) }
 }

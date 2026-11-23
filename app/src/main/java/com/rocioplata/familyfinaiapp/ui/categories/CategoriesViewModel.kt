@@ -163,8 +163,8 @@ class CategoriesViewModel(
             expenseActiveCount = categories.countActive(CategoryType.EXPENSE),
             incomeActiveCount = categories.countActive(CategoryType.INCOME),
             query = query,
-            active = visible.filter { it.status == CategoryStatus.ACTIVE }.map { it.toItem() },
-            archived = visible.filter { it.status == CategoryStatus.DEPRECATED }.map { it.toItem() },
+            active = visible.filter { it.status == CategoryStatus.ACTIVE }.map { it.toItem(categories) },
+            archived = visible.filter { it.status == CategoryStatus.DEPRECATED }.map { it.toItem(categories) },
             archivedExpanded = archivedExpanded,
             isEmpty = ofType.isEmpty(),
             noResults = ofType.isNotEmpty() && visible.isEmpty(),
@@ -178,9 +178,11 @@ class CategoriesViewModel(
     private fun List<Category>.countActive(type: CategoryType) =
         count { it.type == type && it.status == CategoryStatus.ACTIVE }
 
-    private fun Category.toItem() = CategoryItem(
+    // El color de respaldo depende de la posición entre las categorías de su tipo, así que usa la lista completa.
+    private fun Category.toItem(all: List<Category>) = CategoryItem(
         category = this,
         activeTags = tags.filter { it.status == TagStatus.ACTIVE }.sortedBy { it.displayOrder },
+        color = CategoryColors.resolve(this, all),
     )
 
     /**

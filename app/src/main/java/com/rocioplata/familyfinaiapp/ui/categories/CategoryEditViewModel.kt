@@ -9,6 +9,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryValidation
+import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.NameError
 import com.rocioplata.familyfinaiapp.domain.categories.NameValidation
@@ -25,8 +26,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Alta ([categoryId] nulo) y edición de una categoría (RF-07 a RF-10, RF-14). El borrador de nombre,
- * icono y tipo vive aquí y se descarta con el ViewModel; la categoría y sus tags salen del mismo flujo
+ * Alta ([categoryId] nulo) y edición de una categoría (RF-07 a RF-10, RF-14; color en RF-15 de la 008). El
+ * borrador de nombre, icono, color y tipo vive aquí y se descarta con el ViewModel; la categoría y sus tags salen del mismo flujo
  * del repositorio que el listado, así que lo guardado se refleja sin recargar. Se crea con la clave
  * `sesión-familia-categoría` (o «nueva»). Las operaciones van de una en una (RF-21, CA-21).
  */
@@ -38,11 +39,11 @@ class CategoryEditViewModel(
     initialCanManage: Boolean,
     private val onInsufficientRole: () -> Unit,
 ) : ViewModel() {
-    private data class Draft(val name: String, val icon: String?, val type: CategoryType)
+    private data class Draft(val name: String, val icon: String?, val type: CategoryType, val color: String?)
 
     private val isCreate = categoryId == null
     private val canManage = MutableStateFlow(initialCanManage)
-    private val draft = MutableStateFlow<Draft?>(if (isCreate) Draft("", null, initialType) else null)
+    private val draft = MutableStateFlow<Draft?>(if (isCreate) Draft("", null, initialType, null) else null)
     private val nameError = MutableStateFlow<NameFieldError?>(null)
     private val busy = MutableStateFlow(false)
     private val event = MutableStateFlow<CategoryEditEvent?>(null)
@@ -66,7 +67,7 @@ class CategoryEditViewModel(
             Ops(isBusy, pending, done, isDeleting, tags)
         },
     ) { list, draft, nameError, canManage, ops ->
-        buildState(list?.firstOrNull { it.id == categoryId }, list != null, draft, nameError, canManage, ops)
+        buildState(list?.firstOrNull { it.id == categoryId }, list, draft, nameError, canManage, ops)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), CategoryEditUiState.Loading)
 
     init {
@@ -75,7 +76,9 @@ class CategoryEditViewModel(
             viewModelScope.launch {
                 val category = categories.first { list -> list?.any { it.id == categoryId } == true }
                     ?.first { it.id == categoryId }
-                if (category != null && draft.value == null) draft.value = Draft(category.name, category.icon, category.type)
+                if (category != null && draft.value == null) {
+                    draft.value = Draft(category.name, category.icon, category.type, category.color)
+                }
             }
         }
     }
@@ -98,6 +101,17 @@ class CategoryEditViewModel(
         draft.value = current.copy(icon = key)
     }
 
+    /**
+     * Elige el color (RF-15 de la 008) o, con `null`, lo quita. Solo admite claves del catálogo: una clave
+     * desconocida se ignora, porque el selector nunca la ofrece.
+     */
+    fun setColor(key: String?) {
+        if (isReadOnly()) return
+        if (key != null && CategoryColors.find(key) == null) return
+        val current = draft.value ?: return
+        draft.value = current.copy(color = key)
+    }
+
     /** Solo al crear (RF-09): en edición el tipo no cambia. */
     fun setType(type: CategoryType) {
         if (!isCreate || isReadOnly()) return
@@ -118,7 +132,7 @@ class CategoryEditViewModel(
         }
         if (categoryId == null) {
             run(
-                operation = { repository.createCategory(familyId, current.type, name, current.icon) },
+                operation = { repository.createCategory(familyId, current.type, name, current.icon, current.color) },
                 onSuccess = { created -> event.value = CategoryEditEvent.Created(created.id) },
             )
             return
@@ -130,9 +144,14 @@ class CategoryEditViewModel(
             current.icon == null -> IconUpdate.Remove
             else -> IconUpdate.Set(current.icon)
         }
-        if (newName == null && icon == IconUpdate.Unchanged) return
+        val color = when {
+            current.color == saved.color -> ColorUpdate.Unchanged
+            current.color == null -> ColorUpdate.Remove
+            else -> ColorUpdate.Set(current.color)
+        }
+        if (newName == null && icon == IconUpdate.Unchanged && color == ColorUpdate.Unchanged) return
         run(
-            operation = { repository.updateCategory(familyId, categoryId, newName, icon) },
+            operation = { repository.updateCategory(familyId, categoryId, newName, icon, color) },
             // El campo queda con el nombre ya recortado que se guardó.
             onSuccess = { draft.value = draft.value?.copy(name = name) },
         )
@@ -429,7 +448,7 @@ class CategoryEditViewModel(
 
     private fun buildState(
         category: Category?,
-        listLoaded: Boolean,
+        list: List<Category>?,
         draft: Draft?,
         nameError: NameFieldError?,
         canManage: Boolean,
@@ -437,7 +456,7 @@ class CategoryEditViewModel(
     ): CategoryEditUiState {
         if (ops.finished) return CategoryEditUiState.Finished
         if (!isCreate) {
-            if (!listLoaded) return CategoryEditUiState.Loading
+            if (list == null) return CategoryEditUiState.Loading
             if (category == null) return if (ops.deleting) CategoryEditUiState.Loading else CategoryEditUiState.NotFound
         }
         draft ?: return CategoryEditUiState.Loading
@@ -460,15 +479,30 @@ class CategoryEditViewModel(
             newTagName = ops.tags.newName,
             tagError = ops.tags.error,
             renaming = ops.tags.renaming,
+            color = draft.color,
+            effectiveColor = effectiveColor(category, list, draft),
         )
     }
 
-    /** Alta: algo escrito o un icono elegido. Edición: nombre (recortado) o icono distintos de lo guardado. */
+    /**
+     * Color que se dibuja en la vista previa: el elegido o, sin elegir (o con una clave que la app no conoce), el
+     * de respaldo de su posición. Una categoría nueva ocupará el último lugar entre las de su tipo.
+     */
+    private fun effectiveColor(category: Category?, list: List<Category>?, draft: Draft): CategoryColorOption {
+        val position = if (category != null) {
+            CategoryColors.positionOf(category, list.orEmpty())
+        } else {
+            list.orEmpty().count { it.type == draft.type }
+        }
+        return CategoryColors.resolve(draft.color, position)
+    }
+
+    /** Alta: algo escrito o un icono o color elegido. Edición: nombre (recortado), icono o color distintos de lo guardado. */
     private fun hasChanges(category: Category?, draft: Draft): Boolean =
         if (category == null) {
-            draft.name.trim().isNotEmpty() || draft.icon != null
+            draft.name.trim().isNotEmpty() || draft.icon != null || draft.color != null
         } else {
-            draft.name.trim() != category.name || draft.icon != category.icon
+            draft.name.trim() != category.name || draft.icon != category.icon || draft.color != category.color
         }
 
     private fun NameError.toFieldError() = when (this) {

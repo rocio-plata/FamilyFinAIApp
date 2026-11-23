@@ -86,6 +86,8 @@ class MovementFormViewModelTest {
     private fun TestScope.create(
         currency: String? = "CLP",
         loadOptions: Boolean = true,
+        initialType: MovementType = MovementType.EXPENSE,
+        initialCategoryId: String? = null,
         configure: (FakeMovements, FakeCategories, FakePaymentMethods) -> Unit = { _, _, _ -> },
     ): Rig {
         val movements = FakeMovements()
@@ -104,6 +106,8 @@ class MovementFormViewModelTest {
             onClose = { closed++ },
             onInsufficientRole = { insufficient++ },
             onCurrencyMismatch = { mismatch++ },
+            initialType = initialType,
+            initialCategoryId = initialCategoryId,
         )
         backgroundScope.launch { vm.uiState.collect {} }
         advanceUntilIdle()
@@ -145,6 +149,172 @@ class MovementFormViewModelTest {
         assertFalse(s.isSaving)
         assertFalse(s.confirmingDiscard)
         assertNull(s.notice)
+    }
+
+    // --- Alta desde una categoría del dashboard (RF-11 de la 008, CA-11) ---
+
+    @Test
+    fun desdeUnaCategoria_empiezaConElTipoLaCategoriaYLaFechaDeHoy() = runTest {
+        val rig = create(initialType = MovementType.INCOME, initialCategoryId = "c-salary")
+        val s = rig.state
+
+        assertEquals(MovementType.INCOME, s.type)
+        assertEquals("c-salary", s.categoryId)
+        assertEquals(listOf("c-salary"), s.categories.map { it.id })
+        assertEquals(today, s.date)
+        assertEquals(FormOptionsState.Ready, s.options)
+        assertEquals("", s.amountText)
+        assertEquals("", s.title)
+        assertNull(s.paymentMethodId)
+    }
+
+    @Test
+    fun desdeUnaCategoriaDeGasto_ofreceSusEtiquetasActivas_sinElegirNinguna() = runTest {
+        val rig = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-food")
+
+        assertEquals("c-food", rig.state.categoryId)
+        assertEquals(listOf("t-1", "t-2"), rig.state.tags.map { it.id })
+        assertNull(rig.state.tagId)
+    }
+
+    @Test
+    fun desdeUnaCategoria_cerrarSinCambiosNoPideConfirmacion() = runTest {
+        val rig = create(initialType = MovementType.INCOME, initialCategoryId = "c-salary")
+
+        rig.vm.requestClose()
+        advanceUntilIdle()
+
+        assertEquals(1, rig.closed())
+        assertFalse(rig.state.confirmingDiscard)
+    }
+
+    @Test
+    fun desdeUnaCategoria_cualquierCambioPideConfirmacion() = runTest {
+        val rig = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-food")
+        rig.vm.onAmountChange("100")
+        advanceUntilIdle()
+
+        rig.vm.requestClose()
+        advanceUntilIdle()
+
+        assertTrue(rig.state.confirmingDiscard)
+        assertEquals(0, rig.closed())
+    }
+
+    @Test
+    fun desdeUnaCategoria_elegirOtraPideConfirmacion_yVolverALaInicialLoDejaSinCambios() = runTest {
+        val rig = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-food")
+
+        rig.vm.onCategorySelect("c-transport")
+        advanceUntilIdle()
+        rig.vm.requestClose()
+        advanceUntilIdle()
+        assertTrue(rig.state.confirmingDiscard)
+
+        rig.vm.dismissDiscard()
+        rig.vm.onCategorySelect("c-food")
+        advanceUntilIdle()
+        rig.vm.requestClose()
+        advanceUntilIdle()
+
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun desdeUnaCategoria_cambiarElTipoQuitaLaCategoria_yCuentaComoCambio() = runTest {
+        val rig = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-food")
+
+        rig.vm.onTypeChange(MovementType.INCOME)
+        advanceUntilIdle()
+        assertNull(rig.state.categoryId)
+
+        rig.vm.requestClose()
+        advanceUntilIdle()
+        assertTrue(rig.state.confirmingDiscard)
+    }
+
+    @Test
+    fun siLaCategoriaEstaArchivada_elFormularioQuedaSinCategoria_ySalirNoPideConfirmacion() = runTest {
+        val rig = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-old")
+
+        assertNull(rig.state.categoryId)
+        assertEquals(listOf("c-food", "c-transport"), rig.state.categories.map { it.id })
+        rig.vm.requestClose()
+        advanceUntilIdle()
+
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun siLaCategoriaNoExisteOEsDeOtroTipo_elFormularioQuedaSinCategoria() = runTest {
+        val unknown = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-fantasma")
+        val otherType = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-salary")
+
+        assertNull(unknown.state.categoryId)
+        assertNull(otherType.state.categoryId)
+    }
+
+    @Test
+    fun conUnaCategoriaArchivada_sePuedeElegirOtraYGuardar() = runTest {
+        val rig = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-old")
+        rig.vm.onAmountChange("100")
+        rig.vm.onTitleChange("Taxi")
+        rig.vm.onCategorySelect("c-transport")
+        rig.vm.onPaymentMethodSelect("m-card")
+
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals("c-transport", rig.movements.created.single().categoryId)
+    }
+
+    @Test
+    fun siLasCategoriasLlegaranDespues_laInicialSeSeleccionaAlCargar() = runTest {
+        val rig = create(loadOptions = false, initialType = MovementType.EXPENSE, initialCategoryId = "c-food")
+        assertNull(rig.state.categoryId)
+
+        rig.categories.data.value = CategoriesData(listOf(food, transport))
+        advanceUntilIdle()
+
+        assertEquals("c-food", rig.state.categoryId)
+    }
+
+    @Test
+    fun desdeUnaCategoria_guardarCreaElMovimientoConEsaCategoriaYLaFechaDeHoy() = runTest {
+        val rig = create(initialType = MovementType.EXPENSE, initialCategoryId = "c-food")
+        rig.vm.onAmountChange("45900")
+        rig.vm.onTitleChange("Supermercado")
+        rig.vm.onPaymentMethodSelect("m-card")
+
+        rig.vm.save()
+        advanceUntilIdle()
+
+        val created = rig.movements.created.single()
+        assertEquals("c-food", created.categoryId)
+        assertEquals(today, created.date)
+        assertEquals(Money(45_900, "CLP"), created.amount)
+        assertEquals(1, rig.closed())
+    }
+
+    @Test
+    fun conUnIngresoDesdeUnaCategoria_guardarCreaConLaCategoriaDeIngreso() = runTest {
+        val rig = create(initialType = MovementType.INCOME, initialCategoryId = "c-salary")
+        rig.vm.onAmountChange("1200000")
+        rig.vm.onTitleChange("Sueldo")
+        rig.vm.onPaymentMethodSelect("m-card")
+
+        rig.vm.save()
+        advanceUntilIdle()
+
+        assertEquals("c-salary", rig.movements.created.single().categoryId)
+    }
+
+    @Test
+    fun sinCategoriaInicial_todoSigueIgual_gastoSinCategoria() = runTest {
+        val rig = create()
+
+        assertEquals(MovementType.EXPENSE, rig.state.type)
+        assertNull(rig.state.categoryId)
     }
 
     @Test

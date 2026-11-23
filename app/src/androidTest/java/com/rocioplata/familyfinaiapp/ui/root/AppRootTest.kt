@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -79,7 +80,7 @@ class AppRootTest {
                 )
             }
         }
-        rule.onNodeWithText("Inicio · Familia Plata").assertIsDisplayed()
+        rule.onNodeWithTag("home_content").assertIsDisplayed()
         assertFalse(rule.activity.isFinishing)
 
         rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }

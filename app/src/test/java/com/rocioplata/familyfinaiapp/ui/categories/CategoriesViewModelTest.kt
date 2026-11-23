@@ -8,6 +8,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
@@ -56,8 +57,8 @@ class CategoriesViewModelTest {
         }
 
         override suspend fun clear() = Unit
-        override suspend fun createCategory(familyId: String, type: CategoryType, name: String, icon: String?) = unused()
-        override suspend fun updateCategory(familyId: String, categoryId: String, newName: String?, icon: IconUpdate) =
+        override suspend fun createCategory(familyId: String, type: CategoryType, name: String, icon: String?, color: String?) = unused()
+        override suspend fun updateCategory(familyId: String, categoryId: String, newName: String?, icon: IconUpdate, color: ColorUpdate) =
             unused()
 
         override suspend fun deprecateCategory(familyId: String, categoryId: String) = unused()

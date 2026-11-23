@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rocioplata.familyfinaiapp.FamilyFinApp
+import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 
 /**
  * Entrada con estado del formulario de [familyId]: "Nuevo movimiento" o, con [movementId], "Editar movimiento". [viewModelKey] debe incluir la sesión,
@@ -26,6 +27,10 @@ fun MovementFormScreen(
     onInsufficientRole: () -> Unit,
     onCurrencyMismatch: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Tipo con el que empieza un alta (una tarjeta de categoría del dashboard lo elige; por defecto, gasto). */
+    initialType: MovementType = MovementType.EXPENSE,
+    /** Categoría con la que empieza un alta; si no está disponible al cargar, el formulario queda sin categoría. */
+    initialCategoryId: String? = null,
     /** Movimiento que se edita; nulo para un alta. */
     movementId: String? = null,
     /** Se guardó una edición que movió el movimiento a otro mes: se vuelve al listado, no al detalle. */
@@ -48,6 +53,8 @@ fun MovementFormScreen(
                     onCurrencyMismatch = onCurrencyMismatch,
                     movementId = movementId,
                     onMovedToAnotherMonth = onMovedToAnotherMonth,
+                    initialType = initialType,
+                    initialCategoryId = initialCategoryId,
                 )
             }
         },

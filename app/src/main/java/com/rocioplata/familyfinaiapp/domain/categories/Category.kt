@@ -23,6 +23,8 @@ data class Category(
     val status: CategoryStatus,
     /** Todos los tags de la categoría, también los archivados, tal como los devuelve el backend. */
     val tags: List<Tag>,
+    /** Clave de la paleta de colores de la app; nula o desconocida usa el color de respaldo (RF-14 de la 008). */
+    val color: String? = null,
 )
 
 /** Categorías de una familia; `categories` es nulo mientras no haya valor válido (ni caché ni backend). */

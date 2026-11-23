@@ -8,6 +8,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
@@ -433,6 +434,85 @@ class CategoriesRepositoryImplTest {
         env.repository.updateCategory("f-1", "c-1", "Otro", IconUpdate.Unchanged)
         assertEquals("Otro", env.current()?.first { it.id == "c-1" }?.name)
         assertEquals(null, env.current()?.first { it.id == "c-1" }?.icon)
+    }
+
+    @Test
+    fun crearCategoria_conColor_seAplicaAMemoriaYCache() = runTest {
+        val env = loaded()
+        val created = Category("c-9", CategoryType.EXPENSE, "Casa", "pets", CategoryStatus.ACTIVE, emptyList(), "coral")
+        env.backend.responder = {
+            HttpStatusCode.Created to """{"id":"c-9","type":"EXPENSE","name":"Casa","icon":"pets","color":"coral","status":"ACTIVE"}"""
+        }
+
+        val result = env.repository.createCategory("f-1", CategoryType.EXPENSE, "Casa", "pets", "coral")
+
+        assertEquals(CategoryResult.Success(created), result)
+        assertEquals(richCategories + created, env.current())
+        assertEquals(richCategories + created, env.cached()?.value)
+        assertEquals(now, env.cached()?.savedAtMillis)
+    }
+
+    @Test
+    fun editarCategoria_color_setYQuitar_seAplicanAMemoriaYCache() = runTest {
+        val env = loaded()
+        env.backend.responder = { HttpStatusCode.OK to """{"id":"c-1","name":"x","color":"plum","status":"ACTIVE"}""" }
+
+        val set = env.repository.updateCategory("f-1", "c-1", null, IconUpdate.Unchanged, ColorUpdate.Set("plum"))
+
+        assertEquals(CategoryResult.Success(Unit), set)
+        val colored = richCategories[0].copy(color = "plum")
+        assertEquals(listOf(colored, richCategories[1]), env.current())
+        assertEquals(listOf(colored, richCategories[1]), env.cached()?.value)
+        assertEquals(now, env.cached()?.savedAtMillis)
+
+        env.repository.updateCategory("f-1", "c-1", null, IconUpdate.Unchanged, ColorUpdate.Remove)
+
+        assertEquals(null, env.current()?.first { it.id == "c-1" }?.color)
+        assertEquals(null, env.cached()?.value?.first { it.id == "c-1" }?.color)
+    }
+
+    @Test
+    fun editarCategoria_sinTocarElColor_loConserva() = runTest {
+        val env = loaded()
+        env.backend.responder = { HttpStatusCode.OK to """{"id":"c-1","name":"x","color":"plum","status":"ACTIVE"}""" }
+        env.repository.updateCategory("f-1", "c-1", null, IconUpdate.Unchanged, ColorUpdate.Set("plum"))
+
+        env.repository.updateCategory("f-1", "c-1", "Comida", IconUpdate.Set("pets"), ColorUpdate.Unchanged)
+
+        val edited = env.current()?.first { it.id == "c-1" }
+        assertEquals("plum", edited?.color)
+        assertEquals("Comida", edited?.name)
+    }
+
+    @Test
+    fun editarCategoria_colorRechazadoOSinConexion_noCambiaNada() = runTest {
+        val env = loaded()
+        env.backend.responder = { HttpStatusCode.BadRequest to """{"error":"FINANCIAL_TRACKING.INVALID_CATEGORY_COLOR"}""" }
+
+        val rejected = env.repository.updateCategory("f-1", "c-1", null, IconUpdate.Unchanged, ColorUpdate.Set("x"))
+
+        assertEquals(CategoryResult.Failure(CategoryFailure.Unknown), rejected)
+        assertEquals(richCategories, env.current())
+        assertEquals(richCategories, env.cached()?.value)
+
+        env.connectivity.online = false
+        env.backend.calls.set(0)
+        val offline = env.repository.updateCategory("f-1", "c-1", null, IconUpdate.Unchanged, ColorUpdate.Set("plum"))
+
+        assertEquals(CategoryResult.Failure(CategoryFailure.Offline), offline)
+        assertEquals(0, env.backend.calls.get())
+        assertEquals(richCategories, env.current())
+    }
+
+    @Test
+    fun descargaConColor_loExponeYLoGuarda() = runTest {
+        val env = env()
+        env.backend.body = """[{"id":"c-1","type":"EXPENSE","name":"Casa","color":"teal","status":"ACTIVE","tags":[]}]"""
+
+        env.repository.refresh("f-1")
+
+        assertEquals("teal", env.current()?.single()?.color)
+        assertEquals("teal", env.cached()?.value?.single()?.color)
     }
 
     @Test

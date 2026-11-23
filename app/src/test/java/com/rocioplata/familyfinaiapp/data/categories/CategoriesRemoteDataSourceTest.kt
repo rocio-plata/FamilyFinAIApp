@@ -6,6 +6,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
@@ -119,6 +120,28 @@ class CategoriesRemoteDataSourceTest {
             CategoryResult.Success(listOf(Category("c-1", CategoryType.EXPENSE, "Casa", null, CategoryStatus.ACTIVE, emptyList()))),
             result,
         )
+    }
+
+    @Test
+    fun listado_leeElColor_ausenteONulo_quedaSinColor() = runTest {
+        val body = """[
+          {"id":"c-1","type":"EXPENSE","name":"Casa","icon":"home","color":"teal","status":"ACTIVE","tags":[]},
+          {"id":"c-2","type":"EXPENSE","name":"Ocio","color":null,"status":"ACTIVE","tags":[]},
+          {"id":"c-3","type":"INCOME","name":"Sueldo","status":"ACTIVE","tags":[]}
+        ]"""
+
+        val result = source(reply(HttpStatusCode.OK, body)).categories("f-1") as CategoryResult.Success
+
+        assertEquals(listOf("teal", null, null), result.value.map { it.color })
+    }
+
+    @Test
+    fun listado_colorDesconocidoParaLaApp_seConservaTalCual() = runTest {
+        val body = """[{"id":"c-1","type":"EXPENSE","name":"Casa","color":"fucsia_99","status":"ACTIVE","tags":[]}]"""
+
+        val result = source(reply(HttpStatusCode.OK, body)).categories("f-1") as CategoryResult.Success
+
+        assertEquals("fucsia_99", result.value.single().color)
     }
 
     @Test
@@ -308,6 +331,49 @@ class CategoriesRemoteDataSourceTest {
     }
 
     @Test
+    fun crear_conColor_loEnviaYLoDevuelve() = runTest {
+        val captured = Captured()
+        val source = capturing(
+            HttpStatusCode.Created,
+            """{"id":"c-9","type":"EXPENSE","name":"Casa","icon":"home","color":"coral","status":"ACTIVE"}""",
+            captured,
+        )
+
+        val result = source.createCategory("f-1", CategoryType.EXPENSE, "Casa", "home", "coral")
+
+        assertEquals(
+            buildJsonObject { put("type", "EXPENSE"); put("name", "Casa"); put("icon", "home"); put("color", "coral") },
+            captured.body,
+        )
+        assertEquals("coral", (result as CategoryResult.Success).value.color)
+    }
+
+    @Test
+    fun crear_sinColorNoEnviaElCampo() = runTest {
+        val captured = Captured()
+        val source = capturing(
+            HttpStatusCode.Created,
+            """{"id":"c-9","type":"EXPENSE","name":"Casa","color":null,"status":"ACTIVE"}""",
+            captured,
+        )
+
+        val result = source.createCategory("f-1", CategoryType.EXPENSE, "Casa", null, null)
+
+        assertEquals(setOf("type", "name"), (captured.body as JsonObject).keys)
+        assertEquals(null, (result as CategoryResult.Success).value.color)
+    }
+
+    @Test
+    fun crear_colorRechazadoPor400_esErrorGenerico() = runTest {
+        val rejected = source(reply(HttpStatusCode.BadRequest, errorBody("FINANCIAL_TRACKING.INVALID_CATEGORY_COLOR")))
+
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.Unknown),
+            rejected.createCategory("f-1", CategoryType.EXPENSE, "Casa", null, "x".repeat(41)),
+        )
+    }
+
+    @Test
     fun crear_nombreDuplicadoYRolInsuficiente() = runTest {
         val duplicate = source(reply(HttpStatusCode.Conflict, errorBody("FINANCIAL.DUPLICATE_CATEGORY_NAME")))
         val forbidden = source(reply(HttpStatusCode.Forbidden, errorBody("FINANCIAL.INSUFFICIENT_ROLE")))
@@ -385,6 +451,62 @@ class CategoriesRemoteDataSourceTest {
         source.updateCategory("f-1", "c-1", "A", IconUpdate.Set("home"))
 
         assertEquals(buildJsonObject { put("newName", "A"); put("newIcon", JsonPrimitive("home")) }, captured.body)
+    }
+
+    @Test
+    fun editar_soloColor_enviaNewColor() = runTest {
+        val captured = Captured()
+        val source = capturing(HttpStatusCode.OK, """{"id":"c-1","name":"x","color":"coral","status":"ACTIVE"}""", captured)
+
+        val result = source.updateCategory("f-1", "c-1", null, IconUpdate.Unchanged, ColorUpdate.Set("coral"))
+
+        assertEquals(buildJsonObject { put("newColor", "coral") }, captured.body)
+        assertEquals(CategoryResult.Success(Unit), result)
+    }
+
+    @Test
+    fun editar_quitarColor_enviaNewColorNuloExplicito() = runTest {
+        val captured = Captured()
+        val source = capturing(HttpStatusCode.OK, """{"id":"c-1","name":"x","color":null,"status":"ACTIVE"}""", captured)
+
+        source.updateCategory("f-1", "c-1", null, IconUpdate.Unchanged, ColorUpdate.Remove)
+
+        val body = captured.body as JsonObject
+        assertEquals(setOf("newColor"), body.keys)
+        assertEquals(JsonNull, body["newColor"])
+    }
+
+    @Test
+    fun editar_colorSinCambios_noEnviaNewColor() = runTest {
+        val captured = Captured()
+        val source = capturing(HttpStatusCode.OK, """{"id":"c-1","name":"A","status":"ACTIVE"}""", captured)
+
+        source.updateCategory("f-1", "c-1", "A", IconUpdate.Unchanged, ColorUpdate.Unchanged)
+
+        assertEquals(setOf("newName"), (captured.body as JsonObject).keys)
+    }
+
+    @Test
+    fun editar_nombreIconoYColorJuntos() = runTest {
+        val captured = Captured()
+        val source = capturing(HttpStatusCode.OK, """{"id":"c-1","name":"A","status":"ACTIVE"}""", captured)
+
+        source.updateCategory("f-1", "c-1", "A", IconUpdate.Set("home"), ColorUpdate.Set("plum"))
+
+        assertEquals(
+            buildJsonObject { put("newName", "A"); put("newIcon", "home"); put("newColor", "plum") },
+            captured.body,
+        )
+    }
+
+    @Test
+    fun editar_colorRechazadoPor400_esErrorGenerico() = runTest {
+        val rejected = source(reply(HttpStatusCode.BadRequest, errorBody("FINANCIAL_TRACKING.INVALID_CATEGORY_COLOR")))
+
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.Unknown),
+            rejected.updateCategory("f-1", "c-1", null, IconUpdate.Unchanged, ColorUpdate.Set("x".repeat(41))),
+        )
     }
 
     @Test

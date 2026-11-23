@@ -6,6 +6,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoriesRepository
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersData
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersRepository
@@ -109,9 +110,9 @@ internal class FakeCategories : CategoriesRepository {
         refreshes++
         return if (refreshFails) CategoryResult.Failure(CategoryFailure.Network) else CategoryResult.Success(Unit)
     }
-    override suspend fun createCategory(familyId: String, type: CategoryType, name: String, icon: String?) =
+    override suspend fun createCategory(familyId: String, type: CategoryType, name: String, icon: String?, color: String?) =
         error("No se usa")
-    override suspend fun updateCategory(familyId: String, categoryId: String, newName: String?, icon: IconUpdate) =
+    override suspend fun updateCategory(familyId: String, categoryId: String, newName: String?, icon: IconUpdate, color: ColorUpdate) =
         error("No se usa")
     override suspend fun deprecateCategory(familyId: String, categoryId: String) = error("No se usa")
     override suspend fun deleteCategory(familyId: String, categoryId: String) = error("No se usa")

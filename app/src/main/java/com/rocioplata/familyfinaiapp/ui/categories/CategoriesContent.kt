@@ -424,11 +424,12 @@ private fun CategoryRow(item: CategoryItem, onClick: () -> Unit, modifier: Modif
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val tone = item.color.displayColor()
             Surface(
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = tone.softBackground(),
+                contentColor = tone,
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -530,11 +531,12 @@ private fun ArchivedRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val tone = item.color.displayColor()
             Surface(
                 modifier = Modifier.size(48.dp).alpha(DIMMED_ALPHA),
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = tone.softBackground(),
+                contentColor = tone,
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(imageVector = icon.icon, contentDescription = stringResource(icon.descriptionRes))

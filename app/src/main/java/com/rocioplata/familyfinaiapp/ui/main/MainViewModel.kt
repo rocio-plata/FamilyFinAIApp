@@ -7,6 +7,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.header.HeaderData
 import com.rocioplata.familyfinaiapp.domain.header.HeaderRefreshResult
 import com.rocioplata.familyfinaiapp.domain.header.HeaderRepository
+import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +34,10 @@ class MainViewModel(
     private val selectedTab = MutableStateFlow(MainDestination.Home)
     private var refreshJob: Job? = null
     private var nextRouteInstance = 1
+
+    // Familia efectiva vista por última vez y cuántas veces cambió: ver `MainUiState.activeFamilyInstance`.
+    private var lastActiveFamilyId: String? = null
+    private var activeFamilyInstance = 0
 
     val uiState: StateFlow<MainUiState> = combine(
         repository.header,
@@ -95,8 +100,12 @@ class MainViewModel(
     /** "Gestionar" en la sección de medios de pago de Inicio (RF-01 de 006). Ignorado sin familia activa. */
     fun openPaymentMethods() = openRoute(PaymentMethodsRoute)
 
-    /** "+" en Inicio y en Movimientos (RF-04): abre "Nuevo movimiento" de la familia activa. */
-    fun openMovementCreate() = openRoute(MovementRoute.Create)
+    /**
+     * "+" en Inicio y en Movimientos (RF-04): abre "Nuevo movimiento" de la familia activa. Una tarjeta de categoría del
+     * dashboard lo abre con [type] y [categoryId] ya elegidos (RF-11 de la 008); sin ellos es el formulario vacío.
+     */
+    fun openMovementCreate(categoryId: String? = null, type: MovementType? = null) =
+        openRoute(MovementRoute.Create(categoryId, type))
 
     /** Tocar un movimiento del listado (RF-08). */
     fun openMovementDetail(movementId: String) = openRoute(MovementRoute.Detail(movementId))
@@ -119,7 +128,7 @@ class MainViewModel(
         managementRoute.value = when (open.route) {
             CategoriesRoute.List, PaymentMethodsRoute -> null
             is CategoriesRoute.Create, is CategoriesRoute.Edit -> open.copy(route = CategoriesRoute.List)
-            MovementRoute.Create, is MovementRoute.Detail -> null
+            is MovementRoute.Create, is MovementRoute.Detail -> null
             is MovementRoute.Edit -> open.copy(route = MovementRoute.Detail(open.route.movementId))
         }
     }
@@ -139,7 +148,7 @@ class MainViewModel(
             CategoriesRoute.List -> current == null || current is CategoriesRoute
             is CategoriesRoute.Create, is CategoriesRoute.Edit -> current is CategoriesRoute
             PaymentMethodsRoute -> current == null || current == PaymentMethodsRoute
-            MovementRoute.Create, is MovementRoute.Detail -> current == null
+            is MovementRoute.Create, is MovementRoute.Detail -> current == null
             is MovementRoute.Edit -> current == MovementRoute.Detail(route.movementId)
         }
         if (!allowed) return
@@ -194,6 +203,11 @@ class MainViewModel(
                 FamiliesState.Content(families, active, data.isStale)
             }
         }
+        // Solo cuenta con una familia activa visible: mientras la cabecera carga o falla no se pierde la cuenta.
+        (familiesState as? FamiliesState.Content)?.activeFamily?.id?.let { id ->
+            if (lastActiveFamilyId != null && id != lastActiveFamilyId) activeFamilyInstance++
+            lastActiveFamilyId = id
+        }
         return MainUiState(
             families = familiesState,
             pendingInvitations = data.pendingInvitations?.value,
@@ -205,6 +219,7 @@ class MainViewModel(
                 familiesState is FamiliesState.Content && familiesState.activeFamily.id == route?.familyId
             },
             managementRouteInstance = route?.instance ?: 0,
+            activeFamilyInstance = activeFamilyInstance,
         )
     }
 

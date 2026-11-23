@@ -8,18 +8,30 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CategoryIconsTest {
-    private val expectedKeys = listOf(
+    /** Los 15 del mockup, en su orden: sus claves ya pueden estar guardadas en el backend y no cambian. */
+    private val originalKeys = listOf(
         "shopping_cart", "restaurant", "local_cafe", "medical_services", "home",
         "directions_car", "local_shipping", "bolt", "flight", "fitness_center",
         "sports_soccer", "beach_access", "school", "pets", "card_giftcard",
     )
+    private val expectedKeys get() = CategoryIcons.options.map { it.key }
 
     @Test
-    fun elCatalogoTieneLos15IconosEnElOrdenDelMockup() {
-        assertEquals(expectedKeys, CategoryIcons.options.map { it.key })
+    fun elCatalogoConservaLos15OriginalesAlPrincipioYTieneMas() {
+        assertEquals(originalKeys, CategoryIcons.options.map { it.key }.take(originalKeys.size))
+        assertEquals(15 + 47, CategoryIcons.options.size)
+    }
+
+    @Test
+    fun lasClavesCumplenElLimiteDelBackendYElFormato() {
+        CategoryIcons.options.forEach {
+            assertTrue(it.key, it.key.length in 1..40)
+            assertTrue(it.key, it.key.matches(Regex("[a-z0-9_]+")))
+        }
     }
 
     @Test
