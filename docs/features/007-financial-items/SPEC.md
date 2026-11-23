@@ -108,7 +108,7 @@ criterios, decisiones del plan y tareas. -->
   detalle muestra además su rol en la familia. Si quien lo registró ya no
   pertenece a la familia se muestra "Ex-miembro" (sin rol), y si su nombre
   viene vacío, un texto genérico ("Miembro de la familia"). No se muestra su
-  correo.
+  correo (la 009 lo muestra al Propietario solo en «Mi familia», sin guardarlo).
 - **RF-09:** Desde el detalle, "Editar" abre el mismo formulario del alta con
   los datos del movimiento. Se pueden cambiar el monto, el concepto, las
   observaciones, la fecha, el medio de pago, la categoría y la etiqueta. El

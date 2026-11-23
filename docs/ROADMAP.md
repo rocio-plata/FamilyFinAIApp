@@ -31,7 +31,7 @@ las TASKS de cada una.
 | 6 | Medios de pago | `006-payment-methods` | Hecha | Listado, alta, renombrado, archivar y eliminar. BG-01: el backend no permite leer el medio predeterminado, que pasa a «Perfil y ajustes». BG-02: no se puede reactivar lo archivado. BG-04: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*` (confirmado en ejecución). BG-07: el backend permite renombrar un archivado, que la app no ofrece. Sin verificar de extremo a extremo: CA-14 («Efectivo» es predeterminado), CA-06 (Integrante), el caso «con movimientos» de CA-13 y CA-15 sin copia o con datos de más de 24 h. Sin verificar manualmente: TalkBack, fuente máxima con teclado, foco automático del campo y atrás o tocar fuera con el formulario abierto |
 | 7 | Movimientos | `007-financial-items` | Hecha | Listado por mes con resumen, filtro por tipo y subtotales por día; alta, detalle, edición y eliminación; miembros de la familia para mostrar quién registró; moneda de la familia; pestaña seleccionada en `MainViewModel`. BG-06: el backend no tiene consulta individual y el detalle sale de los meses cargados. BG-07: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*` (sin comprobar el prefijo real en ejecución). BG-11: el backend no admite movimientos con fecha futura (a pedir). Verificado en el emulador con el backend local (2026-11-17), con los matices de la tabla de `TASKS.md`: CA-01 a CA-11, CA-13, CA-14, CA-16, CA-17, CA-19, CA-20, CA-21, CA-23, CA-25 y CA-26, y la parte propia de CA-24. Sin verificar de extremo a extremo: CA-15 y los casos de otro miembro y «Ex-miembro» de CA-24 (sin segunda cuenta en la familia), CA-12 y CA-22 (medio, categoría o etiqueta archivados por otra sesión), CA-18, CA-16 con datos de más de 24 h, la elección de etiqueta con datos reales y TalkBack |
 | 8 | Dashboard | `008-dashboard` | Hecha | Inicio con resumen del mes, gráfico y categorías, comparación con el mes anterior, alta desde una categoría y monto del mes por medio de pago; calculado en la app con los movimientos del mes. Color de categoría elegible (BG-01, resuelta en el backend). Sin verificar: TalkBack y el cambio entre dos familias (ver `TASKS.md`) |
-| 9 | Gestión de familias | `family-management` | Pendiente | |
+| 9 | Gestión de familias | `009-family-management` | Tareas | BG-01: el backend no permite a un Integrante salir de una familia (bloquea solo ese requisito). BG-02: no hay operación para renombrar ni eliminar una familia |
 | 10 | Presupuestos | `budgets` | Pendiente | |
 | 11 | Reportes | `reports` | Pendiente | |
 | 12 | Registro por texto con IA | `ai-text-entry` | Pendiente | |
@@ -114,8 +114,9 @@ el sistema muestre el icono nuevo (CA-06).
 
 ### 9. Gestión de familias
 
-- **Alcance orientativo:** miembros, roles, invitaciones (enviar y aceptar),
-  crear familia y reordenar familias. Completa lo que la cabecera solo muestra.
+- **Alcance orientativo:** miembros, roles, invitaciones (enviar, revocar,
+  aceptar y rechazar), crear familia, reordenar familias, salir de una familia y
+  cambiar su moneda. Completa lo que la cabecera solo muestra.
 - **Depende de:** auth.
 - **Backend:** Family & Access.
 
@@ -155,9 +156,9 @@ el sistema muestre el icono nuevo (CA-06).
 
 ### 15. Perfil y ajustes
 
-- **Alcance orientativo:** datos de perfil, ajustes, moneda de la familia y
-  medio de pago predeterminado del usuario por familia (requiere que el
-  backend permita leerlo: BG-01 de `006-payment-methods`).
+- **Alcance orientativo:** datos de perfil, ajustes y medio de pago
+  predeterminado del usuario por familia (requiere que el backend permita
+  leerlo: BG-01 de `006-payment-methods`).
   El logout se entrega en auth.
 - **Depende de:** auth.
 - **Backend:** Identity, Family & Access.
