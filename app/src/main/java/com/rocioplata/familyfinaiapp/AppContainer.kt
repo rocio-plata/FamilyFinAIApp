@@ -118,6 +118,13 @@ class AppContainer(context: Context) {
             remote = HeaderRemoteDataSource(apiClient, BuildConfig.BACKEND_BASE_URL),
             local = HeaderLocalDataSource(headerCacheStore),
             sessionProvider = sessionManager,
+            // Lo guardado de una familia a la que el usuario ya no pertenece se borra del dispositivo (RF-23 de la 009).
+            onFamiliesKnown = { familyIds ->
+                categoriesRepository.retainFamilies(familyIds)
+                paymentMethodsRepository.retainFamilies(familyIds)
+                movementsRepository.retainFamilies(familyIds)
+                membersRepository.retainFamilies(familyIds)
+            },
         )
     }
 

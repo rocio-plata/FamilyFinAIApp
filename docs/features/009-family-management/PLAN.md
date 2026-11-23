@@ -133,9 +133,12 @@ movimiento no cambia: no puede estar abierto a la vez que «Mi familia».
 con un callback, como `SessionManager.onSessionEnded`; `AppContainer` lo conecta
 a los cuatro repositorios con caché por familia, que borran de memoria y disco
 las que no estén. Se compara contra lo que haya en disco, así que también limpia
-lo que quedara de una ejecución anterior. Una época por familia hace que una
-descarga en curso de una familia olvidada no vuelva a guardarla, sin afectar a
-las demás.
+lo que quedara de una ejecución anterior. Cada repositorio recuerda el último
+conjunto de familias vigentes que recibió y no guarda la descarga en curso de
+una que no esté en él, sin afectar a las demás; `clear()` lo olvida. Se eligió
+esto y no una época por familia porque esa no cubre la primera descarga de una
+familia sin nada guardado, que no estaba en memoria ni en disco cuando se
+olvidó.
 
 ## Módulos y componentes afectados
 

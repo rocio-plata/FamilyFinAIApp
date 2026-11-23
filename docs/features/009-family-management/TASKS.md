@@ -38,19 +38,19 @@ verificado.
 
 ## Datos de familias perdidas
 
-- [ ] **T-04 · Olvidar familias en categorías y medios de pago**
+- [x] **T-04 · Olvidar familias en categorías y medios de pago**
   - **Cubre:** RF-23 (CA-27) · **Depende de:** —
   - **Alcance:** Interfaz, repositorio y origen local de `categories` y `paymentmethods`: olvidar las familias que no estén en un conjunto (memoria y claves en disco), con época por familia para que una descarga o un cambio en curso no vuelva a guardarla, sin esperar a la red ni afectar a las demás.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.categories.*"` y `…data.paymentmethods.*`: borra la perdida de memoria y disco, conserva las demás, sin nada que borrar, descarga en curso de una perdida y de una vigente, conjunto vacío, volver a guardar si se recupera. Regresión: `SessionEndDuringCategoriesRefreshTest` y `SessionEndDuringPaymentMethodsRefreshTest`.
   - **Hecho cuando:** los tests pasan.
   - **Evidencia:** —
-- [ ] **T-05 · Olvidar familias en movimientos y miembros**
+- [x] **T-05 · Olvidar familias en movimientos y miembros**
   - **Cubre:** RF-23 (CA-27) · **Depende de:** —
   - **Alcance:** Lo mismo en `movements` (todos los meses de la familia y su `last_payment_method_<usuario>_<familia>`) y `members`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.movements.*"` y `…data.members.*`: los casos de T-04, varios meses, último medio de pago de la perdida y de otra. Regresión: `SessionEndDuringMovementsRefreshTest` y `SessionEndDuringMembersRefreshTest`.
   - **Hecho cuando:** los tests pasan.
   - **Evidencia:** —
-- [ ] **T-06 · Cableado del borrado**
+- [x] **T-06 · Cableado del borrado**
   - **Cubre:** RF-23 (CA-27) · **Depende de:** T-03, T-04, T-05
   - **Alcance:** `AppContainer.kt`: conectar el callback de la cabecera a los cuatro repositorios.
   - **Validación:** test JVM nuevo en `session/`: con los repositorios reales, una lista sin una familia borra lo suyo, y terminar la sesión durante ese borrado no se bloquea. `./gradlew :app:assembleDebug :app:testDebugUnitTest` (suite JVM completa).
@@ -205,13 +205,13 @@ verificado.
   - **Alcance:** `InvitationsViewModel` y estado: carga, vacío, error, aceptar, confirmar rechazo, aviso con «Cambiar a esta familia», una operación a la vez.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.ui.family.InvitationsViewModelTest"`: éxito, cada fallo con su refresco, `Network`, `Offline`, cancelar, doble pulsación, evento consumido.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL; suite JVM completa: 1252 tests, 0 fallos, 0 errores, 0 omitidos (suma de `app/build/test-results/testDebugUnitTest`, de esta ejecución). `AppContainer`: `headerRepository` recibe `onFamiliesKnown`, que llama a `retainFamilies` de los cuatro repositorios (se resuelven al llamarse, sin ciclo de construcción). Test nuevo `session/FamilyDataRetentionWiringTest` (3 tests, con los repositorios y orígenes reales y la sesión real): una lista sin una familia borra lo suyo de los cuatro y conserva lo de las demás; con todas vigentes no se borra nada; terminar la sesión después lo vacía todo sin bloquearse (límite de 5 s en tiempo real). Regresión: los cinco `SessionEndDuring…RefreshTest` y `SessionManagerTest` siguen pasando. Los tests de repositorios y del cableado se repitieron 3 veces con `--rerun` sin fallos. No se ejecutó `lintDebug` ni la suite instrumentada; `AppContainer` no tiene test propio (necesita `Context`): su cableado se comprueba con el test equivalente y se verificará a mano en la T-30.
 - [ ] **T-28 · Pantalla de invitaciones**
   - **Cubre:** RF-18 a RF-21 (CA-22 a CA-25, CA-32) · **Depende de:** T-18, T-27
   - **Alcance:** `InvitationsScreen`, contenido y conexión en `MainScreen`, según `009-notificaciones-familias.png` (sin código ni datos que el backend no da).
   - **Validación:** `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.rocioplata.familyfinaiapp.ui.family.InvitationsContentTest`: tarjeta completa, quien invita sin nombre, vacío, error, confirmación, aviso, descripciones, 48 dp, fuente al 200 %.
   - **Hecho cuando:** los tests pasan y hay captura.
-  - **Evidencia:** —
+  - **Evidencia:** El mismo `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.*"` → BUILD SUCCESSFUL; `MovementsLocalDataSourceTest` 17 (4 nuevos: borra meses y último medio de la perdida de todos los usuarios y conserva las demás, conjunto vacío, identificadores UUID reales sin confundir familia y usuario, claves ajenas), `MovementsRepositoryImplTest` 57 (8 nuevos: los 7 comunes más el borrado de varios meses, de `movement(...)` y del último medio de pago), `FamilyMembersLocalDataSourceTest` 12 (3 nuevos) y `FamilyMembersRepositoryImplTest` 28 (7 nuevos), 0 fallos. Misma interfaz y mismo esquema que en T-04. La familia se lee de la clave de movimientos (`movements_<familia>_<yyyy-MM>` y `last_payment_method_<usuario>_<familia>`), por lo que los identificadores no pueden llevar `_`; son UUID y hay un test con identificadores reales.
 
 ## Cierre
 
@@ -220,7 +220,7 @@ verificado.
   - **Alcance:** Suite JVM e instrumentada completas y lint; corregir lo que falle. No dejar la app desinstalada del emulador de la persona.
   - **Validación:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` y `./gradlew :app:connectedDebugAndroidTest`.
   - **Hecho cuando:** todo pasa sin avisos nuevos de lint, o cada fallo previo está identificado.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.*"` → BUILD SUCCESSFUL; en `data.categories` y `data.paymentmethods` (leído de `app/build/test-results/testDebugUnitTest`, de esta ejecución): `CategoriesLocalDataSourceTest` 18 y `PaymentMethodsLocalDataSourceTest` 16 (3 nuevos cada uno: borra las que no están y conserva las demás, conjunto vacío, no toca claves que no son de una familia), `CategoriesRepositoryImplTest` 54 y `PaymentMethodsRepositoryImplTest` 39 (7 nuevos cada uno: borra de memoria y disco la perdida y conserva las demás, conjunto vacío, todas vigentes sin cambios, descarga en curso de una perdida que no se guarda y sin esperar a la red, descarga en curso de una vigente que sí se guarda, familia recuperada que vuelve a guardarse, `clear` que olvida el conjunto); 0 fallos. Comprobación de que los tests detectan el fallo: quitando temporalmente la protección en `PaymentMethodsRepositoryImpl` fallaron 2 tests; ya restaurada. `CategoriesRepository` y `PaymentMethodsRepository` ganan `retainFamilies(familyIds: Set<String>)`; los orígenes locales borran las claves `<prefijo><familia>` que no estén en el conjunto. **Desviación del plan:** en vez de una época por familia, cada repositorio recuerda el último conjunto de familias vigentes (`knownFamilyIds`, nulo hasta que se conoce; `clear()` lo reinicia), porque la época por familia no cubre la primera descarga de una familia sin nada guardado; el PLAN lo recoge. Los siete fakes de tests de ViewModels implementan el método sin efecto.
 - [ ] **T-30 · Pruebas manuales con dos cuentas**
   - **Cubre:** CA-01 a CA-29, CA-31 · **Depende de:** T-29
   - **Alcance:** Con el backend local y dos cuentas de prueba: pasos manuales del plan, códigos reales del backend (anotados en `BACKEND_GAPS.md`), modo avión y segundo plano; inspección de `members_cache` y de los almacenes tras perder una familia. Borrar los datos de prueba al terminar.

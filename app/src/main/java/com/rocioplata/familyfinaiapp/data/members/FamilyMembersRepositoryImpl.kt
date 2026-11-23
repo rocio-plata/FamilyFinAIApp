@@ -40,6 +40,13 @@ class FamilyMembersRepositoryImpl(
     private val storageLock = Mutex()
     private var clearEpoch = 0
 
+    // Familias que el backend dice que siguen siendo del usuario (nulo hasta que se sabe). Una descarga en curso de una
+    // que no está no se guarda, aunque no hubiera nada suyo en memoria ni en disco cuando se olvidaron (RF-23).
+    // Solo se lee y escribe con `storageLock`.
+    private var knownFamilyIds: Set<String>? = null
+
+    private fun isKnown(familyId: String) = knownFamilyIds?.contains(familyId) != false
+
     private val refreshLocks = mutableMapOf<String, Mutex>()
     private val lastRefreshResults = mutableMapOf<String, FamilyMembersResult<Unit>>()
 
@@ -77,8 +84,16 @@ class FamilyMembersRepositoryImpl(
     // obtenga en vez de guardarlo tras el borrado.
     override suspend fun clear() = storageLock.withLock {
         clearEpoch++
+        knownFamilyIds = null
         local.clear()
         state.value = emptyMap()
+    }
+
+    // No espera a un refresco en curso: solo toma el candado de escritura, que nunca se mantiene durante la red.
+    override suspend fun retainFamilies(familyIds: Set<String>) = storageLock.withLock {
+        knownFamilyIds = familyIds
+        local.retainFamilies(familyIds)
+        state.update { entries -> entries.filterKeys { it in familyIds } }
     }
 
     private suspend fun fetch(familyId: String): FamilyMembersResult<Unit> {
@@ -96,7 +111,7 @@ class FamilyMembersRepositoryImpl(
         val now = clock()
         storageLock.withLock {
             // Si se borró la caché mientras se esperaba la red, no se guarda nada.
-            if (epoch != clearEpoch) return@withLock
+            if (epoch != clearEpoch || !isKnown(familyId)) return@withLock
             local.save(familyId, session.userId, now, members)
             state.update { it + (familyId to Entry(members, now)) }
         }

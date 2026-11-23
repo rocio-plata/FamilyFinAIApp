@@ -7,6 +7,7 @@ import com.rocioplata.familyfinaiapp.data.header.Cached
 import com.rocioplata.familyfinaiapp.domain.money.Money
 import com.rocioplata.familyfinaiapp.domain.movements.Movement
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -193,5 +194,67 @@ class MovementsLocalDataSourceTest {
 
         assertNull(source.read("f-1", november))
         assertNull(source.lastUsedPaymentMethodId("u-1", "f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_borraMesesYUltimoMedioDeLaPerdida_yConservaLasDemas() = runTest {
+        val source = MovementsLocalDataSource(newStore())
+        source.save("f-1", november, "u-1", 1L, movements)
+        source.save("f-1", october, "u-1", 1L, movements)
+        source.save("f-2", november, "u-1", 2L, movements)
+        source.saveLastUsedPaymentMethodId("u-1", "f-1", "m-1")
+        source.saveLastUsedPaymentMethodId("u-2", "f-1", "m-3")
+        source.saveLastUsedPaymentMethodId("u-1", "f-2", "m-2")
+
+        source.retainFamilies(setOf("f-2"))
+
+        assertNull(source.read("f-1", november))
+        assertNull(source.read("f-1", october))
+        assertEquals(Cached("u-1", 2L, movements), source.read("f-2", november))
+        assertNull(source.lastUsedPaymentMethodId("u-1", "f-1"))
+        assertNull(source.lastUsedPaymentMethodId("u-2", "f-1"))
+        assertEquals("m-2", source.lastUsedPaymentMethodId("u-1", "f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_conjuntoVacio_borraTodasLasFamilias() = runTest {
+        val source = MovementsLocalDataSource(newStore())
+        source.save("f-1", november, "u-1", 1L, movements)
+        source.saveLastUsedPaymentMethodId("u-1", "f-2", "m-2")
+
+        source.retainFamilies(emptySet())
+
+        assertNull(source.read("f-1", november))
+        assertNull(source.lastUsedPaymentMethodId("u-1", "f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_conIdentificadoresDeVerdad_noConfundeFamiliaYUsuario() = runTest {
+        val source = MovementsLocalDataSource(newStore())
+        val keep = "7d0d9a1e-6c54-4b01-90e6-d701748f0851"
+        val lost = "a1a2a3a4-5555-4666-8777-123456789abc"
+        val user = "d290f1ee-6c54-4b01-90e6-d701748f0851"
+        source.save(keep, november, user, 1L, movements)
+        source.save(lost, november, user, 1L, movements)
+        source.saveLastUsedPaymentMethodId(user, keep, "m-1")
+        source.saveLastUsedPaymentMethodId(user, lost, "m-2")
+
+        source.retainFamilies(setOf(keep))
+
+        assertEquals(Cached(user, 1L, movements), source.read(keep, november))
+        assertNull(source.read(lost, november))
+        assertEquals("m-1", source.lastUsedPaymentMethodId(user, keep))
+        assertNull(source.lastUsedPaymentMethodId(user, lost))
+    }
+
+    @Test
+    fun conservarFamilias_noTocaClavesQueNoSonDeUnaFamilia() = runTest {
+        val store = newStore()
+        val source = MovementsLocalDataSource(store)
+        store.edit { it[stringPreferencesKey("otra_clave")] = "x" }
+
+        source.retainFamilies(emptySet())
+
+        assertEquals("x", store.data.first()[stringPreferencesKey("otra_clave")])
     }
 }

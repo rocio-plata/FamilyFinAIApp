@@ -69,6 +69,25 @@ class MovementsLocalDataSource(
         store.edit { it.clear() }
     }
 
+    /**
+     * Borra los meses y el último medio de pago de las familias que no estén en [familyIds] (RF-23 de la 009); las demás
+     * no se tocan. La familia se lee de la clave, así que sus identificadores no pueden llevar `_` (son UUID).
+     */
+    suspend fun retainFamilies(familyIds: Set<String>) {
+        store.edit { prefs ->
+            prefs.asMap().keys
+                .filter { key -> familyOf(key.name)?.let { it !in familyIds } == true }
+                .forEach { prefs.remove(stringPreferencesKey(it.name)) }
+        }
+    }
+
+    // `movements_<familia>_<yyyy-MM>` y `last_payment_method_<usuario>_<familia>`; otras claves no son de una familia.
+    private fun familyOf(keyName: String): String? = when {
+        keyName.startsWith(MONTH_PREFIX) -> keyName.removePrefix(MONTH_PREFIX).substringBeforeLast('_')
+        keyName.startsWith(LAST_PAYMENT_METHOD_PREFIX) -> keyName.substringAfterLast('_')
+        else -> null
+    }
+
     private fun monthKey(familyId: String, month: YearMonth) =
         stringPreferencesKey("$MONTH_PREFIX${familyId}_$month")
 

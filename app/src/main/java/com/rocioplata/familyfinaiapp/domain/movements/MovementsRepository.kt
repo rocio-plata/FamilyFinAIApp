@@ -35,4 +35,10 @@ interface MovementsRepository {
 
     /** Borra los datos guardados y en memoria al terminar la sesión; no espera a la red. */
     suspend fun clear()
+
+    /**
+     * Olvida lo guardado y en memoria de las familias que no estén en [familyIds] (RF-23 de la 009) y no guarda nada
+     * más de ellas hasta que vuelvan a estarlo; las demás no se tocan. No espera a la red.
+     */
+    suspend fun retainFamilies(familyIds: Set<String>)
 }

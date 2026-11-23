@@ -121,4 +121,42 @@ class FamilyMembersLocalDataSourceTest {
         assertFalse(raw.contains("@"))
         assertEquals(true, raw.contains("Valentina Plata"))
     }
+
+    @Test
+    fun conservarFamilias_borraLasQueNoEstan_yConservaLasDemas() = runTest {
+        val source = FamilyMembersLocalDataSource(newStore())
+        source.save("f-1", "u-1", 1L, members)
+        source.save("f-2", "u-1", 2L, members)
+        source.save("f-3", "u-1", 3L, members)
+
+        source.retainFamilies(setOf("f-2", "f-3", "f-9"))
+
+        assertNull(source.read("f-1"))
+        assertEquals(Cached("u-1", 2L, members), source.read("f-2"))
+        assertEquals(Cached("u-1", 3L, members), source.read("f-3"))
+    }
+
+    @Test
+    fun conservarFamilias_conjuntoVacio_borraTodasLasFamilias() = runTest {
+        val source = FamilyMembersLocalDataSource(newStore())
+        source.save("f-1", "u-1", 1L, members)
+        source.save("f-2", "u-1", 2L, members)
+
+        source.retainFamilies(emptySet())
+
+        assertNull(source.read("f-1"))
+        assertNull(source.read("f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_noTocaClavesQueNoSonDeUnaFamilia() = runTest {
+        val store = newStore()
+        val source = FamilyMembersLocalDataSource(store)
+        source.save("f-1", "u-1", 1L, members)
+        store.edit { it[stringPreferencesKey("otra_clave")] = "x" }
+
+        source.retainFamilies(emptySet())
+
+        assertEquals("x", store.data.first()[stringPreferencesKey("otra_clave")])
+    }
 }

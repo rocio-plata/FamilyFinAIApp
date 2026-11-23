@@ -29,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -340,5 +341,99 @@ class FamilyMembersRepositoryImplTest {
 
         val cached = env.local.read("f-1")?.value.orEmpty()
         assertEquals(false, cached.any { it.toString().contains("@") })
+    }
+
+    @Test
+    fun conservarFamilias_borraLaPerdidaDeMemoriaYDisco_yConservaLasDemas() = runTest {
+        val env = env()
+        env.local.save("f-1", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        env.local.save("f-2", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        env.repository.members("f-1").first()
+        val kept = env.repository.members("f-2").first()
+
+        env.repository.retainFamilies(setOf("f-2"))
+
+        assertEquals(FamilyMembersData(), env.repository.members("f-1").first())
+        assertEquals(kept, env.repository.members("f-2").first())
+        assertNull(env.local.read("f-1"))
+        assertNotNull(env.local.read("f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_conjuntoVacio_borraTodasLasFamilias() = runTest {
+        val env = env()
+        env.local.save("f-1", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        env.repository.members("f-1").first()
+
+        env.repository.retainFamilies(emptySet())
+
+        assertEquals(FamilyMembersData(), env.repository.members("f-1").first())
+        assertNull(env.local.read("f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_conTodasVigentes_noCambiaNada() = runTest {
+        val env = env()
+        env.local.save("f-1", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        val before = env.repository.members("f-1").first()
+
+        env.repository.retainFamilies(setOf("f-1", "f-9"))
+
+        assertEquals(before, env.repository.members("f-1").first())
+        assertNotNull(env.local.read("f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_unaDescargaEnCursoDeLaPerdida_noSeGuarda_yNoEsperaALaRed() = runTest {
+        val env = env()
+        env.backend.gate = CompletableDeferred()
+        val refresh = async { env.repository.refresh("f-1") }
+        runCurrent()
+
+        env.repository.retainFamilies(setOf("f-2"))
+        assertFalse(refresh.isCompleted)
+        env.backend.gate!!.complete(Unit)
+        refresh.await()
+
+        assertEquals(FamilyMembersData(), env.repository.members("f-1").first())
+        assertNull(env.local.read("f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_unaDescargaEnCursoDeUnaVigente_sigueGuardandose() = runTest {
+        val env = env()
+        env.backend.gate = CompletableDeferred()
+        val refresh = async { env.repository.refresh("f-2") }
+        runCurrent()
+
+        env.repository.retainFamilies(setOf("f-2"))
+        env.backend.gate!!.complete(Unit)
+        refresh.await()
+
+        assertNotNull(env.local.read("f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_unaFamiliaRecuperada_vuelveAGuardarse() = runTest {
+        val env = env()
+        env.repository.retainFamilies(emptySet())
+        env.repository.refresh("f-1")
+        assertNull(env.local.read("f-1"))
+
+        env.repository.retainFamilies(setOf("f-1"))
+        env.repository.refresh("f-1")
+
+        assertNotNull(env.local.read("f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_clear_olvidaElConjuntoYVuelveAGuardarTodo() = runTest {
+        val env = env()
+        env.repository.retainFamilies(setOf("f-2"))
+        env.repository.clear()
+
+        env.repository.refresh("f-1")
+
+        assertNotNull(env.local.read("f-1"))
     }
 }

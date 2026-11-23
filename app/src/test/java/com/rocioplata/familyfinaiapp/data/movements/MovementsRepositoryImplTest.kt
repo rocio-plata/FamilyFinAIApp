@@ -39,6 +39,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -764,5 +766,121 @@ class MovementsRepositoryImplTest {
 
         assertEquals(MovementsData(), env.repository.movements("f-1", november).first())
         assertNull(env.local.read("f-1", november))
+    }
+
+    @Test
+    fun conservarFamilias_borraLaPerdidaDeMemoriaYDisco_yConservaLasDemas() = runTest {
+        val env = env()
+        env.local.save("f-1", november, "u-1", now - 1.hours.inWholeMilliseconds, ordered)
+        env.local.save("f-2", november, "u-1", now - 1.hours.inWholeMilliseconds, ordered)
+        env.repository.movements("f-1", november).first()
+        val kept = env.repository.movements("f-2", november).first()
+
+        env.repository.retainFamilies(setOf("f-2"))
+
+        assertEquals(MovementsData(), env.repository.movements("f-1", november).first())
+        assertEquals(kept, env.repository.movements("f-2", november).first())
+        assertNull(env.local.read("f-1", november))
+        assertNotNull(env.local.read("f-2", november))
+    }
+
+    @Test
+    fun conservarFamilias_conjuntoVacio_borraTodasLasFamilias() = runTest {
+        val env = env()
+        env.local.save("f-1", november, "u-1", now - 1.hours.inWholeMilliseconds, ordered)
+        env.repository.movements("f-1", november).first()
+
+        env.repository.retainFamilies(emptySet())
+
+        assertEquals(MovementsData(), env.repository.movements("f-1", november).first())
+        assertNull(env.local.read("f-1", november))
+    }
+
+    @Test
+    fun conservarFamilias_conTodasVigentes_noCambiaNada() = runTest {
+        val env = env()
+        env.local.save("f-1", november, "u-1", now - 1.hours.inWholeMilliseconds, ordered)
+        val before = env.repository.movements("f-1", november).first()
+
+        env.repository.retainFamilies(setOf("f-1", "f-9"))
+
+        assertEquals(before, env.repository.movements("f-1", november).first())
+        assertNotNull(env.local.read("f-1", november))
+    }
+
+    @Test
+    fun conservarFamilias_unaDescargaEnCursoDeLaPerdida_noSeGuarda_yNoEsperaALaRed() = runTest {
+        val env = env()
+        env.backend.gate = CompletableDeferred()
+        val refresh = async { env.repository.refresh("f-1", november) }
+        runCurrent()
+
+        env.repository.retainFamilies(setOf("f-2"))
+        assertFalse(refresh.isCompleted)
+        env.backend.gate!!.complete(Unit)
+        refresh.await()
+
+        assertEquals(MovementsData(), env.repository.movements("f-1", november).first())
+        assertNull(env.local.read("f-1", november))
+    }
+
+    @Test
+    fun conservarFamilias_unaDescargaEnCursoDeUnaVigente_sigueGuardandose() = runTest {
+        val env = env()
+        env.backend.gate = CompletableDeferred()
+        val refresh = async { env.repository.refresh("f-2", november) }
+        runCurrent()
+
+        env.repository.retainFamilies(setOf("f-2"))
+        env.backend.gate!!.complete(Unit)
+        refresh.await()
+
+        assertNotNull(env.local.read("f-2", november))
+    }
+
+    @Test
+    fun conservarFamilias_unaFamiliaRecuperada_vuelveAGuardarse() = runTest {
+        val env = env()
+        env.repository.retainFamilies(emptySet())
+        env.repository.refresh("f-1", november)
+        assertNull(env.local.read("f-1", november))
+
+        env.repository.retainFamilies(setOf("f-1"))
+        env.repository.refresh("f-1", november)
+
+        assertNotNull(env.local.read("f-1", november))
+    }
+
+    @Test
+    fun conservarFamilias_clear_olvidaElConjuntoYVuelveAGuardarTodo() = runTest {
+        val env = env()
+        env.repository.retainFamilies(setOf("f-2"))
+        env.repository.clear()
+
+        env.repository.refresh("f-1", november)
+
+        assertNotNull(env.local.read("f-1", november))
+    }
+
+    @Test
+    fun conservarFamilias_borraTodosLosMesesYElUltimoMedioDeLaPerdida() = runTest {
+        val env = env()
+        env.local.save("f-1", november, "u-1", now, ordered)
+        env.local.save("f-1", october, "u-1", now, ordered)
+        env.local.save("f-2", november, "u-1", now, ordered)
+        env.local.saveLastUsedPaymentMethodId("u-1", "f-1", "m-1")
+        env.local.saveLastUsedPaymentMethodId("u-1", "f-2", "m-2")
+        env.repository.movements("f-1", november).first()
+        env.repository.movements("f-1", october).first()
+
+        env.repository.retainFamilies(setOf("f-2"))
+
+        assertEquals(MovementsData(), env.repository.movements("f-1", november).first())
+        assertEquals(MovementsData(), env.repository.movements("f-1", october).first())
+        assertNull(env.local.read("f-1", october))
+        assertNull(env.repository.movement("f-1", "b").first())
+        assertNull(env.repository.lastUsedPaymentMethodId("f-1"))
+        assertEquals("m-2", env.repository.lastUsedPaymentMethodId("f-2"))
+        assertNotNull(env.local.read("f-2", november))
     }
 }

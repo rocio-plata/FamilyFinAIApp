@@ -9,6 +9,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -194,5 +195,43 @@ class CategoriesLocalDataSourceTest {
 
         assertNull(source.read("f-1"))
         assertEquals(Cached("u-1", 2L, categories), source.read("f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_borraLasQueNoEstan_yConservaLasDemas() = runTest {
+        val source = CategoriesLocalDataSource(newStore())
+        source.save("f-1", "u-1", 1L, categories)
+        source.save("f-2", "u-1", 2L, categories)
+        source.save("f-3", "u-1", 3L, categories)
+
+        source.retainFamilies(setOf("f-2", "f-3", "f-9"))
+
+        assertNull(source.read("f-1"))
+        assertEquals(Cached("u-1", 2L, categories), source.read("f-2"))
+        assertEquals(Cached("u-1", 3L, categories), source.read("f-3"))
+    }
+
+    @Test
+    fun conservarFamilias_conjuntoVacio_borraTodasLasFamilias() = runTest {
+        val source = CategoriesLocalDataSource(newStore())
+        source.save("f-1", "u-1", 1L, categories)
+        source.save("f-2", "u-1", 2L, categories)
+
+        source.retainFamilies(emptySet())
+
+        assertNull(source.read("f-1"))
+        assertNull(source.read("f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_noTocaClavesQueNoSonDeUnaFamilia() = runTest {
+        val store = newStore()
+        val source = CategoriesLocalDataSource(store)
+        source.save("f-1", "u-1", 1L, categories)
+        store.edit { it[stringPreferencesKey("otra_clave")] = "x" }
+
+        source.retainFamilies(emptySet())
+
+        assertEquals("x", store.data.first()[stringPreferencesKey("otra_clave")])
     }
 }

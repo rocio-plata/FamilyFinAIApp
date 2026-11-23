@@ -99,6 +99,7 @@ internal class FakeMovements : MovementsRepository {
     }
     override suspend fun lastUsedPaymentMethodId(familyId: String): String? = lastUsedPaymentMethodId
     override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }
 
 internal class FakeCategories : CategoriesRepository {
@@ -124,6 +125,7 @@ internal class FakeCategories : CategoriesRepository {
     override suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
     override suspend fun deleteTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
     override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }
 
 internal class FakePaymentMethods : PaymentMethodsRepository {
@@ -142,6 +144,7 @@ internal class FakePaymentMethods : PaymentMethodsRepository {
     override suspend fun deprecatePaymentMethod(familyId: String, paymentMethodId: String) = error("No se usa")
     override suspend fun deletePaymentMethod(familyId: String, paymentMethodId: String) = error("No se usa")
     override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }
 
 internal class FakeMembers : FamilyMembersRepository {
@@ -153,6 +156,7 @@ internal class FakeMembers : FamilyMembersRepository {
         return FamilyMembersResult.Success(Unit)
     }
     override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }
 
 internal class FakeConnectivity : ConnectivityObserver {
