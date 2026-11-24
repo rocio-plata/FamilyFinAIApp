@@ -8,8 +8,12 @@ las TASKS de cada una.
 
 - Cada funcionalidad sigue el flujo SDD de `AGENTS.md`: `SPEC.md` → aprobación →
   `PLAN.md` → aprobación → `TASKS.md` → implementación con evidencia.
-- Sus documentos viven en `docs/features/<NNN>-<nombre>/`. El número `NNN` se
-  asigna cuando se crea la carpeta, siguiendo el orden en que se aborda.
+- Sus documentos viven en `docs/features/<NNN>-<nombre>/`. **El número `NNN` es
+  siempre el de la columna «Orden» de este documento** (por ejemplo, la fila 10
+  vive en `010-…`). Una funcionalidad nueva se inserta en el orden que le
+  corresponda y las posteriores que aún no tienen carpeta se renumeran en el
+  mismo cambio; las que ya tienen carpeta nunca cambian de número. Mientras una
+  fila no tiene carpeta, su columna «Carpeta» muestra solo el nombre.
 - El alcance de cada paso es orientativo: lo fija su SPEC. Si una SPEC cambia el
   alcance o el orden, se actualiza este documento en el mismo cambio.
 - Una funcionalidad se especifica cuando los endpoints que necesita existen o su
@@ -27,17 +31,18 @@ las TASKS de cada una.
 | 2 | Cabecera principal | `002-main-header` | Hecha | Ya usa la sesión real de la 003; su caché se vacía al terminar la sesión. Pendientes de verificar: TalkBack y CA-18 con dos cuentas reales |
 | 3 | Autenticación y sesión | `003-auth` | Hecha | BG-01: el registro del backend permite enumerar emails. Sin verificar: CA-03, CA-12 y CA-21 de extremo a extremo y TalkBack con voz |
 | 4 | Identidad visual de la app | `004-brand-identity` | Hecha | CA-06 sin verificar: no se logró ver la pantalla de arranque del sistema |
-| 5 | Categorías y tags | `005-categories` | Hecha | Listado, alta, edición, archivar, eliminar y tags (con reordenado). BG-01: el backend no permite reactivar lo archivado. BG-02 a BG-04: la categoría no tiene color, fecha de archivado ni orden modificable. BG-05: sin categorías de ingreso por defecto. BG-06: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*`. BG-07: el nombre duplicado se rechaza entre tipos. Sin verificar de extremo a extremo: CA-07, los casos «con movimientos» de CA-12 y CA-17, CA-19 con datos de más de 24 h o sin datos, rol Integrante y TalkBack |
+| 5 | Categorías y tags | `005-categories` | Hecha | Listado, alta, edición, archivar, eliminar y tags (con reordenado). BG-01, BG-03 y BG-04: el backend ya permite reactivar, informa la fecha de archivado y reordena categorías (2026-11-24), pero la app aún no lo usa y falta una spec. BG-02: el color ya lo guarda el backend y lo usa la 008. BG-05: el backend ya crea 3 categorías de ingreso por defecto. BG-06: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*`. BG-07: resuelta en el backend, el duplicado se evalúa por tipo. Sin verificar de extremo a extremo: CA-07, los casos «con movimientos» de CA-12 y CA-17, CA-19 con datos de más de 24 h o sin datos, rol Integrante y TalkBack |
 | 6 | Medios de pago | `006-payment-methods` | Hecha | Listado, alta, renombrado, archivar y eliminar. BG-01: el backend no permite leer el medio predeterminado, que pasa a «Perfil y ajustes». BG-02: no se puede reactivar lo archivado. BG-04: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*` (confirmado en ejecución). BG-07: el backend permite renombrar un archivado, que la app no ofrece. Sin verificar de extremo a extremo: CA-14 («Efectivo» es predeterminado), CA-06 (Integrante), el caso «con movimientos» de CA-13 y CA-15 sin copia o con datos de más de 24 h. Sin verificar manualmente: TalkBack, fuente máxima con teclado, foco automático del campo y atrás o tocar fuera con el formulario abierto |
 | 7 | Movimientos | `007-financial-items` | Hecha | Listado por mes con resumen, filtro por tipo y subtotales por día; alta, detalle, edición y eliminación; miembros de la familia para mostrar quién registró; moneda de la familia; pestaña seleccionada en `MainViewModel`. BG-06: el backend no tiene consulta individual y el detalle sale de los meses cargados. BG-07: el backend emite `FINANCIAL_TRACKING.*` en vez de `FINANCIAL.*` (sin comprobar el prefijo real en ejecución). BG-11: el backend no admite movimientos con fecha futura (a pedir). Verificado en el emulador con el backend local (2026-11-17), con los matices de la tabla de `TASKS.md`: CA-01 a CA-11, CA-13, CA-14, CA-16, CA-17, CA-19, CA-20, CA-21, CA-23, CA-25 y CA-26, y la parte propia de CA-24. Sin verificar de extremo a extremo: CA-15 y los casos de otro miembro y «Ex-miembro» de CA-24 (sin segunda cuenta en la familia), CA-12 y CA-22 (medio, categoría o etiqueta archivados por otra sesión), CA-18, CA-16 con datos de más de 24 h, la elección de etiqueta con datos reales y TalkBack |
 | 8 | Dashboard | `008-dashboard` | Hecha | Inicio con resumen del mes, gráfico y categorías, comparación con el mes anterior, alta desde una categoría y monto del mes por medio de pago; calculado en la app con los movimientos del mes. Color de categoría elegible (BG-01, resuelta en el backend). Sin verificar: TalkBack y el cambio entre dos familias (ver `TASKS.md`) |
-| 9 | Gestión de familias | `009-family-management` | Tareas | BG-01: el backend no permite a un Integrante salir de una familia (bloquea solo ese requisito). BG-02: no hay operación para renombrar ni eliminar una familia |
-| 10 | Presupuestos | `budgets` | Pendiente | |
-| 11 | Reportes | `reports` | Pendiente | |
-| 12 | Registro por texto con IA | `ai-text-entry` | Pendiente | |
-| 13 | Registro por recibo con IA | `ai-receipt-entry` | Pendiente | |
-| 14 | Asistente | `assistant` | Pendiente | |
-| 15 | Perfil y ajustes | `profile` | Pendiente | |
+| 9 | Gestión de familias | `009-family-management` | En curso | Implementada (T-01 a T-29); faltan el paso manual de T-24 y las pruebas manuales con dos cuentas y de accesibilidad (T-30, T-31). BG-01, BG-04 y BG-07: resueltas en el backend el 2026-11-24 (rama `feat/families-management-gaps`, sin mergear a `main`); falta verificar en ejecución que un Integrante salga. BG-02: no hay operación para renombrar ni eliminar una familia |
+| 10 | Categorías reversibles | `010-categories-reversible` | Spec | Borrador: reactivar categorías y tags archivados, «Archivada en …» y reordenar categorías (el backend lo permite desde el 2026-11-24: BG-01, BG-03 y BG-04 de la 005). Sin decisiones pendientes |
+| 11 | Presupuestos | `budgets` | Pendiente | |
+| 12 | Reportes | `reports` | Pendiente | |
+| 13 | Registro por texto con IA | `ai-text-entry` | Pendiente | |
+| 14 | Registro por recibo con IA | `ai-receipt-entry` | Pendiente | |
+| 15 | Asistente | `assistant` | Pendiente | |
+| 16 | Perfil y ajustes | `profile` | Pendiente | |
 
 ## Detalle por paso
 
@@ -118,43 +123,55 @@ el sistema muestre el icono nuevo (CA-06).
   aceptar y rechazar), crear familia, reordenar familias, salir de una familia y
   cambiar su moneda. Completa lo que la cabecera solo muestra.
 - **Depende de:** auth.
+- **Decisiones que fuerza:** resueltas en la 009: la cabecera es la fuente de verdad de las familias (cambios locales con
+  versión por recurso), lo guardado de las familias que se pierden se borra del dispositivo (`retainFamilies`), el selector
+  se abre siempre, los correos de los miembros no se guardan y la moneda forma parte de las claves de los ViewModels de
+  Movimientos y Dashboard.
 - **Backend:** Family & Access.
 
-### 10. Presupuestos
+### 10. Categorías reversibles
+
+- **Alcance orientativo:** reactivar categorías y tags archivados (quedan como
+  los últimos de las activas), quitar la advertencia de «irreversible» de la 005,
+  mostrar «Archivada en …» y reordenar categorías.
+- **Depende de:** categorías (005). Usa lo que el backend publicó el 2026-11-24.
+- **Backend:** Financial Tracking.
+
+### 11. Presupuestos
 
 - **Alcance orientativo:** presupuestos mensuales por categoría y su progreso.
 - **Depende de:** categorías y movimientos.
 - **Backend:** Budgeting.
 
-### 11. Reportes
+### 12. Reportes
 
 - **Alcance orientativo:** gráficos, comparativas y drill-down.
 - **Depende de:** movimientos.
 - **Decisiones que fuerza:** cómo dibujar los gráficos (donut y barras).
 - **Backend:** Reporting.
 
-### 12. Registro por texto con IA
+### 13. Registro por texto con IA
 
 - **Alcance orientativo:** texto libre → movimiento sugerido, editable, con
   badge "Sugerido por IA" y confirmación explícita.
 - **Depende de:** movimientos (reutiliza su formulario).
 - **Backend:** AI Assistance.
 
-### 13. Registro por recibo con IA
+### 14. Registro por recibo con IA
 
 - **Alcance orientativo:** foto de recibo → un gasto sugerido por recibo.
 - **Depende de:** registro por texto (mismo flujo de confirmación).
 - **Decisiones que fuerza:** cámara, permisos y compresión previa al envío.
 - **Backend:** AI Assistance.
 
-### 14. Asistente
+### 15. Asistente
 
 - **Alcance orientativo:** consultas en lenguaje natural, insights y
   recomendaciones.
 - **Depende de:** movimientos; se beneficia de presupuestos y reportes.
 - **Backend:** AI Assistance.
 
-### 15. Perfil y ajustes
+### 16. Perfil y ajustes
 
 - **Alcance orientativo:** datos de perfil, ajustes y medio de pago
   predeterminado del usuario por familia (requiere que el backend permita

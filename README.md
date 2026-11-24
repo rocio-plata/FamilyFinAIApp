@@ -35,7 +35,7 @@ Este repositorio contiene el cliente móvil. Se construye con **Spec-Driven Deve
 
 La moneda es la de cada familia (**CLP** por defecto). El dinero se maneja siempre como un entero en la unidad menor de la moneda, nunca como `Double`.
 
-> Hoy la app ya permite registrarse e iniciar sesión, cambiar de familia, gestionar categorías, tags y medios de pago, y llevar los movimientos de cada mes (alta, listado con resumen y filtro, detalle, edición y eliminación). El resto (dashboard, presupuestos, reportes, IA, etc.) está por construir: ver la sección *Features y estado*.
+> Hoy la app ya permite registrarse e iniciar sesión, cambiar de familia, gestionar categorías, tags y medios de pago, llevar los movimientos de cada mes (alta, listado con resumen y filtro, detalle, edición y eliminación), ver el dashboard del mes y gestionar las familias (crear, reordenar, miembros y roles, invitaciones enviadas y recibidas, moneda y salir; el backend ya permite salir también a un Integrante, BG-01, aún sin verificar en ejecución). El resto (presupuestos, reportes, IA, etc.) está por construir: ver la sección *Features y estado*.
 
 ----------
 
@@ -140,7 +140,7 @@ Los tests JVM están en `app/src/test/…` (corrutinas, `ktor-client-mock`) y lo
 2. **Autenticación:** access token de corta duración y refresh token con rotación. Si el refresh falla o se detecta reuso, la sesión se cierra y se vuelve al login.
 3. **Los roles (Owner / Member) se respetan en la UI**, pero la autorización real siempre la hace el backend.
 4. **Lo que propone la IA nunca se guarda solo:** se muestra editable con badge "Sugerido por IA" y botón "Confirmar".
-5. **Categorías, tags y medios de pago archivados** siguen visibles en lo que ya los usa, marcados como "Archivada" o "Archivado". El backend no permite reactivarlos.
+5. **Categorías, tags y medios de pago archivados** siguen visibles en lo que ya los usa, marcados como "Archivada" o "Archivado". La app no permite reactivarlos todavía (el backend ya lo permite para categorías y tags desde el 2026-11-24; falta especificarlo).
 6. Los **íconos de categoría** llegan de la API como una clave de texto. Hay un catálogo de 15 y la app tolera una categoría sin ícono o con uno desconocido (ícono genérico).
 7. Los errores del backend llegan con un `code` de dominio: la app los traduce a mensajes comprensibles, sin mostrar errores técnicos. Hoy el backend emite `FINANCIAL_TRACKING.*` aunque el contrato documente `FINANCIAL.*`: la app acepta ambos prefijos.
 8. **Los cambios requieren conexión:** sin red se avisa y se conserva lo escrito; no hay cola offline.
@@ -160,14 +160,17 @@ Cada feature tiene su carpeta en `docs/features/` y recorre SPEC → PLAN → TA
 | 5 | Categorías y tags | `005-categories` | ✅ | Financial Tracking |
 | 6 | Medios de pago | `006-payment-methods` | ✅ | Financial Tracking |
 | 7 | Movimientos: alta, listado, detalle, edición y eliminación | `007-financial-items` | ✅ | Financial Tracking |
-| 8 | Dashboard | `dashboard` | ⏳ | Financial Tracking |
-| 9 | Gestión de familias: miembros, roles, invitaciones | `family-management` | ⏳ | Family & Access |
-| 10 | Presupuestos | `budgets` | ⏳ | Budgeting |
-| 11 | Reportes | `reports` | ⏳ | Reporting |
-| 12 | Registro por texto con IA | `ai-text-entry` | ⏳ | AI Assistance |
-| 13 | Registro por recibo con IA | `ai-receipt-entry` | ⏳ | AI Assistance |
-| 14 | Asistente: chat e insights | `assistant` | ⏳ | AI Assistance |
-| 15 | Perfil y ajustes | `profile` | ⏳ | Identity |
+| 8 | Dashboard | `008-dashboard` | ✅ | Financial Tracking |
+| 9 | Gestión de familias: miembros, roles, invitaciones | `009-family-management` | 🚧 | Family & Access |
+| 10 | Categorías reversibles: reactivar categorías y tags | `010-categories-reversible` | 📝 | Financial Tracking |
+| 11 | Presupuestos | `budgets` | ⏳ | Budgeting |
+| 12 | Reportes | `reports` | ⏳ | Reporting |
+| 13 | Registro por texto con IA | `ai-text-entry` | ⏳ | AI Assistance |
+| 14 | Registro por recibo con IA | `ai-receipt-entry` | ⏳ | AI Assistance |
+| 15 | Asistente: chat e insights | `assistant` | ⏳ | AI Assistance |
+| 16 | Perfil y ajustes | `profile` | ⏳ | Identity |
+
+El número de cada fila es el de su carpeta en `docs/features/` y el de `docs/ROADMAP.md`. Estados: ✅ hecha · 🚧 en curso · 📝 con spec · ⏳ pendiente.
 
 > [!NOTE]
 > El orden depende del avance del backend: una feature de la app se especifica cuando los endpoints que necesita existen o su contrato está acordado. Reportes, Presupuestos y la IA real se abordan al final. La IA empieza con un adaptador *fake* determinista en el backend.
