@@ -119,7 +119,7 @@ criterios, decisiones del plan y tareas. -->
   familia activa, con confirmación. Al salir, la familia desaparece del selector y la favorita pasa
   a ser la activa. No se puede salir de la única familia que se tiene, ni si se
   es su único Propietario: la acción aparece deshabilitada con el motivo.
-  (Requiere un cambio en el backend para el Integrante: BG-01.)
+  (El backend ya lo permite al Integrante desde el 2026-11-24: BG-01.)
 
 **Moneda**
 
@@ -295,7 +295,7 @@ No conviertas una preferencia del agente en una restricción. -->
 - Se trabaja en la rama `feature/009-family-management`.
 - Los datos provienen del backend según `docs/backend/api-contract.md` §3.3 y
   `docs/backend/openapi.yaml`; las brechas están en `BACKEND_GAPS.md`. Solo RF-12
-  depende de un cambio en el backend (BG-01).
+  dependía de un cambio en el backend (BG-01, resuelta el 2026-11-24).
 - Referencia visual de estilo y disposición, no vinculante:
   `docs/ui/snapshots/009-selector-familia.png`, `009-nueva-familia.png`,
   `009-gestion-familia.png` y `009-notificaciones-familias.png`, junto con
@@ -402,7 +402,7 @@ Ninguna. Confirmadas por la persona el 2026-11-22 e incorporadas al texto:
 - **P-06:** El selector se abre siempre, también con una sola familia, para
   poder gestionarla (RF-01; modifica RF-02 y CA-19 de la 002).
 - **P-07:** Un Integrante también puede salir de una familia (RF-12); el backend
-  aún no lo permite y se registra como BG-01.
+  no lo permitía y se registró como BG-01 (resuelta en el backend el 2026-11-24).
 
 <!-- ANTES DE SOLICITAR APROBACIÓN
 Comprueba que el alcance está acordado, los flujos son coherentes, los puntos

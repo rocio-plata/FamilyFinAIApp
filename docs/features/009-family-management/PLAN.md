@@ -395,9 +395,8 @@ Escribe Ninguna en las decisiones pendientes cuando estén resueltas. -->
 
 - **Riesgos y medidas acordadas:**
   - *BG-01.* «Salir» se implementa para ambos roles sobre
-    `DELETE …/members/<propio>`, que hoy funciona para el Propietario. Mientras
-    el backend no lo permita al Integrante, este verá el aviso de rol
-    insuficiente. Si el backend elige otra ruta solo cambia el origen remoto.
+    `DELETE …/members/<propio>`, que funcionaba para el Propietario. El backend
+    lo permite también al Integrante desde el 2026-11-24 (misma ruta, `e8271db`).
     RF-12 no se dará por cumplido hasta comprobarlo.
   - *Refresco contra cambio local.* Es el riesgo principal: hay refrescos al
     iniciar, en `ON_START` y al recuperar red. Medida: versión por recurso con

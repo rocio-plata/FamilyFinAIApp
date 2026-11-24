@@ -11,9 +11,10 @@ Rutas relativas a `app/src/main/java/com/rocioplata/familyfinaiapp/` salvo
 indicación. Los tests JVM van en `app/src/test/…` y los de UI en
 `app/src/androidTest/…`, en el mismo paquete que lo que prueban.
 
-**Dependencia externa:** RF-12 para el Integrante (CA-14) está bloqueado por
-BG-01 (`BACKEND_GAPS.md`). No impide implementar ninguna tarea, pero sí darlo por
-verificado.
+**Dependencia externa:** RF-12 para el Integrante (CA-14) dependía de
+BG-01 (`BACKEND_GAPS.md`), resuelta en el backend el 2026-11-24 (rama
+`feat/families-management-gaps`, sin mergear a `main`). Falta verificarlo en
+ejecución con un Integrante real (T-30).
 
 ## Cabecera
 
@@ -215,16 +216,16 @@ verificado.
 
 ## Cierre
 
-- [ ] **T-29 · Comprobaciones automáticas completas**
+- [x] **T-29 · Comprobaciones automáticas completas**
   - **Cubre:** Regresión y CA-30 a CA-32 · **Depende de:** T-06, T-20, T-24, T-26, T-28
   - **Alcance:** Suite JVM e instrumentada completas y lint; corregir lo que falle. No dejar la app desinstalada del emulador de la persona.
   - **Validación:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` y `./gradlew :app:connectedDebugAndroidTest`.
   - **Hecho cuando:** todo pasa sin avisos nuevos de lint, o cada fallo previo está identificado.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --rerun-tasks` → BUILD SUCCESSFUL; JVM 1547 tests, 0 fallos, 0 errores, 0 omitidos. Lint: 0 errores y 26 avisos (`lint-results-debug.xml`), todos de versiones de dependencias y AGP, `OldTargetApi`, `RedundantLabel`, `LockedOrientationActivity`, `DiscouragedApi`, `Typos` («momento», falso positivo en español) y `UnusedResources` de `auth_message_logout_needs_connection` (anterior a la 009). El `UnusedResources` nuevo de la 009 (`family_selector_handle_description`) se eliminó. `./gradlew :app:connectedDebugAndroidTest` en `Pixel_9` (solo ese emulador): 534 tests, 0 fallos, 0 errores, 1 omitido (en el commit base `606fa54` la suite completa da 386 tests, 0 fallos, 1 omitido, así que el omitido no es nuevo). **Fallo encontrado y corregido:** una ejecución previa de la suite completa falló siempre en `MovementFormContentTest.backWithTheDiscardDialogOpenKeepsEditing` (sin foco de ventana o `pressBack` que cerraba el teclado) y pasaba sola (37/0 en la base y 2 veces en la rama). Causa: `FamilyCreateContentTest` e `InviteMemberDialogTest` (nuevos) dejaban el teclado abierto al terminar y el test siguiente de la suite lo encontraba así; reproducido con esas cuatro clases de `ui.family` más `MovementFormContentTest` (150 tests, 1 fallo) y corregido con un `@After` que cierra el teclado en las dos clases (150 tests, 0 fallos; suite completa 534/0). Nota: T-24 sigue con su paso manual pendiente.
 - [ ] **T-30 · Pruebas manuales con dos cuentas**
   - **Cubre:** CA-01 a CA-29, CA-31 · **Depende de:** T-29
   - **Alcance:** Con el backend local y dos cuentas de prueba: pasos manuales del plan, códigos reales del backend (anotados en `BACKEND_GAPS.md`), modo avión y segundo plano; inspección de `members_cache` y de los almacenes tras perder una familia. Borrar los datos de prueba al terminar.
-  - **Validación:** tabla por criterio con resultado y captura. CA-14 como Integrante requiere BG-01; CA-21 y el caso vencida de CA-25, solo si se ajusta la fecha en la base local.
+  - **Validación:** tabla por criterio con resultado y captura. CA-14 como Integrante requiere el backend con BG-01 resuelta (rama `feat/families-management-gaps`); CA-21 y el caso vencida de CA-25, solo si se ajusta la fecha en la base local.
   - **Hecho cuando:** cada criterio está verificado o marcado como no verificado con su motivo.
   - **Evidencia:** —
 - [ ] **T-31 · Accesibilidad manual**
@@ -238,4 +239,4 @@ verificado.
   - **Alcance:** `AGENTS.md` (capas, rutas, borrado de familias perdidas, versión por recurso, claves con moneda), `docs/ROADMAP.md`, `README.md` y `BACKEND_GAPS.md`. `CLAUDE.md` no se toca. El contrato solo si el backend publica BG-01.
   - **Validación:** revisar referencias y que cada CA apunte a su evidencia.
   - **Hecho cuando:** los documentos coinciden con lo implementado.
-  - **Evidencia:** —
+  - **Evidencia:** **Parcial: se escribió con lo implementado hasta T-29; faltan T-30 y T-31 (manuales) y revisar los documentos con sus resultados.** `AGENTS.md`: nuevo apartado «Gestión de familias» (capas, resultados tipados y `Offline`, cabecera como fuente de verdad con versión por recurso, `retainFamilies`/`knownFamilyIds` y la desviación del PLAN, correos solo en memoria, comprobación tras un fallo de red incierto, moneda en las claves de ViewModels, nombres `Received…`, límites BG-01/05/08), la sección de navegación con `FamilyRoute.Manage/Create`, `InvitationsRoute`, selector siempre abierto y aviso `NoLongerMember`, y la nota de tests sobre cerrar el teclado. `docs/ROADMAP.md`: la 009 pasa a «En curso» con sus decisiones. `README.md`: la 008 pasa a ✅ y la 009 a 🚧, y se actualiza el resumen de lo que ya hace la app. `BACKEND_GAPS.md` se actualizó el 2026-11-24 (BG-01, BG-04 y BG-07 resueltas en el backend; BG-06 parcial); el contrato local no se sincronizó. `CLAUDE.md` no se tocó. Pendiente: pasar la 009 a «Hecha» y registrar los resultados de T-24, T-30 y T-31 cuando se hagan.
