@@ -34,3 +34,13 @@ fun FamilyCreateError.messageRes(): Int = when (this) {
     FamilyCreateError.Duplicate -> R.string.family_create_error_duplicate
     is FamilyCreateError.Failure -> failure.messageRes()
 }
+
+@StringRes
+fun InviteFormError.messageRes(): Int = when (this) {
+    InviteFormError.Required -> R.string.family_invite_error_required
+    InviteFormError.InvalidFormat -> R.string.family_invite_error_invalid
+    InviteFormError.TooLong -> R.string.family_invite_error_too_long
+    InviteFormError.AlreadyInvited -> R.string.family_invite_error_already_invited
+    InviteFormError.AlreadyMember -> R.string.family_invite_error_already_member
+    is InviteFormError.Failure -> failure.messageRes()
+}

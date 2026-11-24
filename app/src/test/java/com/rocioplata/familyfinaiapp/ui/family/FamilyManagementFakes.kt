@@ -80,6 +80,23 @@ internal class RecordingManagement(
     var failure: FamilyAccessFailure? = null
     var gate: CompletableDeferred<Unit>? = null
 
+    /** Ajustes que devuelve el backend; cambiarlos entre llamadas simula un bloqueo entretanto. */
+    var settingsResult: FamilyAccessResult<FamilySettings> = FamilyAccessResult.Success(FamilySettings("CLP", false, emptySet()))
+    var settingsGate: CompletableDeferred<Unit>? = null
+    var settingsCalls = 0
+    val currencyChanges = mutableListOf<Pair<String, String>>()
+
+    override suspend fun settings(familyId: String): FamilyAccessResult<FamilySettings> {
+        settingsCalls++
+        settingsGate?.await()
+        return settingsResult
+    }
+
+    override suspend fun changeCurrency(familyId: String, currency: String): FamilyAccessResult<Unit> {
+        currencyChanges += familyId to currency
+        return result(Unit) { header.updateFamily(familyId) { it.copy(currency = currency) } }
+    }
+
     private suspend fun <T> result(value: T, apply: suspend () -> Unit): FamilyAccessResult<T> {
         gate?.await()
         failure?.let { return FamilyAccessResult.Failure(it) }
@@ -105,13 +122,39 @@ internal class RecordingManagement(
         return result(Unit) { header.removeFamily(familyId) }
     }
 
+    // --- Invitaciones enviadas: `sentList` hace de backend ---
+    val sentList = mutableListOf<SentInvitation>()
+    var sentFailure: FamilyAccessFailure? = null
+    var sentGate: CompletableDeferred<Unit>? = null
+    var sentCalls = 0
+    val invites = mutableListOf<Triple<String, String, FamilyRole>>()
+    val revokes = mutableListOf<String>()
+
+    /** Con un fallo de `invite`, la invitación llega a crearse igualmente (un fallo de red incierto). */
+    var inviteAppliesBeforeFailing = false
+    private var inviteCounter = 0
+
+    override suspend fun sentInvitations(familyId: String): FamilyAccessResult<List<SentInvitation>> {
+        sentCalls++
+        sentGate?.await()
+        sentFailure?.let { return FamilyAccessResult.Failure(it) }
+        return FamilyAccessResult.Success(sentList.toList())
+    }
+
+    override suspend fun invite(familyId: String, email: String, role: FamilyRole): FamilyAccessResult<SentInvitation> {
+        invites += Triple(familyId, email, role)
+        val created = SentInvitation("i-new-${++inviteCounter}", email, role, java.time.Instant.parse("2026-11-29T12:00:00Z"))
+        if (inviteAppliesBeforeFailing && failure != null) sentList += created
+        return result(created) { sentList += created }
+    }
+
+    override suspend fun revokeInvitation(invitationId: String): FamilyAccessResult<Unit> {
+        revokes += invitationId
+        return result(Unit) { sentList.removeAll { it.id == invitationId } }
+    }
+
     override suspend fun createFamily(name: String): FamilyAccessResult<Family> = error("no se usa")
     override suspend fun reorderFamilies(orderedFamilyIds: List<String>): FamilyAccessResult<Unit> = error("no se usa")
-    override suspend fun settings(familyId: String): FamilyAccessResult<FamilySettings> = error("no se usa")
-    override suspend fun changeCurrency(familyId: String, currency: String): FamilyAccessResult<Unit> = error("no se usa")
-    override suspend fun sentInvitations(familyId: String): FamilyAccessResult<List<SentInvitation>> = error("no se usa")
-    override suspend fun invite(familyId: String, email: String, role: FamilyRole): FamilyAccessResult<SentInvitation> = error("no se usa")
-    override suspend fun revokeInvitation(invitationId: String): FamilyAccessResult<Unit> = error("no se usa")
 }
 
 internal class ControllableConnectivity(initial: Boolean = true) : ConnectivityObserver {

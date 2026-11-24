@@ -83,7 +83,8 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                 DashboardScreen(
                     familyId = family.id,
                     currency = family.currency,
-                    viewModelKey = "${viewModelKey ?: "main"}-dashboard-${family.id}-${uiState.activeFamilyInstance}",
+                    // La moneda va en la clave: al cambiarla en «Mi familia» el dashboard se rehace con la nueva (RF-13).
+                    viewModelKey = "${viewModelKey ?: "main"}-dashboard-${family.id}-${uiState.activeFamilyInstance}-${family.currency}",
                     onCategoryClick = { categoryId, type -> viewModel.openMovementCreate(categoryId, type) },
                     onManageCategories = viewModel::openCategories,
                     onManagePaymentMethods = viewModel::openPaymentMethods,
@@ -103,7 +104,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     familyId = family.id,
                     currency = family.currency,
                     currentUserId = (session as? SessionState.SignedIn)?.userId,
-                    viewModelKey = "${viewModelKey ?: "main"}-movements-${family.id}",
+                    viewModelKey = "${viewModelKey ?: "main"}-movements-${family.id}-${family.currency}",
                     onMovementClick = viewModel::openMovementDetail,
                     onInsufficientRole = viewModel::onInsufficientRole,
                     modifier = contentModifier,

@@ -192,6 +192,60 @@
     <string name="family_create_title">Nueva familia</string>
     <string name="invitations_title">Invitaciones</string>
 
+    <string name="family_currency_title">Moneda de la familia</string>
+    <string name="family_currency_change">Cambiar moneda</string>
+    <string name="family_currency_change_description">Cambiar la moneda de la familia, ahora %1$s</string>
+    <string name="family_currency_hint">Puedes cambiarla mientras no haya movimientos ni presupuestos activos.</string>
+    <string name="family_currency_locked_movements">No puedes cambiar la moneda porque la familia tiene movimientos registrados.</string>
+    <string name="family_currency_locked_budgets">No puedes cambiar la moneda porque hay presupuestos activos.</string>
+    <string name="family_currency_locked_both">No puedes cambiar la moneda porque la familia tiene movimientos registrados y presupuestos activos.</string>
+    <string name="family_currency_locked_unknown">No puedes cambiar la moneda en este momento.</string>
+    <string name="family_currency_loading">Comprobando si se puede cambiar la moneda…</string>
+    <string name="family_currency_error">No se pudo comprobar si se puede cambiar la moneda.</string>
+    <string name="family_currency_retry">Reintentar</string>
+    <string name="currency_name_clp">Peso chileno (CLP)</string>
+    <string name="currency_name_usd">Dólar estadounidense (USD)</string>
+    <string name="currency_name_eur">Euro (EUR)</string>
+
+    <string name="family_invite_title">Invitaciones pendientes</string>
+    <plurals name="family_invite_count">
+        <item quantity="one">%d pendiente</item>
+        <item quantity="other">%d pendientes</item>
+    </plurals>
+    <string name="family_invite_empty">No hay invitaciones pendientes.</string>
+    <string name="family_invite_loading">Cargando invitaciones…</string>
+    <string name="family_invite_error">No se pudieron cargar las invitaciones.</string>
+    <string name="family_invite_error_offline">Las invitaciones requieren conexión.</string>
+    <string name="family_invite_retry">Reintentar</string>
+    <string name="family_invite_expires">Vence el %1$s</string>
+    <string name="family_invite_expired_on">Venció el %1$s</string>
+    <string name="family_invite_expired_badge">Vencida</string>
+    <string name="family_invite_revoke">Revocar</string>
+    <string name="family_invite_revoke_description">Revocar la invitación a %1$s</string>
+    <string name="family_invite_reinvite">Volver a invitar</string>
+    <string name="family_invite_reinvite_description">Volver a invitar a %1$s</string>
+    <string name="family_invite_remove">Quitar</string>
+    <string name="family_invite_remove_description">Quitar la invitación vencida a %1$s</string>
+    <string name="family_invite_button">Invitar miembro</string>
+    <string name="family_invite_dialog_title">Invitar miembro</string>
+    <string name="family_invite_email_label">Correo electrónico</string>
+    <string name="family_invite_email_placeholder">persona@ejemplo.com</string>
+    <string name="family_invite_role_label">Rol</string>
+    <string name="family_invite_info">No se envía ningún correo: la persona verá la invitación al entrar en la app con ese correo. Vence a los 7 días.</string>
+    <string name="family_invite_submit">Invitar</string>
+    <string name="family_invite_submitting">Enviando la invitación…</string>
+    <string name="family_invite_cancel">Cancelar</string>
+    <string name="family_invite_discard_title">¿Salir sin invitar?</string>
+    <string name="family_invite_discard_message">Se perderá lo que escribiste.</string>
+    <string name="family_invite_discard_confirm">Salir sin invitar</string>
+    <string name="family_invite_discard_keep">Seguir editando</string>
+    <string name="family_invite_error_required">Escribe el correo de la persona</string>
+    <string name="family_invite_error_invalid">El correo no es válido</string>
+    <string name="family_invite_error_too_long">El correo admite hasta 255 caracteres</string>
+    <string name="family_invite_error_already_invited">Ya hay una invitación vigente a ese correo. Revócala antes de enviar otra.</string>
+    <string name="family_invite_error_already_member">Esa persona ya es miembro de la familia</string>
+    <string name="family_invite_sent">Invitación enviada a %1$s. No se envía ningún correo: la verá al entrar en la app con ese correo y vence en 7 días.</string>
+
     <string name="family_manage_members_title">Miembros de la familia</string>
     <string name="family_manage_members_subtitle_owner">Como Propietario puedes gestionar roles y acceso.</string>
     <string name="family_manage_members_subtitle_member">Solo los Propietarios pueden gestionar roles y acceso.</string>
@@ -225,6 +279,9 @@
     <string name="family_manage_leave_message">Perderás el acceso a esta familia. Los movimientos que registraste se conservan en ella.</string>
     <string name="family_manage_leave_confirm">Salir</string>
     <string name="family_manage_dialog_cancel">Cancelar</string>
+    <string name="family_invite_revoke_title">Revocar la invitación</string>
+    <string name="family_invite_revoke_message">La invitación a %1$s dejará de valer. Podrás volver a invitar a esa persona cuando quieras.</string>
+    <string name="family_invite_revoke_confirm">Revocar</string>
 
     <string name="family_create_name_label">Nombre de la familia</string>
     <string name="family_create_name_placeholder">Ej. Familia Silva, Casa Playa</string>

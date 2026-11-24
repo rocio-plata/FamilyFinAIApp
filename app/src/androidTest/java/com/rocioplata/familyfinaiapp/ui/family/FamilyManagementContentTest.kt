@@ -47,6 +47,13 @@ class FamilyManagementContentTest {
         var confirms = 0
         var dismisses = 0
         var consumed = 0
+        val currencyChanges = mutableListOf<String>()
+        var currencyRetries = 0
+        var invites = 0
+        val reinvites = mutableListOf<String>()
+        val revokes = mutableListOf<String>()
+        val removals = mutableListOf<String>()
+        var invitationRetries = 0
     }
 
     private val valentina = MemberRow("u-1", "Valentina Plata", FamilyRole.OWNER, isYou = true, email = "valentina@example.com", newRole = FamilyRole.MEMBER, canChangeRole = true, canRemove = false)
@@ -103,6 +110,15 @@ class FamilyManagementContentTest {
             onConfirmAction = { holder.confirms++ },
             onDismissAction = { holder.dismisses++ },
             onEventConsumed = { holder.consumed++; holder.state = holder.state.copy(event = null) },
+            onChangeCurrency = { holder.currencyChanges += it },
+            onRetryCurrency = { holder.currencyRetries++ },
+            invitations = InvitationActions(
+                onInvite = { holder.invites++ },
+                onReinvite = { holder.reinvites += it },
+                onRevoke = { holder.revokes += it },
+                onRemoveExpired = { holder.removals += it },
+                onRetry = { holder.invitationRetries++ },
+            ),
         )
     }
 
@@ -418,5 +434,288 @@ class FamilyManagementContentTest {
         tag("member_remove_u-9").performScrollTo().assertIsDisplayed()
         tag("family_manage_leave").performScrollTo().assertIsDisplayed()
         tag("family_manage_leave_reason").performScrollTo().assertIsDisplayed()
+    }
+
+    // --- Moneda (T-24) ---
+
+    private fun unlocked(current: String = "CLP") =
+        CurrencySection.Content(current, listOf("CLP", "USD", "EUR"), isLocked = false, lockReasons = emptySet())
+
+    private fun lockedBy(vararg reasons: com.rocioplata.familyfinaiapp.domain.family.CurrencyLockReason) =
+        CurrencySection.Content("CLP", listOf("CLP", "USD", "EUR"), isLocked = true, lockReasons = reasons.toSet())
+
+    @Test
+    fun theOwnerSeesTheCurrencyWithAWayToChangeIt() {
+        show(owner().copy(currency = unlocked()))
+
+        tag("family_currency_section").assertIsDisplayed()
+        tag("family_currency_current").assertTextEquals("Peso chileno (CLP)")
+        tag("family_currency_change").assertIsEnabled()
+        tag("family_currency_hint").assertTextEquals("Puedes cambiarla mientras no haya movimientos ni presupuestos activos.")
+    }
+
+    @Test
+    fun aMemberDoesNotSeeTheCurrencySection() {
+        show(member())
+
+        rule.onAllNodesWithTag("family_currency_section", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun theMenuListsTheThreeCurrencies_andChoosingOneAsksForIt() {
+        val holder = show(owner().copy(currency = unlocked()))
+
+        tag("family_currency_change").performClick()
+        // El peso aparece dos veces: como moneda actual y como opción del menú.
+        rule.onAllNodesWithText("Peso chileno (CLP)", useUnmergedTree = true).assertCountEquals(2)
+        rule.onNodeWithText("Dólar estadounidense (USD)").assertIsDisplayed()
+        rule.onNodeWithText("Euro (EUR)").assertIsDisplayed()
+        tag("family_currency_option_USD").performClick()
+
+        assertEquals(listOf("USD"), holder.currencyChanges)
+    }
+
+    @Test
+    fun theCurrentCurrencyIsShownByName_andTheChangeButtonSaysWhichIsTheCurrent() {
+        show(owner().copy(currency = unlocked("USD")))
+
+        tag("family_currency_current").assertTextEquals("Dólar estadounidense (USD)")
+        rule.onNodeWithContentDescription("Cambiar la moneda de la familia, ahora Dólar estadounidense (USD)").assertExists()
+    }
+
+    private fun assertLocked(section: CurrencySection, text: String) {
+        show(owner().copy(currency = section))
+
+        tag("family_currency_locked").assertTextEquals(text)
+        rule.onAllNodesWithTag("family_currency_change", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun lockedByMovementsShowsItsReason() = assertLocked(
+        lockedBy(com.rocioplata.familyfinaiapp.domain.family.CurrencyLockReason.MOVEMENTS),
+        "No puedes cambiar la moneda porque la familia tiene movimientos registrados.",
+    )
+
+    @Test
+    fun lockedByBudgetsShowsItsReason() = assertLocked(
+        lockedBy(com.rocioplata.familyfinaiapp.domain.family.CurrencyLockReason.BUDGETS),
+        "No puedes cambiar la moneda porque hay presupuestos activos.",
+    )
+
+    @Test
+    fun lockedByBothShowsBothReasons() = assertLocked(
+        lockedBy(*com.rocioplata.familyfinaiapp.domain.family.CurrencyLockReason.entries.toTypedArray()),
+        "No puedes cambiar la moneda porque la familia tiene movimientos registrados y presupuestos activos.",
+    )
+
+    @Test
+    fun lockedWithAnUnknownReasonStillSaysItIsLocked() = assertLocked(
+        lockedBy(),
+        "No puedes cambiar la moneda en este momento.",
+    )
+
+    @Test
+    fun whileTheCurrencyIsChecked_thereIsProgress_andTheRestStaysVisible() {
+        show(owner().copy(currency = CurrencySection.Loading))
+
+        rule.onNodeWithContentDescription("Comprobando si se puede cambiar la moneda…").assertIsDisplayed()
+        tag("member_row_u-2").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun aCurrencyErrorOffersRetry_withoutHidingTheMembers() {
+        val holder = show(owner().copy(currency = CurrencySection.Error))
+
+        rule.onNodeWithText("No se pudo comprobar si se puede cambiar la moneda.").assertIsDisplayed()
+        tag("family_currency_retry").performClick()
+
+        assertEquals(1, holder.currencyRetries)
+        tag("member_row_u-2").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun whileBusyTheCurrencyCannotBeChanged() {
+        show(owner(busy = true).copy(currency = unlocked()))
+
+        tag("family_currency_change").assertIsNotEnabled()
+    }
+
+    @Test
+    fun theCurrencyControlsAreAtLeast48dp_andReachableWithTheLargestText() {
+        show(owner().copy(currency = unlocked()), fontScale = 2f)
+
+        tag("family_currency_change").performScrollTo().assertHeightIsAtLeast(48.dp).assertIsDisplayed()
+        tag("family_currency_hint").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun theRetryOfTheCurrencyIsAtLeast48dp() {
+        show(owner().copy(currency = CurrencySection.Error))
+
+        tag("family_currency_retry").assertHeightIsAtLeast(48.dp)
+    }
+
+    // --- Invitaciones enviadas (T-26) ---
+
+    private val expiresAt = java.time.Instant.parse("2026-11-29T12:00:00Z")
+    private val expiredAt = java.time.Instant.parse("2026-11-15T12:00:00Z")
+    private val vigente = SentInvitationRow("i-1", "hermano@example.com", FamilyRole.MEMBER, expiresAt, isExpired = false)
+    private val vigenteOwner = SentInvitationRow("i-2", "tia@example.com", FamilyRole.OWNER, expiresAt, isExpired = false)
+    private val vencida = SentInvitationRow("i-3", "primo@example.com", FamilyRole.MEMBER, expiredAt, isExpired = true)
+
+    private fun withInvitations(vararg rows: SentInvitationRow, busy: Boolean = false) =
+        owner(busy = busy).copy(invitations = InvitationsSection.Content(rows.toList(), rows.count { !it.isExpired }))
+
+    private fun dateOf(instant: java.time.Instant) =
+        java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+            .withLocale(java.util.Locale.getDefault()).withZone(java.time.ZoneId.systemDefault()).format(instant)
+
+    @Test
+    fun theInvitationsShowEmailRoleCountAndExpiry() {
+        show(withInvitations(vigente, vigenteOwner))
+
+        tag("family_invitations_count").assertIsDisplayed()
+        rule.onNodeWithContentDescription("2 pendientes").assertExists()
+        tag("invitation_email_i-1").assertTextEquals("hermano@example.com")
+        tag("invitation_date_i-1").assertTextEquals("Vence el ${dateOf(expiresAt)}")
+        tag("invitation_email_i-2").assertTextEquals("tia@example.com")
+    }
+
+    @Test
+    fun theCountUsesTheSingular_andExpiredOnesDoNotCount() {
+        show(withInvitations(vigente, vencida))
+
+        rule.onNodeWithContentDescription("1 pendiente").assertExists()
+    }
+
+    @Test
+    fun anExpiredInvitationIsMarked_withItsOwnActions() {
+        val holder = show(withInvitations(vencida))
+
+        tag("invitation_expired_i-3").assertIsDisplayed()
+        tag("invitation_date_i-3").assertTextEquals("Venció el ${dateOf(expiredAt)}")
+        rule.onAllNodesWithTag("invitation_revoke_i-3", useUnmergedTree = true).assertCountEquals(0)
+        tag("invitation_reinvite_i-3").performScrollTo().performClick()
+        tag("invitation_remove_i-3").performScrollTo().performClick()
+
+        assertEquals(listOf("i-3"), holder.reinvites)
+        assertEquals(listOf("i-3"), holder.removals)
+    }
+
+    @Test
+    fun aValidInvitationCanOnlyBeRevoked() {
+        val holder = show(withInvitations(vigente))
+
+        rule.onAllNodesWithTag("invitation_reinvite_i-1", useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodesWithTag("invitation_remove_i-1", useUnmergedTree = true).assertCountEquals(0)
+        tag("invitation_expired_i-1").assertDoesNotExistInTree()
+        tag("invitation_revoke_i-1").performScrollTo().performClick()
+
+        assertEquals(listOf("i-1"), holder.revokes)
+    }
+
+    private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertDoesNotExistInTree() = assertDoesNotExist()
+
+    @Test
+    fun theInvitationActionsNameTheirEmailForTheScreenReader() {
+        show(withInvitations(vigente, vencida))
+
+        rule.onNodeWithContentDescription("Revocar la invitación a hermano@example.com").assertExists()
+        rule.onNodeWithContentDescription("Volver a invitar a primo@example.com").assertExists()
+        rule.onNodeWithContentDescription("Quitar la invitación vencida a primo@example.com").assertExists()
+    }
+
+    @Test
+    fun withoutInvitationsThereIsAnEmptyMessage_andInvitingIsAvailable() {
+        val holder = show(withInvitations())
+
+        tag("family_invitations_empty").assertTextEquals("No hay invitaciones pendientes.")
+        tag("family_invite_button").performScrollTo().assertIsEnabled().performClick()
+
+        assertEquals(1, holder.invites)
+    }
+
+    @Test
+    fun whileTheInvitationsLoad_invitingIsNotAvailable() {
+        show(owner().copy(invitations = InvitationsSection.Loading))
+
+        rule.onNodeWithContentDescription("Cargando invitaciones…").assertExists()
+        tag("family_invite_button").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun anInvitationsErrorOffersRetry_andSaysWhenItIsTheConnection() {
+        val holder = show(owner().copy(invitations = InvitationsSection.Error(FamilyAccessFailure.Offline)))
+
+        rule.onNodeWithText("Las invitaciones requieren conexión.").performScrollTo().assertIsDisplayed()
+        tag("family_invite_button").performScrollTo().assertIsNotEnabled()
+        tag("family_invitations_retry").performClick()
+
+        assertEquals(1, holder.invitationRetries)
+        tag("member_row_u-2").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun anotherInvitationsErrorUsesTheGenericText() {
+        show(owner().copy(invitations = InvitationsSection.Error(FamilyAccessFailure.Network)))
+
+        rule.onNodeWithText("No se pudieron cargar las invitaciones.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun aMemberDoesNotSeeTheInvitations() {
+        show(member())
+
+        rule.onAllNodesWithTag("family_invitations_section", useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodesWithTag("family_invite_button", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun whileBusyTheInvitationActionsAreDisabled() {
+        show(withInvitations(vigente, vencida, busy = true))
+
+        tag("invitation_revoke_i-1").performScrollTo().assertIsNotEnabled()
+        tag("invitation_reinvite_i-3").performScrollTo().assertIsNotEnabled()
+        tag("invitation_remove_i-3").performScrollTo().assertIsNotEnabled()
+        tag("family_invite_button").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun revokingAsksForConfirmationNamingTheEmail() {
+        val holder = show(withInvitations(vigente).copy(pendingAction = FamilyPendingAction.RevokeInvitation("i-1", "hermano@example.com")))
+
+        rule.onNodeWithText("Revocar la invitación").assertIsDisplayed()
+        rule.onNodeWithText("La invitación a hermano@example.com dejará de valer. Podrás volver a invitar a esa persona cuando quieras.")
+            .assertIsDisplayed()
+        tag("family_manage_confirm").performClick()
+        assertEquals(1, holder.confirms)
+    }
+
+    @Test
+    fun anInvitationSentShowsTheNoEmailNotice() {
+        show(withInvitations(vigente).copy(event = FamilyManagementEvent.InvitationSent("nuevo@example.com")))
+
+        rule.onNodeWithText(
+            "Invitación enviada a nuevo@example.com. No se envía ningún correo: la verá al entrar en la app con ese correo y vence en 7 días.",
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun theOpenInviteFormIsShownOverTheScreen() {
+        show(withInvitations().copy(inviteForm = InviteFormState(email = "x@y.cl", role = FamilyRole.MEMBER)))
+
+        rule.onNodeWithTag("invite_email").assertIsDisplayed()
+        // «Invitar miembro» es el botón de la pantalla y el título del diálogo.
+        rule.onAllNodesWithText("Invitar miembro", useUnmergedTree = true).assertCountEquals(2)
+    }
+
+    @Test
+    fun theInvitationControlsAreAtLeast48dp_andReachableWithTheLargestText() {
+        show(withInvitations(vigente, vencida), fontScale = 2f)
+
+        tag("invitation_revoke_i-1").performScrollTo().assertHeightIsAtLeast(48.dp).assertIsDisplayed()
+        tag("invitation_reinvite_i-3").performScrollTo().assertHeightIsAtLeast(48.dp).assertIsDisplayed()
+        tag("invitation_remove_i-3").performScrollTo().assertHeightIsAtLeast(48.dp).assertIsDisplayed()
+        tag("family_invite_button").performScrollTo().assertHeightIsAtLeast(48.dp).assertIsDisplayed()
     }
 }

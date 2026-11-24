@@ -60,4 +60,20 @@ class FamilyTextsTest {
             assertEquals(it.toString(), it.messageRes(), FamilyCreateError.Failure(it).messageRes())
         }
     }
+
+    @Test
+    fun losErroresDelCorreoDeLaInvitacionTienenSuTexto() {
+        assertEquals(R.string.family_invite_error_required, InviteFormError.Required.messageRes())
+        assertEquals(R.string.family_invite_error_invalid, InviteFormError.InvalidFormat.messageRes())
+        assertEquals(R.string.family_invite_error_too_long, InviteFormError.TooLong.messageRes())
+        assertEquals(R.string.family_invite_error_already_invited, InviteFormError.AlreadyInvited.messageRes())
+        assertEquals(R.string.family_invite_error_already_member, InviteFormError.AlreadyMember.messageRes())
+    }
+
+    @Test
+    fun unFalloAlInvitarUsaElTextoDelFallo() {
+        listOf(FamilyAccessFailure.Offline, FamilyAccessFailure.Network, FamilyAccessFailure.InvalidEmail).forEach {
+            assertEquals(it.toString(), it.messageRes(), InviteFormError.Failure(it).messageRes())
+        }
+    }
 }

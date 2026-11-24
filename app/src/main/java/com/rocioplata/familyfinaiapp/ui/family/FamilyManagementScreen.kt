@@ -58,6 +58,21 @@ fun FamilyManagementScreen(
         onConfirmAction = viewModel::confirmPendingAction,
         onDismissAction = viewModel::dismissPendingAction,
         onEventConsumed = viewModel::consumeEvent,
+        onChangeCurrency = viewModel::changeCurrency,
+        onRetryCurrency = viewModel::retryCurrency,
+        invitations = InvitationActions(
+            onInvite = viewModel::openInviteForm,
+            onReinvite = viewModel::reinvite,
+            onRevoke = viewModel::requestRevoke,
+            onRemoveExpired = viewModel::removeExpired,
+            onRetry = viewModel::retryInvitations,
+            onEmailChange = viewModel::onInviteEmailChange,
+            onRoleChange = viewModel::onInviteRoleChange,
+            onSubmit = viewModel::submitInvite,
+            onClose = viewModel::requestCloseInvite,
+            onConfirmDiscard = viewModel::confirmDiscardInvite,
+            onDismissDiscard = viewModel::dismissDiscardInvite,
+        ),
         modifier = modifier,
     )
 }
