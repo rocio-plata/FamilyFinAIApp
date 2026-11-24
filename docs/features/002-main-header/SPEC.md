@@ -59,16 +59,17 @@ criterios, decisiones del plan y tareas. -->
 - **RF-02:** Tocar el selector abre una lista con todas las familias del
   usuario, en el orden del backend, mostrando nombre y rol de cada una y
   marcando la activa. Elegir una familia la convierte en la activa, actualiza
-  la cabecera y cierra la lista. Si el usuario tiene una sola familia, no hay
-  selector: la cabecera muestra su nombre y rol sin indicador de selector y
-  tocarla no abre ninguna lista.
+  la cabecera y cierra la lista. El selector se abre también con una sola
+  familia. (Modificado por la 009, RF-01: antes, con una sola familia no había
+  selector.)
 - **RF-03:** La familia activa se mantiene mientras el proceso de la app siga
   vivo; al reabrir la app tras terminarse el proceso, la activa vuelve a ser la
   favorita.
 - **RF-04:** El icono de notificaciones muestra un contador con el número de
   invitaciones pendientes recibidas por el usuario (`GET /me/invitations`),
   siempre que sea distinto de 0 (sin límite superior). Con 0 no se muestra
-  contador. Tocar el icono no navega ni ejecuta otra acción.
+  contador. Tocar el icono abre las invitaciones recibidas. (Modificado por la
+  009, RF-18: antes no ejecutaba ninguna acción.)
 - **RF-05:** El icono de perfil muestra la inicial del nombre del usuario
   (`GET /me/profile`, `displayName`).
 - **RF-06:** Tocar el icono de perfil no navega ni ejecuta ninguna acción: en
@@ -100,7 +101,7 @@ adicionales, indícalo tras revisarlo con la persona. -->
   hacia ella desde la cabecera: spec posterior. Aquí el icono de perfil solo
   muestra la inicial y no ejecuta ninguna acción al pulsarlo.
 - Pantalla o lista de invitaciones, y aceptar o rechazar invitaciones: spec
-  posterior. El icono de notificaciones solo muestra el contador.
+  009.
 - Lista de notificaciones, invitaciones enviadas por el OWNER y su estado
   (pendiente, rechazada, aceptada) y marcar como leída: spec de notificaciones
   posterior. El contador no incluye invitaciones enviadas.
@@ -143,8 +144,8 @@ y comportamiento, sin diseñar tablas, DTO, DAO ni almacenamiento. -->
   backend; la primera es la favorita. No existe un campo "favorita" propio.
 - Las invitaciones pendientes son las del usuario autenticado. Se muestra su
   cantidad exacta cuando no es 0.
-- Todo usuario tiene al menos una familia: al registrarse se crea su familia
-  personal.
+- Todo usuario empieza con una familia: al registrarse se crea su familia
+  personal. Puede quedarse sin ninguna si lo quitan de la única (009, RF-24).
 - La inicial del avatar es la primera letra de `displayName`, en mayúscula.
 - El backend es la autoridad del rol y rechaza las acciones no permitidas. Si
   una operación sobre la familia activa responde `FAMILY.INSUFFICIENT_ROLE`,
@@ -153,9 +154,9 @@ y comportamiento, sin diseñar tablas, DTO, DAO ni almacenamiento. -->
   acciones restringidas por rol: la regla aplica a las specs que las
   introduzcan, y cada una define su criterio de aceptación.
 - Cada familia se identifica por su identificador, no por su nombre. El nombre
-  no se repite, no está vacío y no contiene emojis: esas validaciones se
-  definen en la spec de creación de familias, por lo que aquí se asumen
-  garantizadas.
+  no está vacío. La app impide repetirlo o usar emojis al crear una familia,
+  pero no lo garantiza en las familias a las que se entra por invitación
+  (modificado por la 009).
 - Regla para specs futuras: cuando haya cambios de datos, se envían al backend
   y a la memoria local a la vez. Si no se puede por problemas de red, se
   muestra el icono de cambios solo locales (RF-09), que indica que esos
@@ -185,7 +186,7 @@ ni conservación de todo el estado. Expresa resultados, no mecanismos técnicos.
 | Situación | Comportamiento esperado |
 | --- | --- |
 | Carga o acción en curso | Mientras se cargan las familias, el selector muestra un estado de carga y no se puede abrir la lista. Si los datos guardados son de otro usuario, se informa de que no hay datos mientras se consultan en el backend. Mientras carga el contador no se muestra. |
-| Sin datos | Sin invitaciones: icono sin contador. Sin familias: no se espera (siempre existe la personal). Una sola familia: sin selector ni lista (RF-02). |
+| Sin datos | Sin invitaciones: icono sin contador. Sin familias: mensaje con «Crear familia» y «Ver invitaciones» (009, RF-24). Una sola familia: el selector se abre igualmente (RF-02). |
 | Entrada inválida | No aplica: el usuario solo elige entre opciones existentes. |
 | Error o espera excesiva | Sin datos previos, el selector muestra un error con opción de reintentar. Si falla solo el contador o el perfil, no se muestra contador y el avatar usa un icono genérico y no se bloquea la cabecera. Tiempo máximo de espera: conexión 10 s y solicitud 15 s (PLAN.md). Errores `401`/`403`: se tratan en la spec de sesión. |
 | Sin conexión o conexión interrumpida | Con datos guardados de menos de 7 días, se muestran los últimos conocidos (con alerta de posible desactualización si tienen más de 24 h); sin ellos, eliminados por antigüedad (7 días) o de otro usuario, error con reintento. Al recuperar la conexión se actualizan los datos. |
@@ -224,7 +225,7 @@ Repite el formato según sea necesario. -->
 - **CA-03 · RF-02:** Dada la lista abierta, cuando elige otra familia, entonces la lista se cierra y la cabecera muestra la elegida.
 - **CA-04 · RF-02:** Dada la lista abierta, cuando pulsa Atrás, entonces se cierra y la familia activa no cambia.
 - **CA-05 · RF-03:** Dada una familia no favorita elegida, cuando la app pasa a segundo plano y vuelve o se recrea la pantalla, entonces sigue activa; tras terminarse el proceso y reabrir, muestra la favorita.
-- **CA-06 · RF-04:** Dado un usuario con N>0 invitaciones pendientes, cuando se muestra la cabecera, entonces el icono muestra el contador N; con 0, no muestra contador; y tocarlo no produce ninguna acción.
+- **CA-06 · RF-04:** Dado un usuario con N>0 invitaciones pendientes, cuando se muestra la cabecera, entonces el icono muestra el contador N; con 0, no muestra contador; y tocarlo abre las invitaciones (009, CA-22).
 - **CA-07 · RF-05:** Dado un usuario llamado «rocío», cuando se muestra la cabecera, entonces el avatar muestra «R».
 - **CA-08 · RF-06:** Dada cualquier pestaña, cuando toca el icono de perfil, entonces no ocurre ninguna acción ni navegación.
 - **CA-09 · RF-07:** Dado un primer uso sin conexión, cuando se abre la app, entonces el selector muestra error con reintento y, al reintentar con conexión, muestra la familia favorita.
@@ -237,7 +238,7 @@ Repite el formato según sea necesario. -->
 - **CA-16 · RF-07:** Dados datos guardados de más de 24 h y menos de 7 días y sin conexión, cuando se abre la app, entonces se muestran esos datos con una alerta de que podrían estar desactualizados; con datos de menos de 24 h, no hay alerta.
 - **CA-17 · RF-07:** Dados datos guardados de más de 7 días y sin conexión, cuando se abre la app, entonces se eliminan, no se muestran y aparece el error con reintento.
 - **CA-18 · RF-07:** Dados datos guardados de otro usuario, cuando el usuario autenticado abre la app, entonces se eliminan y nunca se muestran: se informa de que no hay datos mientras se consultan en el backend (o error con reintento si no hay conexión) y luego se muestran los suyos.
-- **CA-19 · RF-02:** Dado un usuario con una sola familia, cuando se muestra la cabecera, entonces ve su nombre y rol sin indicador de selector, y al tocarla no se abre ninguna lista.
+- **CA-19 · RF-02:** Dado un usuario con una sola familia, cuando se muestra la cabecera, entonces ve su nombre y rol con el indicador de selector, y al tocarla se abre la lista (modificado por la 009, CA-01).
 - **CA-20 · RF-09:** Dado que no hay cambios solo locales, cuando se muestra la cabecera, entonces el icono de cambios locales no se muestra; y dado que existen, entonces aparece a la izquierda del icono de notificaciones con una etiqueta accesible (p. ej. "Cambios solo en este dispositivo").
 
 ## Cómo se comprueba el comportamiento
@@ -253,7 +254,7 @@ No marques los criterios como superados durante la especificación. -->
 | CA-03 | Elegir otra familia | Lista cerrada; cabecera actualizada |
 | CA-04 | Abrir lista y pulsar Atrás | Lista cerrada; sin cambio |
 | CA-05 | Elegir otra; segundo plano, recrear y matar el proceso | Persiste hasta matar el proceso; luego favorita |
-| CA-06 | Cuentas con 0 y con N invitaciones; tocar el icono | Sin contador / contador N; sin acción |
+| CA-06 | Cuentas con 0 y con N invitaciones; tocar el icono | Sin contador / contador N; se abren las invitaciones |
 | CA-07 | Cuenta con nombre «rocío» | Avatar «R» |
 | CA-08 | Tocar el icono de perfil desde distintas pestañas | Sin acción ni navegación |
 | CA-09 | Instalación limpia, sin red, abrir; activar red y reintentar | Error con reintento; luego familia favorita |
@@ -266,7 +267,7 @@ No marques los criterios como superados durante la especificación. -->
 | CA-16 | Datos guardados de 1 h y de 30 h; abrir sin red | Sin alerta / con alerta de posible desactualización |
 | CA-17 | Datos guardados de 8 días; abrir sin red | Error con reintento; datos eliminados y no mostrados |
 | CA-18 | Iniciar sesión con otro usuario en el mismo dispositivo; abrir con y sin red | Datos del anterior nunca visibles; aviso de sin datos y luego los propios / error con reintento |
-| CA-19 | Cuenta con una sola familia; tocar la cabecera | Sin indicador de selector; no se abre lista |
+| CA-19 | Cuenta con una sola familia; tocar la cabecera | Con indicador de selector; se abre la lista |
 | CA-20 | Abrir la app en cualquier estado de red; con un indicador de prueba de cambios locales activo e inactivo | Sin cambios locales: icono oculto; con cambios locales: visible a la izquierda de notificaciones con su etiqueta accesible |
 
 ## Decisiones pendientes

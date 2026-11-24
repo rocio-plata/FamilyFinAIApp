@@ -9,11 +9,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -21,12 +28,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.rocioplata.familyfinaiapp.FamilyFinApp
+import com.rocioplata.familyfinaiapp.R
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
 import com.rocioplata.familyfinaiapp.ui.dashboard.DashboardScreen
+import com.rocioplata.familyfinaiapp.ui.family.FamilyCreateScreen
+import com.rocioplata.familyfinaiapp.ui.family.FamilyManagementScreen
+import com.rocioplata.familyfinaiapp.ui.family.InvitationsScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementDetailScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementFormScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementsScreen
@@ -42,7 +53,9 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
     val viewModel: MainViewModel = viewModel(
         key = viewModelKey,
         factory = viewModelFactory {
-            initializer { MainViewModel(container.headerRepository, container.connectivityObserver) }
+            initializer {
+                MainViewModel(container.headerRepository, container.connectivityObserver, container.familyManagementRepository)
+            }
         },
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -55,6 +68,11 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
         onRetry = viewModel::retry,
         onSelectFamily = viewModel::selectFamily,
         onDismissSelector = viewModel::dismissSelector,
+        onMoveFamily = viewModel::moveFamily,
+        onManageFamily = viewModel::openFamilyManagement,
+        onCreateFamily = viewModel::openFamilyCreate,
+        onInvitationsClick = viewModel::openInvitations,
+        onNoticeConsumed = viewModel::consumeNotice,
         onSelectTab = viewModel::selectTab,
         onManagePaymentMethods = viewModel::openPaymentMethods,
         onAddMovement = { viewModel.openMovementCreate() },
@@ -66,7 +84,8 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                 DashboardScreen(
                     familyId = family.id,
                     currency = family.currency,
-                    viewModelKey = "${viewModelKey ?: "main"}-dashboard-${family.id}-${uiState.activeFamilyInstance}",
+                    // La moneda va en la clave: al cambiarla en «Mi familia» el dashboard se rehace con la nueva (RF-13).
+                    viewModelKey = "${viewModelKey ?: "main"}-dashboard-${family.id}-${uiState.activeFamilyInstance}-${family.currency}",
                     onCategoryClick = { categoryId, type -> viewModel.openMovementCreate(categoryId, type) },
                     onManageCategories = viewModel::openCategories,
                     onManagePaymentMethods = viewModel::openPaymentMethods,
@@ -86,7 +105,7 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                     familyId = family.id,
                     currency = family.currency,
                     currentUserId = (session as? SessionState.SignedIn)?.userId,
-                    viewModelKey = "${viewModelKey ?: "main"}-movements-${family.id}",
+                    viewModelKey = "${viewModelKey ?: "main"}-movements-${family.id}-${family.currency}",
                     onMovementClick = viewModel::openMovementDetail,
                     onInsufficientRole = viewModel::onInsufficientRole,
                     modifier = contentModifier,
@@ -99,7 +118,27 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
             val key = "${viewModelKey ?: "main"}-categories-${family?.id}"
             val canManage = family?.role == FamilyRole.OWNER
             when {
+                // Crear familia e invitaciones no dependen de una familia: se abren también sin ninguna (RF-24).
+                route == FamilyRoute.Create -> FamilyCreateScreen(
+                    viewModelKey = "${viewModelKey ?: "main"}-family-create-${uiState.managementRouteInstance}",
+                    onCreated = viewModel::onFamilyCreated,
+                    onClose = viewModel::managementBack,
+                    modifier = modifier,
+                )
+                route == InvitationsRoute -> InvitationsScreen(
+                    viewModelKey = "${viewModelKey ?: "main"}-invitations-${uiState.managementRouteInstance}",
+                    onBack = viewModel::managementBack,
+                    onSwitchFamily = viewModel::switchToFamily,
+                    modifier = modifier,
+                )
                 family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
+                route == FamilyRoute.Manage -> FamilyManagementScreen(
+                    familyId = family.id,
+                    viewModelKey = "${viewModelKey ?: "main"}-family-${family.id}",
+                    onBack = viewModel::managementBack,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
                 route is MovementRoute.Create -> MovementFormScreen(
                     familyId = family.id,
                     familyName = family.name,
@@ -180,6 +219,11 @@ fun MainScreen(
     onDismissSelector: () -> Unit,
     modifier: Modifier = Modifier,
     onSelectTab: (MainDestination) -> Unit = {},
+    onMoveFamily: (familyId: String, targetIndex: Int) -> Unit = { _, _ -> },
+    onManageFamily: () -> Unit = {},
+    onCreateFamily: () -> Unit = {},
+    onInvitationsClick: () -> Unit = {},
+    onNoticeConsumed: () -> Unit = {},
     onManagePaymentMethods: () -> Unit = {},
     onAddMovement: () -> Unit = {},
     onManagementBack: () -> Unit = {},
@@ -212,6 +256,11 @@ fun MainScreen(
         onRetry = onRetry,
         onSelectFamily = onSelectFamily,
         onDismissSelector = onDismissSelector,
+        onMoveFamily = onMoveFamily,
+        onManageFamily = onManageFamily,
+        onCreateFamily = onCreateFamily,
+        onInvitationsClick = onInvitationsClick,
+        onNoticeConsumed = onNoticeConsumed,
         onManagePaymentMethods = onManagePaymentMethods,
         onAddMovement = onAddMovement,
         movementsContent = movementsContent,
@@ -227,6 +276,7 @@ private fun ManagementPlaceholder(route: ManagementRoute, onBack: () -> Unit, mo
         PaymentMethodsRoute -> PaymentMethodsPlaceholder(onBack = onBack, modifier = modifier)
         is CategoriesRoute -> CategoriesPlaceholder(onBack = onBack, modifier = modifier)
         is MovementRoute -> MovementRoutePlaceholder(route, onBack = onBack, modifier = modifier)
+        is FamilyRoute, InvitationsRoute -> FamilyRoutePlaceholder(route, onBack = onBack, modifier = modifier)
     }
 }
 
@@ -240,20 +290,54 @@ fun MainScreenContent(
     onRetry: () -> Unit = {},
     onSelectFamily: (String) -> Unit = {},
     onDismissSelector: () -> Unit = {},
+    onMoveFamily: (familyId: String, targetIndex: Int) -> Unit = { _, _ -> },
+    onManageFamily: () -> Unit = {},
+    onCreateFamily: () -> Unit = {},
+    onInvitationsClick: () -> Unit = {},
+    onNoticeConsumed: () -> Unit = {},
     onManagePaymentMethods: () -> Unit = {},
     onAddMovement: () -> Unit = {},
     movementsContent: (@Composable (Modifier) -> Unit)? = null,
     homeDashboardContent: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val content = uiState.families as? FamiliesState.Content
+    val hasNoFamilies = uiState.families == FamiliesState.NoData
+    // Avisos de la pantalla principal (RF-22 de la 009): se muestran una vez y se confirman.
+    val snackbar = remember { SnackbarHostState() }
+    val notice = uiState.notice
+    val noticeText = when (notice) {
+        is MainNotice.NoLongerMember ->
+            if (notice.familyName.isBlank()) {
+                stringResource(R.string.main_notice_no_longer_member_unnamed)
+            } else {
+                stringResource(R.string.main_notice_no_longer_member, notice.familyName)
+            }
+        null -> null
+    }
+    // Se confirma al recibirlo y se muestra aparte: confirmarlo limpia el estado y recompone, lo que cancelaría un efecto
+    // que estuviera mostrando el aviso.
+    var pendingMessage by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(notice) {
+        if (noticeText != null) {
+            pendingMessage = noticeText
+            onNoticeConsumed()
+        }
+    }
+    LaunchedEffect(pendingMessage) {
+        val message = pendingMessage ?: return@LaunchedEffect
+        snackbar.showSnackbar(message)
+        pendingMessage = null
+    }
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             Column {
                 MainHeader(
                     state = uiState,
                     onFamilyClick = onFamilyClick,
                     onRetry = onRetry,
+                    onNotificationsClick = onInvitationsClick,
                     modifier = Modifier.windowInsetsPadding(
                         WindowInsets.safeDrawing.only(
                             WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
@@ -265,7 +349,8 @@ fun MainScreenContent(
         },
         bottomBar = { MainBottomBar(selected = selected, onSelect = onSelect) },
         floatingActionButton = {
-            if (selected == MainDestination.Home || selected == MainDestination.Movements) {
+            // Sin familia no hay nada que registrar (RF-24).
+            if (!hasNoFamilies && (selected == MainDestination.Home || selected == MainDestination.Movements)) {
                 HomeFab(onClick = onAddMovement)
             }
         },
@@ -274,7 +359,9 @@ fun MainScreenContent(
         // key(familyId) recrea el cuerpo al cambiar de familia para que recargue sus datos.
         key(content?.activeFamily?.id) {
             val familyName = content?.activeFamily?.name
-            if (selected == MainDestination.Home) {
+            if (hasNoFamilies) {
+                NoFamiliesContent(onCreate = onCreateFamily, onInvitations = onInvitationsClick, modifier = contentModifier)
+            } else if (selected == MainDestination.Home) {
                 HomeContent(
                     modifier = contentModifier,
                     onManagePaymentMethods = onManagePaymentMethods.takeIf { content != null },
@@ -291,7 +378,12 @@ fun MainScreenContent(
         FamilySelectorSheet(
             families = content.families,
             activeFamilyId = content.activeFamily.id,
+            error = uiState.selectorError,
+            isReordering = uiState.isReordering,
             onSelect = onSelectFamily,
+            onMove = onMoveFamily,
+            onManage = onManageFamily,
+            onCreate = onCreateFamily,
             onDismiss = onDismissSelector,
         )
     }

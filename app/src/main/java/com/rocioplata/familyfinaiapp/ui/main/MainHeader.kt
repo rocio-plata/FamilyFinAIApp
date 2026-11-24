@@ -51,6 +51,7 @@ fun MainHeader(
     onFamilyClick: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onNotificationsClick: () -> Unit = {},
 ) {
     Row(
         modifier = modifier
@@ -78,7 +79,7 @@ fun MainHeader(
                     )
                 }
             }
-            NotificationsIcon(count = state.pendingInvitations ?: 0)
+            NotificationsIcon(count = state.pendingInvitations ?: 0, onClick = onNotificationsClick)
             Spacer(Modifier.width(4.dp))
             Avatar(displayName = state.displayName)
         }
@@ -100,8 +101,8 @@ private fun FamilyArea(
                 title = name,
                 subtitle = role,
                 description = stringResource(R.string.header_family_selector_description, name, role),
-                showArrow = families.hasSelector,
-                onClick = if (families.hasSelector) onFamilyClick else null,
+                showArrow = true,
+                onClick = onFamilyClick,
                 modifier = modifier,
             )
         }
@@ -196,7 +197,7 @@ private fun FamilyPill(
 }
 
 @Composable
-private fun NotificationsIcon(count: Int) {
+private fun NotificationsIcon(count: Int, onClick: () -> Unit) {
     val description = if (count > 0) {
         pluralStringResource(R.plurals.header_notifications_count_description, count, count)
     } else {
@@ -205,6 +206,8 @@ private fun NotificationsIcon(count: Int) {
     Box(
         modifier = Modifier
             .size(MinTouchTarget)
+            // Abre las invitaciones recibidas (RF-18 de la 009); sin ninguna, la pantalla lo dice.
+            .clickable(role = Role.Button, onClick = onClick)
             .clearAndSetSemantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {

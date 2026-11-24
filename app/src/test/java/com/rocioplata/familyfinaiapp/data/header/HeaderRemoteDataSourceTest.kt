@@ -59,8 +59,8 @@ class HeaderRemoteDataSourceTest {
         assertEquals(
             RemoteResult.Success(
                 listOf(
-                    Family("f-1", "Plata", FamilyRole.OWNER, "CLP"),
-                    Family("f-2", "Depto", FamilyRole.MEMBER, "CLP"),
+                    Family("f-1", "Plata", FamilyRole.OWNER, "CLP", memberCount = 3),
+                    Family("f-2", "Depto", FamilyRole.MEMBER, "CLP", memberCount = 2),
                 ),
             ),
             result,
@@ -99,6 +99,21 @@ class HeaderRemoteDataSourceTest {
 
         assertEquals(listOf(null, null, null), result.value.map { it.currency })
         assertEquals(listOf("Plata", "Depto", "Otra"), result.value.map { it.name })
+    }
+
+    @Test
+    fun familias_sinNumeroDeMiembros_quedaNulo() = runTest {
+        val source = source(
+            reply(
+                HttpStatusCode.OK,
+                """[{"familyId":"f-1","name":"Plata","role":"OWNER"},
+                    {"familyId":"f-2","name":"Depto","role":"MEMBER","memberCount":null}]""",
+            ),
+        )
+
+        val result = source.families() as RemoteResult.Success
+
+        assertEquals(listOf(null, null), result.value.map { it.memberCount })
     }
 
     @Test

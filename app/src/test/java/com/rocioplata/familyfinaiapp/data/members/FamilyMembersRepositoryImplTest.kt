@@ -1,6 +1,7 @@
 package com.rocioplata.familyfinaiapp.data.members
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.rocioplata.familyfinaiapp.data.header.Cached
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMember
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersData
@@ -29,6 +30,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -340,5 +342,246 @@ class FamilyMembersRepositoryImplTest {
 
         val cached = env.local.read("f-1")?.value.orEmpty()
         assertEquals(false, cached.any { it.toString().contains("@") })
+    }
+
+    @Test
+    fun conservarFamilias_borraLaPerdidaDeMemoriaYDisco_yConservaLasDemas() = runTest {
+        val env = env()
+        env.local.save("f-1", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        env.local.save("f-2", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        env.repository.members("f-1").first()
+        val kept = env.repository.members("f-2").first()
+
+        env.repository.retainFamilies(setOf("f-2"))
+
+        assertEquals(FamilyMembersData(), env.repository.members("f-1").first())
+        assertEquals(kept, env.repository.members("f-2").first())
+        assertNull(env.local.read("f-1"))
+        assertNotNull(env.local.read("f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_conjuntoVacio_borraTodasLasFamilias() = runTest {
+        val env = env()
+        env.local.save("f-1", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        env.repository.members("f-1").first()
+
+        env.repository.retainFamilies(emptySet())
+
+        assertEquals(FamilyMembersData(), env.repository.members("f-1").first())
+        assertNull(env.local.read("f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_conTodasVigentes_noCambiaNada() = runTest {
+        val env = env()
+        env.local.save("f-1", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        val before = env.repository.members("f-1").first()
+
+        env.repository.retainFamilies(setOf("f-1", "f-9"))
+
+        assertEquals(before, env.repository.members("f-1").first())
+        assertNotNull(env.local.read("f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_unaDescargaEnCursoDeLaPerdida_noSeGuarda_yNoEsperaALaRed() = runTest {
+        val env = env()
+        env.backend.gate = CompletableDeferred()
+        val refresh = async { env.repository.refresh("f-1") }
+        runCurrent()
+
+        env.repository.retainFamilies(setOf("f-2"))
+        assertFalse(refresh.isCompleted)
+        env.backend.gate!!.complete(Unit)
+        refresh.await()
+
+        assertEquals(FamilyMembersData(), env.repository.members("f-1").first())
+        assertNull(env.local.read("f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_unaDescargaEnCursoDeUnaVigente_sigueGuardandose() = runTest {
+        val env = env()
+        env.backend.gate = CompletableDeferred()
+        val refresh = async { env.repository.refresh("f-2") }
+        runCurrent()
+
+        env.repository.retainFamilies(setOf("f-2"))
+        env.backend.gate!!.complete(Unit)
+        refresh.await()
+
+        assertNotNull(env.local.read("f-2"))
+    }
+
+    @Test
+    fun conservarFamilias_unaFamiliaRecuperada_vuelveAGuardarse() = runTest {
+        val env = env()
+        env.repository.retainFamilies(emptySet())
+        env.repository.refresh("f-1")
+        assertNull(env.local.read("f-1"))
+
+        env.repository.retainFamilies(setOf("f-1"))
+        env.repository.refresh("f-1")
+
+        assertNotNull(env.local.read("f-1"))
+    }
+
+    @Test
+    fun conservarFamilias_clear_olvidaElConjuntoYVuelveAGuardarTodo() = runTest {
+        val env = env()
+        env.repository.retainFamilies(setOf("f-2"))
+        env.repository.clear()
+
+        env.repository.refresh("f-1")
+
+        assertNotNull(env.local.read("f-1"))
+    }
+
+    private val withEmailsBody =
+        """[{"userId":"u-1","role":"OWNER","displayName":"Valentina Plata","email":"v@example.com"},""" +
+            """{"userId":"u-2","role":"MEMBER","displayName":"Sofía","email":"s@example.com"}]"""
+
+    @Test
+    fun conCorreos_devuelveLosCorreos_ActualizaLaListaYNoGuardaNingunoEnDisco() = runTest {
+        val env = env()
+        env.backend.body = withEmailsBody
+
+        val result = env.repository.refreshWithEmails("f-1")
+
+        assertEquals(
+            FamilyMembersResult.Success(mapOf("u-1" to "v@example.com", "u-2" to "s@example.com")),
+            result,
+        )
+        assertEquals(
+            listOf(FamilyMember("u-1", "Valentina Plata", FamilyRole.OWNER), FamilyMember("u-2", "Sofía", FamilyRole.MEMBER)),
+            env.repository.members("f-1").first().members,
+        )
+        // Lo guardado en disco tiene los nombres y ningún correo.
+        val onDisk = folder.root.walkTopDown().filter { it.isFile }.joinToString("") { String(it.readBytes(), Charsets.ISO_8859_1) }
+        assertTrue(onDisk.contains("Valentina"))
+        assertFalse(onDisk.contains("example.com"))
+        assertFalse(onDisk.contains("@"))
+    }
+
+    @Test
+    fun conCorreos_sinCorreosDelBackend_devuelveUnMapaVacio() = runTest {
+        val env = env()
+
+        // El cuerpo por defecto trae el correo solo del primero; un Integrante no recibiría ninguno.
+        env.backend.body = """[{"userId":"u-1","role":"OWNER","displayName":"A"}]"""
+
+        assertEquals(FamilyMembersResult.Success(emptyMap<String, String>()), env.repository.refreshWithEmails("f-1"))
+    }
+
+    @Test
+    fun conCorreos_unFallo_lo_devuelve_yNoCambiaLoGuardado() = runTest {
+        val env = env()
+        env.local.save("f-1", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        env.backend.offline = true
+
+        val result = env.repository.refreshWithEmails("f-1")
+
+        assertEquals(FamilyMembersResult.Failure(FamilyMembersFailure.Network), result)
+        assertEquals(FamilyMembersData(remoteMembers, isStale = false), env.repository.members("f-1").first())
+    }
+
+    @Test
+    fun aplicarRol_cambiaElRolEnMemoriaYCache_conservandoElSavedAt() = runTest {
+        val env = env()
+        val savedAt = now - 1.hours.inWholeMilliseconds
+        env.local.save("f-1", "u-1", savedAt, remoteMembers)
+        env.repository.members("f-1").first()
+
+        env.repository.applyRole("f-1", "u-2", FamilyRole.OWNER)
+
+        val expected = listOf(remoteMembers[0], remoteMembers[1].copy(role = FamilyRole.OWNER))
+        assertEquals(FamilyMembersData(expected, isStale = false), env.repository.members("f-1").first())
+        assertEquals(Cached("u-1", savedAt, expected), env.local.read("f-1"))
+    }
+
+    @Test
+    fun aplicarBaja_quitaAlMiembroDeMemoriaYCache_conservandoElSavedAt() = runTest {
+        val env = env()
+        val savedAt = now - 30.hours.inWholeMilliseconds
+        env.local.save("f-1", "u-1", savedAt, remoteMembers)
+        env.repository.members("f-1").first()
+
+        env.repository.applyRemoval("f-1", "u-2")
+
+        assertEquals(FamilyMembersData(listOf(remoteMembers[0]), isStale = true), env.repository.members("f-1").first())
+        assertEquals(Cached("u-1", savedAt, listOf(remoteMembers[0])), env.local.read("f-1"))
+    }
+
+    @Test
+    fun aplicarCambios_sinListaCargadaOSinSesion_noHacenNada() = runTest {
+        val env = env()
+
+        env.repository.applyRole("f-1", "u-1", FamilyRole.MEMBER)
+        env.repository.applyRemoval("f-1", "u-1")
+        assertNull(env.local.read("f-1"))
+
+        env.repository.refresh("f-1")
+        env.session.failure = SessionFailure.NOT_SIGNED_IN
+        env.repository.applyRemoval("f-1", "u-2")
+
+        assertEquals(remoteMembers, env.local.read("f-1")?.value)
+    }
+
+    @Test
+    fun aplicarCambios_aUnMiembroQueNoEsta_noCambiaLaLista() = runTest {
+        val env = env()
+        env.repository.refresh("f-1")
+
+        env.repository.applyRole("f-1", "u-9", FamilyRole.OWNER)
+        env.repository.applyRemoval("f-1", "u-9")
+
+        assertEquals(remoteMembers, env.repository.members("f-1").first().members)
+    }
+
+    @Test
+    fun unRefrescoEnCurso_noDeshaceUnaBaja_niUnCambioDeRol() = runTest {
+        val env = env()
+        env.local.save("f-1", "u-1", now - 1.hours.inWholeMilliseconds, remoteMembers)
+        env.backend.gate = CompletableDeferred()
+        val refresh = async { env.repository.refresh("f-1") }
+        runCurrent()
+
+        env.repository.applyRemoval("f-1", "u-2")
+        env.repository.applyRole("f-1", "u-1", FamilyRole.MEMBER)
+        env.backend.gate!!.complete(Unit)
+        refresh.await()
+
+        val expected = listOf(remoteMembers[0].copy(role = FamilyRole.MEMBER))
+        assertEquals(expected, env.repository.members("f-1").first().members)
+        assertEquals(expected, env.local.read("f-1")?.value)
+    }
+
+    @Test
+    fun unRefrescoQueEmpiezaDespuesDeUnCambio_siTraeLosDatosDelBackend() = runTest {
+        val env = env()
+        env.repository.refresh("f-1")
+        env.repository.applyRemoval("f-1", "u-2")
+
+        env.repository.refresh("f-1")
+
+        assertEquals(remoteMembers, env.repository.members("f-1").first().members)
+    }
+
+    @Test
+    fun conCorreos_unRefrescoEnCursoConUnCambioLocal_devuelveLosCorreosPeroNoPisaLaLista() = runTest {
+        val env = env()
+        env.backend.body = withEmailsBody
+        env.repository.refresh("f-1")
+        env.backend.gate = CompletableDeferred()
+        val refresh = async { env.repository.refreshWithEmails("f-1") }
+        runCurrent()
+
+        env.repository.applyRemoval("f-1", "u-2")
+        env.backend.gate!!.complete(Unit)
+        val result = refresh.await()
+
+        assertEquals(mapOf("u-1" to "v@example.com", "u-2" to "s@example.com"), (result as FamilyMembersResult.Success).value)
+        assertEquals(listOf("u-1"), env.repository.members("f-1").first().members?.map { it.userId })
     }
 }

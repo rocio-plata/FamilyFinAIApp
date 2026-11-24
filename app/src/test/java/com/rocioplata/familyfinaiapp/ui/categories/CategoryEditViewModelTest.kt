@@ -105,6 +105,7 @@ class CategoryEditViewModelTest {
         }
 
         override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
         override suspend fun deprecateCategory(familyId: String, categoryId: String): CategoryResult<Unit> {
             archives += categoryId
             gate?.await()

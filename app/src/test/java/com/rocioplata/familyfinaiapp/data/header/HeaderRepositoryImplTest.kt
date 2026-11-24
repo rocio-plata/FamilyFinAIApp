@@ -55,6 +55,8 @@ class HeaderRepositoryImplTest {
     }
 
     private class Env(
+        val known: MutableList<Set<String>>,
+        var knownGate: CompletableDeferred<Unit>?,
         val repository: HeaderRepositoryImpl,
         val local: HeaderLocalDataSource,
         val backend: Backend,
@@ -83,8 +85,15 @@ class HeaderRepositoryImplTest {
         val local = HeaderLocalDataSource(store)
         val session = FixedSession()
         lateinit var env: Env
-        val repository = HeaderRepositoryImpl(HeaderRemoteDataSource(client, "http://x"), local, session) { env.clock }
-        env = Env(repository, local, backend, session, now)
+        val known = mutableListOf<Set<String>>()
+        val repository = HeaderRepositoryImpl(
+            HeaderRemoteDataSource(client, "http://x"), local, session,
+            onFamiliesKnown = {
+                known += it
+                env.knownGate?.await()
+            },
+        ) { env.clock }
+        env = Env(known, null, repository, local, backend, session, now)
         return env
     }
 
@@ -235,6 +244,319 @@ class HeaderRepositoryImplTest {
 
         assertEquals(HeaderFailure.Unauthorized, result.families)
         assertEquals(listOf(plata), env.local.readFamilies()?.value)
+    }
+
+    private val depto = Family("f-2", "Depto", FamilyRole.MEMBER, "CLP", memberCount = 2)
+
+    @Test
+    fun addFamily_laAnadeAlFinal_enMemoriaYCache_conservandoElSavedAt() = runTest {
+        val env = env()
+        env.seed(1.hours.inWholeMilliseconds)
+        env.backend.offline = allPaths
+        env.repository.refresh()
+
+        env.repository.addFamily(depto)
+
+        val families = env.repository.header.first().families
+        val savedAt = env.clock - 1.hours.inWholeMilliseconds
+        assertEquals(listOf(plata, depto), families?.value)
+        assertEquals(savedAt, families?.savedAtMillis)
+        assertEquals(Cached("u-1", savedAt, listOf(plata, depto)), env.local.readFamilies())
+    }
+
+    @Test
+    fun addFamily_conLosDatosAntiguos_siguenMarcadosComoDesactualizados() = runTest {
+        val env = env()
+        env.seed(30.hours.inWholeMilliseconds)
+        env.backend.offline = allPaths
+        env.repository.refresh()
+
+        env.repository.addFamily(depto)
+
+        assertTrue(env.repository.header.first().isStale)
+    }
+
+    @Test
+    fun addFamily_deUnaQueYaEsta_laSustituyeSinDuplicarla() = runTest {
+        val env = env()
+        env.repository.refresh()
+        val renamed = plata.copy(currency = "USD", memberCount = 5)
+
+        env.repository.addFamily(renamed)
+
+        assertEquals(listOf(renamed), env.repository.header.first().families?.value)
+        assertEquals(listOf(renamed), env.local.readFamilies()?.value)
+    }
+
+    @Test
+    fun removeFamily_laQuitaDeMemoriaYCache_yLasDemasSeConservan() = runTest {
+        val env = env()
+        env.repository.refresh()
+        env.repository.addFamily(depto)
+
+        env.repository.removeFamily("f-1")
+
+        assertEquals(listOf(depto), env.repository.header.first().families?.value)
+        assertEquals(listOf(depto), env.local.readFamilies()?.value)
+    }
+
+    @Test
+    fun setFamilyOrder_ordena_ignoraDesconocidasYDejaAlFinalLasNoMencionadas() = runTest {
+        val env = env()
+        env.repository.refresh()
+        val tercera = Family("f-3", "Tercera", FamilyRole.OWNER)
+        env.repository.addFamily(depto)
+        env.repository.addFamily(tercera)
+
+        env.repository.setFamilyOrder(listOf("f-3", "no-existe", "f-1", "f-3"))
+
+        val expected = listOf(tercera, plata, depto)
+        assertEquals(expected, env.repository.header.first().families?.value)
+        assertEquals(expected, env.local.readFamilies()?.value)
+    }
+
+    @Test
+    fun updateFamily_cambiaRolMonedaYMiembros_soloDeEsaFamilia() = runTest {
+        val env = env()
+        env.repository.refresh()
+        env.repository.addFamily(depto)
+
+        env.repository.updateFamily("f-2") { it.copy(role = FamilyRole.OWNER, currency = "USD", memberCount = 3) }
+        env.repository.updateFamily("no-existe") { it.copy(currency = "EUR") }
+
+        val expected = listOf(plata, Family("f-2", "Depto", FamilyRole.OWNER, "USD", 3))
+        assertEquals(expected, env.repository.header.first().families?.value)
+        assertEquals(expected, env.local.readFamilies()?.value)
+    }
+
+    @Test
+    fun cambiosDeFamilias_sinListaCargada_noHacenNada() = runTest {
+        val env = env()
+
+        env.repository.addFamily(depto)
+        env.repository.removeFamily("f-1")
+        env.repository.setFamilyOrder(listOf("f-1"))
+        env.repository.updateFamily("f-1") { it.copy(currency = "USD") }
+
+        assertNull(env.repository.header.first().families)
+        assertNull(env.local.readFamilies())
+    }
+
+    @Test
+    fun setPendingInvitations_loFijaEnMemoriaYCache_tambienSinListaDeFamilias() = runTest {
+        val env = env()
+
+        env.repository.setPendingInvitations(4)
+
+        assertEquals(4, env.repository.header.first().pendingInvitations?.value)
+        assertEquals(4, env.local.readPendingInvitations()?.value)
+        assertEquals("u-1", env.local.readPendingInvitations()?.userId)
+        assertNull(env.repository.header.first().families)
+    }
+
+    @Test
+    fun cambiosLocales_sinSesion_noHacenNada() = runTest {
+        val env = env()
+        env.repository.refresh()
+        env.session.failure = SessionFailure.NOT_SIGNED_IN
+
+        env.repository.addFamily(depto)
+        env.repository.setPendingInvitations(9)
+
+        assertEquals(listOf(plata), env.repository.header.first().families?.value)
+        assertEquals(2, env.repository.header.first().pendingInvitations?.value)
+        assertEquals(listOf(plata), env.local.readFamilies()?.value)
+    }
+
+    @Test
+    fun cambiosLocales_despuesDeClear_noHacenNada() = runTest {
+        val env = env()
+        env.repository.refresh()
+        env.repository.clear()
+
+        env.repository.addFamily(depto)
+
+        assertNull(env.repository.header.first().families)
+        assertNull(env.local.readFamilies())
+    }
+
+    @Test
+    fun unRefrescoEnCurso_noDeshaceUnaFamiliaAnadida_peroSiActualizaLosDemasRecursos() = runTest {
+        val env = env()
+        env.seed(1.hours.inWholeMilliseconds)
+        val gate = CompletableDeferred<Unit>()
+        env.backend.gate = gate
+        val refresh = async { env.repository.refresh() }
+        runCurrent()
+
+        env.repository.addFamily(depto)
+        gate.complete(Unit)
+        val result = refresh.await()
+
+        val data = env.repository.header.first()
+        assertTrue(result.isSuccessful)
+        assertEquals(listOf(plata, depto), data.families?.value)
+        assertEquals(listOf(plata, depto), env.local.readFamilies()?.value)
+        assertEquals(2, data.pendingInvitations?.value)
+        assertEquals("rocío", data.displayName?.value)
+    }
+
+    @Test
+    fun unRefrescoEnCurso_noDeshaceUnaBaja() = runTest {
+        val env = env()
+        env.seed(1.hours.inWholeMilliseconds)
+        val gate = CompletableDeferred<Unit>()
+        env.backend.gate = gate
+        val refresh = async { env.repository.refresh() }
+        runCurrent()
+
+        env.repository.removeFamily("f-1")
+        gate.complete(Unit)
+        refresh.await()
+
+        assertEquals(emptyList<Family>(), env.repository.header.first().families?.value)
+        assertEquals(emptyList<Family>(), env.local.readFamilies()?.value)
+    }
+
+    @Test
+    fun unRefrescoEnCurso_noDeshaceElContador_peroSiActualizaLasFamilias() = runTest {
+        val env = env()
+        env.seed(1.hours.inWholeMilliseconds)
+        val gate = CompletableDeferred<Unit>()
+        env.backend.gate = gate
+        val refresh = async { env.repository.refresh() }
+        runCurrent()
+
+        env.repository.setPendingInvitations(9)
+        gate.complete(Unit)
+        refresh.await()
+
+        val data = env.repository.header.first()
+        assertEquals(9, data.pendingInvitations?.value)
+        assertEquals(9, env.local.readPendingInvitations()?.value)
+        assertEquals(listOf(plata), data.families?.value)
+        assertEquals(env.clock, data.families?.savedAtMillis)
+    }
+
+    @Test
+    fun unRefrescoQueEmpiezaDespuesDeUnCambio_siTraeLosDatosDelBackend() = runTest {
+        val env = env()
+        env.repository.refresh()
+        env.repository.addFamily(depto)
+
+        env.repository.refresh()
+
+        // El backend de la prueba solo conoce f-1: un refresco posterior al cambio manda.
+        assertEquals(listOf(plata), env.repository.header.first().families?.value)
+    }
+
+    @Test
+    fun alAvisar_unRefrescoCorrectoEntregaLasFamiliasDelBackend() = runTest {
+        val env = env()
+
+        env.repository.refresh()
+
+        assertEquals(listOf(setOf("f-1")), env.known)
+    }
+
+    @Test
+    fun alAvisar_cadaCambioLocalDeFamiliasEntregaLaListaResultante() = runTest {
+        val env = env()
+        env.repository.refresh()
+        env.known.clear()
+
+        env.repository.addFamily(depto)
+        env.repository.updateFamily("f-2") { it.copy(currency = "USD") }
+        env.repository.setFamilyOrder(listOf("f-2", "f-1"))
+        env.repository.removeFamily("f-1")
+
+        assertEquals(listOf(setOf("f-1", "f-2"), setOf("f-1", "f-2"), setOf("f-1", "f-2"), setOf("f-2")), env.known)
+    }
+
+    @Test
+    fun alAvisar_nadaCuandoNoHayListaCargadaNiSesion() = runTest {
+        val env = env()
+
+        env.repository.addFamily(depto)
+        env.repository.refresh()
+        env.known.clear()
+        env.session.failure = SessionFailure.NOT_SIGNED_IN
+        env.repository.addFamily(depto)
+
+        assertEquals(emptyList<Set<String>>(), env.known)
+    }
+
+    @Test
+    fun alAvisar_nadaConUnFalloDeRedNiConLaCacheNiConElContador() = runTest {
+        val env = env()
+        env.seed(1.hours.inWholeMilliseconds)
+        env.backend.offline = allPaths
+
+        env.repository.refresh()
+        env.repository.setPendingInvitations(3)
+
+        assertEquals(emptyList<Set<String>>(), env.known)
+    }
+
+    @Test
+    fun alAvisar_nadaSiSoloFallanLasFamilias_peroSiCuandoFallaOtroRecurso() = runTest {
+        val env = env()
+        env.backend.offline = setOf("/me/families")
+        env.repository.refresh()
+        assertEquals(emptyList<Set<String>>(), env.known)
+
+        env.backend.offline = setOf("/me/invitations")
+        env.repository.refresh()
+        assertEquals(listOf(setOf("f-1")), env.known)
+    }
+
+    @Test
+    fun alAvisar_nadaSiLaListaSeDescartaPorUnCambioLocalDuranteElRefresco() = runTest {
+        val env = env()
+        env.seed(1.hours.inWholeMilliseconds)
+        val gate = CompletableDeferred<Unit>()
+        env.backend.gate = gate
+        val refresh = async { env.repository.refresh() }
+        runCurrent()
+        env.repository.addFamily(depto)
+        env.known.clear()
+
+        gate.complete(Unit)
+        refresh.await()
+
+        assertEquals(emptyList<Set<String>>(), env.known)
+    }
+
+    @Test
+    fun alAvisar_nadaSiSeBorraDuranteElRefrescoNiAlHacerClear() = runTest {
+        val env = env()
+        val gate = CompletableDeferred<Unit>()
+        env.backend.gate = gate
+        val refresh = async { env.repository.refresh() }
+        runCurrent()
+        env.repository.clear()
+
+        gate.complete(Unit)
+        refresh.await()
+
+        assertEquals(emptyList<Set<String>>(), env.known)
+    }
+
+    @Test
+    fun alAvisar_elCallbackSePuedeSuspenderSinBloquearLosCambiosDeLaCabecera() = runTest {
+        val env = env()
+        env.repository.refresh()
+        val release = CompletableDeferred<Unit>()
+        env.knownGate = release
+        val add = async { env.repository.addFamily(depto) }
+        runCurrent()
+
+        // El aviso sigue esperando, pero el candado de la cabecera ya se soltó: otro cambio no se bloquea.
+        env.repository.setPendingInvitations(1)
+        assertFalse(add.isCompleted)
+        assertEquals(1, env.repository.header.first().pendingInvitations?.value)
+        release.complete(Unit)
+        add.await()
     }
 
     @Test

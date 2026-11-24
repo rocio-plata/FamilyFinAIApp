@@ -214,6 +214,28 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   claro/oscuro. Una clave nula o desconocida usa un color de respaldo estable por posición entre las categorías del
   mismo tipo (las archivadas cuentan). `ColorUpdate` (`Unchanged`/`Remove`/`Set`) distingue no tocar, quitar y fijar en
   `updateCategory`. El color se guarda en `categories_cache` y se aplica a memoria y caché tras un cambio correcto.
+- **Gestión de familias** (`domain/family`, `data/family`, `ui/family`; 009): `FamilyManagementRepositoryImpl` (crear,
+  reordenar, ajustes y moneda, rol, quitar, salir, invitaciones enviadas) e `InvitationsRepositoryImpl` (recibidas, aceptar,
+  rechazar) devuelven `FamilyAccessResult` con un `FamilyAccessFailure` tipado; sin conexión devuelven `Offline` sin llamar al
+  backend y no hay cola offline. Las invitaciones no se guardan en disco: la lista recibida fija el contador de la campana y
+  cada respuesta lo baja. La fuente remota es `FamilyAccessRemoteDataSource` (errores `FAMILY.*`). **La cabecera es la fuente
+  de verdad de las familias**: `HeaderRepository` ganó cambios locales (`addFamily`, `removeFamily`, `setFamilyOrder`,
+  `updateFamily`, `setPendingInvitations`) y un refresco que llega con datos anteriores no los pisa (versión por recurso en
+  `HeaderRepositoryImpl`). `Family` lleva `memberCount` (opcional, de `GET /me/families`). **Familias perdidas (RF-23)**: tras
+  cada lista de familias vigente, la cabecera llama a `onFamiliesKnown` y `AppContainer` lo reenvía a `retainFamilies` de los
+  repositorios de categorías, medios de pago, movimientos y miembros, que borran de memoria y disco lo de las familias que ya no
+  están; cada uno recuerda el último conjunto vigente (`knownFamilyIds`) para que una descarga en curso de una perdida no se
+  guarde (en vez de una época por familia, ver PLAN de la 009). Los correos de los miembros solo los ve un Propietario y viven
+  en memoria del ViewModel (`refreshWithEmails`; `members_cache` nunca los guarda). Un fallo de red al crear una familia o
+  invitar es incierto: antes de reintentar se comprueba si ya existe para no duplicarla. Las claves de los ViewModels de
+  Movimientos y Dashboard incluyen `Family.currency`, así que cambiar la moneda los reinicia. Presentación:
+  `FamilyCreateViewModel` (crear), `FamilyManagementViewModel` («Mi familia»: miembros, rol, quitar, salir, moneda e
+  invitaciones enviadas con su formulario `InviteMemberDialog`) e `InvitationsViewModel` (recibidas: cargar, aceptar,
+  rechazar con confirmación y aviso «Cambiar a esta familia»; los tipos se llaman `Received…` para no chocar con los de las
+  enviadas). Todos permiten una sola operación a la vez, con el indicador fijado antes de lanzar la corrutina, y sus claves
+  llevan la sesión y la apertura de la ruta. Límites del backend vigentes (BG-01 a BG-09 en
+  `docs/features/009-family-management/BACKEND_GAPS.md`): el backend ya permite salir a un Integrante (BG-01, 2026-11-24, rama `feat/families-management-gaps` sin mergear a `main`; sin verificar en ejecución),
+  `FAMILY_ACCESS.INVITATION_ALREADY_PENDING` (BG-04, resuelta en el backend) se muestra como «ya invitado» y recarga la lista enviada, las invitaciones vencidas siguen `PENDING` (BG-05) y no se envía ningún correo (BG-08).
 - **Presentación**: `MainViewModel` combina el flujo del repositorio con estado local
   (familia activa solo en memoria, selector abierto, refresco en curso) en un
   `StateFlow<MainUiState>`; `FamiliesState` es un sealed interface
@@ -240,11 +262,19 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   origen. Una edición que mueve el movimiento a otro mes cierra todo de una vez (`closeManagement()`), porque el
   detalle ya no lo encontraría. `MainViewModel.onInsufficientRole()` vuelve a consultar la cabecera cuando el
   backend rechaza una acción por rol: si el usuario ya no es miembro, la familia desaparece y la ruta se cierra sola.
+  Las gestiones de familias son rutas en memoria del mismo estilo (`FamilyRoute.Manage`, `FamilyRoute.Create` e
+  `InvitationsRoute`): «Mi familia» está ligada a la familia activa con la que se abrió, mientras que crear familia e
+  invitaciones no dependen de ninguna y se abren también sin familias (`NoFamiliesContent`). El selector de familias se abre
+  siempre (también con una sola), permite reordenar arrastrando (`ui/common/DragReorder.kt`) y abre «Mi familia» y
+  «Crear familia»; la campana abre «Invitaciones» desde cualquier pestaña. Tras crear una familia se activa y se abre su gestión
+  (`MainViewModel.onFamilyCreated`); tras aceptar una invitación la activa no cambia salvo con «Cambiar a esta familia»
+  (`switchToFamily`, que lleva a Inicio). Si la familia activa desaparece, `MainUiState.notice` (`MainNotice.NoLongerMember`)
+  avisa con un aviso de una sola vez.
 - **Tests**: unitarios JVM con `kotlinx-coroutines-test` y `ktor-client-mock`; los de UI
   (`androidTest`) usan `TestMainHost`, que reproduce lo mínimo del ViewModel sobre la
   sobrecarga stateless de `MainScreen`, sin red ni caché; los de acceso (`AuthScreenTest`,
   `AppRootTest`) usan `AuthContent` y `AppRootContent` con repositorios falsos. Los repositorios falsos de los tests de movimientos (movimientos, categorías, medios de pago y
-  miembros) están compartidos en `app/src/test/…/ui/movements/Fakes.kt`.
+  miembros) están compartidos en `app/src/test/…/ui/movements/Fakes.kt`. Los tests de UI cuyos campos toman el foco cierran el teclado en un `@After` (`closeSoftKeyboard()`): si no, el siguiente test de la suite lo encuentra abierto y `pressBack` no llega a su diálogo.
 
 ## Documentación y especificaciones
 

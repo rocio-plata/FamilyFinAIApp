@@ -57,6 +57,7 @@ class CategoriesViewModelTest {
         }
 
         override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
         override suspend fun createCategory(familyId: String, type: CategoryType, name: String, icon: String?, color: String?) = unused()
         override suspend fun updateCategory(familyId: String, categoryId: String, newName: String?, icon: IconUpdate, color: ColorUpdate) =
             unused()

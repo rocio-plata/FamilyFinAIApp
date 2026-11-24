@@ -49,6 +49,7 @@ class PaymentMethodsViewModelTest {
         }
 
         override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 
         val created = mutableListOf<String>()
         val renamed = mutableListOf<Pair<String, String>>()

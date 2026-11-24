@@ -67,6 +67,33 @@ class HeaderLocalDataSourceTest {
     }
 
     @Test
+    fun elNumeroDeMiembros_seGuardaYSeLee() = runTest {
+        val source = HeaderLocalDataSource(newStore())
+        val withCount = listOf(
+            Family("f-1", "Familia Plata", FamilyRole.OWNER, "CLP", memberCount = 4),
+            Family("f-2", "Depto", FamilyRole.MEMBER, "EUR"),
+        )
+
+        source.saveFamilies("u-1", 1_000L, withCount)
+
+        assertEquals(Cached("u-1", 1_000L, withCount), source.readFamilies())
+    }
+
+    @Test
+    fun copiaAnteriorSinNumeroDeMiembros_sigueLeyendose_sinEl() = runTest {
+        val store = newStore()
+        store.edit {
+            it[stringPreferencesKey("families")] =
+                """{"schemaVersion":1,"userId":"u-1","savedAtMillis":5,"value":[{"id":"f-1","name":"Plata","role":"OWNER","currency":"CLP"}]}"""
+        }
+
+        assertEquals(
+            Cached("u-1", 5L, listOf(Family("f-1", "Plata", FamilyRole.OWNER, "CLP", memberCount = null))),
+            HeaderLocalDataSource(store).readFamilies(),
+        )
+    }
+
+    @Test
     fun sinDatos_devuelveNulo() = runTest {
         val source = HeaderLocalDataSource(newStore())
 

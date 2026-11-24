@@ -8,6 +8,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
+import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersData
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersRepository
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersResult
@@ -99,6 +100,7 @@ internal class FakeMovements : MovementsRepository {
     }
     override suspend fun lastUsedPaymentMethodId(familyId: String): String? = lastUsedPaymentMethodId
     override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }
 
 internal class FakeCategories : CategoriesRepository {
@@ -124,6 +126,7 @@ internal class FakeCategories : CategoriesRepository {
     override suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
     override suspend fun deleteTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
     override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }
 
 internal class FakePaymentMethods : PaymentMethodsRepository {
@@ -142,6 +145,7 @@ internal class FakePaymentMethods : PaymentMethodsRepository {
     override suspend fun deprecatePaymentMethod(familyId: String, paymentMethodId: String) = error("No se usa")
     override suspend fun deletePaymentMethod(familyId: String, paymentMethodId: String) = error("No se usa")
     override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }
 
 internal class FakeMembers : FamilyMembersRepository {
@@ -152,7 +156,14 @@ internal class FakeMembers : FamilyMembersRepository {
         refreshes++
         return FamilyMembersResult.Success(Unit)
     }
+    override suspend fun refreshWithEmails(familyId: String): FamilyMembersResult<Map<String, String>> {
+        refreshes++
+        return FamilyMembersResult.Success(emptyMap())
+    }
+    override suspend fun applyRole(familyId: String, userId: String, role: FamilyRole) = Unit
+    override suspend fun applyRemoval(familyId: String, userId: String) = Unit
     override suspend fun clear() = Unit
+    override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }
 
 internal class FakeConnectivity : ConnectivityObserver {

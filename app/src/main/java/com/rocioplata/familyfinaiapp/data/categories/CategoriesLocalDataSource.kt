@@ -53,6 +53,15 @@ class CategoriesLocalDataSource(
         store.edit { it.clear() }
     }
 
+    /** Borra la caché de las familias que no estén en [familyIds] (RF-23 de la 009); las demás no se tocan. */
+    suspend fun retainFamilies(familyIds: Set<String>) {
+        store.edit { prefs ->
+            prefs.asMap().keys
+                .filter { it.name.startsWith(KEY_PREFIX) && it.name.removePrefix(KEY_PREFIX) !in familyIds }
+                .forEach { prefs.remove(stringPreferencesKey(it.name)) }
+        }
+    }
+
     private fun keyOf(familyId: String) = stringPreferencesKey("$KEY_PREFIX$familyId")
 
     @Serializable

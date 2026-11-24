@@ -145,11 +145,11 @@ Elementos de los mockups 005/006 que el backend no ofrece (acordado omitirlos):
 - Contador "N reglas AI", insignia "Compartido", "ID: CAT-…" e indicador
   "IA sincronizada".
 - Tonalidad o color por categoría (ver `BACKEND_GAPS.md`, BG-02).
-- Fecha de archivado (BG-03) y texto de presupuesto en las archivadas.
-- "Reordenar" categorías (solo se reordenan tags; BG-04).
+- Fecha de archivado (BG-03, resuelta en el backend el 2026-11-24, pendiente de especificar) y texto de presupuesto en las archivadas.
+- "Reordenar" categorías (solo se reordenan tags; BG-04, resuelta en el backend el 2026-11-24, pendiente de especificar).
 - Número de movimientos ligados en el botón de eliminar.
 - Banner "Organización inteligente".
-- Reactivar una categoría o un tag archivados (ver `BACKEND_GAPS.md`, BG-01).
+- Reactivar una categoría o un tag archivados (ver `BACKEND_GAPS.md`, BG-01, resuelta en el backend el 2026-11-24, pendiente de especificar).
 
 Otras exclusiones acordadas:
 
@@ -160,7 +160,7 @@ Otras exclusiones acordadas:
   desglose de gastos. Pertenecen a la spec de Dashboard, que conservará el
   enlace "Gestionar" definido aquí.
 - Gestionar las categorías archivadas más allá de consultarlas y eliminarlas:
-  se definirá cuando el backend permita reactivarlas (BG-01).
+  se definirá cuando el backend permita reactivarlas (BG-01; ya lo permite desde el 2026-11-24, pendiente de especificar).
 
 Pertenecen a otras specs: elegir categoría y tag al registrar un movimiento,
 presupuestos por categoría e importes por categoría.
@@ -200,9 +200,9 @@ y comportamiento, sin diseñar tablas, DTO, DAO ni almacenamiento. -->
   tipo con el mismo nombre (cuentan también las archivadas) ni dos tags con el
   mismo nombre en una categoría. La app muestra el mensaje junto al campo y
   conserva lo escrito.
-- Orden: las categorías se muestran en el orden que devuelve el backend; los
+- Orden: las categorías se muestran en el orden que devuelve el backend (desde el 2026-11-24 es su `displayOrder`, BG-04); los
   tags, según su posición.
-- Archivar es irreversible. Una categoría archivada no admite tags nuevos.
+- Archivar es irreversible para la app (el backend ya permite reactivar desde el 2026-11-24, BG-01; pendiente de especificar). Una categoría archivada no admite tags nuevos.
 - Eliminar solo es posible si no hay movimientos asociados; el backend es
   quien lo determina.
 - El backend es la autoridad del rol. La app oculta las acciones al
@@ -212,9 +212,9 @@ y comportamiento, sin diseñar tablas, DTO, DAO ni almacenamiento. -->
   borrado al terminar la sesión). Es la regla común de toda la app para los
   datos guardados en el dispositivo.
 - Toda familia nace con 9 categorías de gasto creadas por el backend, sin
-  icono. No se crean categorías de ingreso por defecto, por lo que "Ingresos"
-  empieza vacío hasta que el Propietario cree alguna (ver `BACKEND_GAPS.md`,
-  BG-05).
+  icono. Desde el 2026-11-22 el backend crea también 3 de ingreso (`Salario`,
+  `Ventas`, `Otros`, BG-05); las familias creadas antes siguen con "Ingresos"
+  vacío hasta que el Propietario cree alguna.
 - Tras cada cambio con éxito, listado y detalle reflejan el resultado sin que
   el usuario tenga que actualizar manualmente.
 - Mensajes de error: según los códigos del contrato (§4 y §9).
@@ -228,7 +228,7 @@ ni conservación de todo el estado. Expresa resultados, no mecanismos técnicos.
 | Situación | Comportamiento esperado |
 | --- | --- |
 | Carga o acción en curso | Primera carga sin copia local: indicador de carga. Con copia local: se muestra y se actualiza al llegar los datos. Durante un guardado, la acción muestra progreso y queda deshabilitada; pulsaciones repetidas no duplican la operación. |
-| Sin datos | Tipo sin categorías (habitual en "Ingresos" de una familia nueva; el backend solo crea categorías de gasto por defecto): mensaje de vacío; al Propietario se le invita a crear una. Búsqueda sin resultados: mensaje específico. Categoría sin tags: mensaje de vacío en la sección de tags. |
+| Sin datos | Tipo sin categorías (en "Ingresos" de una familia creada antes del 2026-11-22, que no tiene categorías de ingreso por defecto, BG-05): mensaje de vacío; al Propietario se le invita a crear una. Búsqueda sin resultados: mensaje específico. Categoría sin tags: mensaje de vacío en la sección de tags. |
 | Entrada inválida | Nombre vacío o solo espacios: no se puede guardar. No se puede escribir más allá del límite. Duplicado: mensaje junto al campo. |
 | Error o espera excesiva | Sin copia local: error con "Reintentar". En una acción: mensaje de error, se conserva lo escrito y se puede reintentar. Si la categoría o el tag ya no existe, se informa y se actualiza la lista. |
 | Sin conexión o conexión interrumpida | Consulta con la copia local y aviso si es antigua; sin copia, error con reintento. Las acciones de cambio informan de que requieren conexión (RF-21). Al recuperar la conexión, los datos se actualizan. |
