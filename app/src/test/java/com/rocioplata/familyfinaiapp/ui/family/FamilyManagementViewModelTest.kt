@@ -1120,6 +1120,19 @@ class FamilyManagementViewModelTest {
     }
 
     @Test
+    fun siElBackendDiceQueYaHayInvitacionPendiente_seAvisaJuntoAlCampo_yRecargaLaLista() = runTest {
+        val rig = owner()
+        rig.management.failure = FamilyAccessFailure.InvitationAlreadyPending
+        val callsBefore = rig.management.sentCalls
+
+        submit(rig, "nuevo@example.com")
+
+        assertEquals(InviteFormError.AlreadyInvited, rig.state.inviteForm?.error)
+        assertEquals("nuevo@example.com", rig.state.inviteForm?.email)
+        assertEquals(callsBefore + 1, rig.management.sentCalls)
+    }
+
+    @Test
     fun invitar_conExito_cierraElFormulario_laAnadeALaLista_yAvisaDeComoLaVera() = runTest {
         val rig = owner(inv("a", "a@example.com", 3))
         rig.vm.openInviteForm()

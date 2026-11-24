@@ -34,7 +34,6 @@
         <item quantity="other">%d miembros</item>
     </plurals>
     <string name="family_selector_manage_description">Gestionar %1$s</string>
-    <string name="family_selector_handle_description">Arrastrar para reordenar %1$s</string>
     <string name="family_selector_move_up">Subir en la lista</string>
     <string name="family_selector_move_down">Bajar en la lista</string>
     <string name="family_selector_create">Crear nueva familia</string>

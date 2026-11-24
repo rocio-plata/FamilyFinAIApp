@@ -17,6 +17,7 @@ class FamilyTextsTest {
         assertEquals(R.string.family_error_not_a_member, FamilyAccessFailure.NotAMember.messageRes())
         assertEquals(R.string.family_error_last_owner, FamilyAccessFailure.LastOwner.messageRes())
         assertEquals(R.string.family_error_already_member, FamilyAccessFailure.AlreadyMember.messageRes())
+        assertEquals(R.string.family_invite_error_already_invited, FamilyAccessFailure.InvitationAlreadyPending.messageRes())
         assertEquals(R.string.family_error_invalid_email, FamilyAccessFailure.InvalidEmail.messageRes())
         assertEquals(R.string.family_error_member_not_found, FamilyAccessFailure.MemberNotFound.messageRes())
         assertEquals(R.string.family_error_invitation_not_found, FamilyAccessFailure.InvitationNotFound.messageRes())
@@ -39,6 +40,7 @@ class FamilyTextsTest {
             FamilyAccessFailure.Offline, FamilyAccessFailure.Network, FamilyAccessFailure.InvalidName,
             FamilyAccessFailure.InvalidOrder, FamilyAccessFailure.InsufficientRole, FamilyAccessFailure.NotAMember,
             FamilyAccessFailure.LastOwner, FamilyAccessFailure.AlreadyMember, FamilyAccessFailure.InvalidEmail,
+            FamilyAccessFailure.InvitationAlreadyPending,
             FamilyAccessFailure.MemberNotFound, FamilyAccessFailure.InvitationNotFound, FamilyAccessFailure.InvitationExpired,
             FamilyAccessFailure.InvitationNotPending, FamilyAccessFailure.InvitationNotForUser, FamilyAccessFailure.CurrencyLocked,
         ).map { it.messageRes() }

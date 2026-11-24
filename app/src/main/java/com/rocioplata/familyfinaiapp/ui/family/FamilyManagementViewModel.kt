@@ -259,11 +259,16 @@ class FamilyManagementViewModel(
                 when (result.failure) {
                     FamilyAccessFailure.Network -> uncertainInvite = UncertainInvite(email, idsBefore)
                     FamilyAccessFailure.InsufficientRole, FamilyAccessFailure.NotAMember -> onInsufficientRole()
+                    // La lista enviada estaba desactualizada (otro Propietario invitó antes): se recarga.
+                    FamilyAccessFailure.InvitationAlreadyPending -> loadInvitations()
                     else -> Unit
                 }
                 InviteOutcome.Error(
-                    if (result.failure == FamilyAccessFailure.AlreadyMember) InviteFormError.AlreadyMember
-                    else InviteFormError.Failure(result.failure),
+                    when (result.failure) {
+                        FamilyAccessFailure.AlreadyMember -> InviteFormError.AlreadyMember
+                        FamilyAccessFailure.InvitationAlreadyPending -> InviteFormError.AlreadyInvited
+                        else -> InviteFormError.Failure(result.failure)
+                    },
                 )
             }
         }

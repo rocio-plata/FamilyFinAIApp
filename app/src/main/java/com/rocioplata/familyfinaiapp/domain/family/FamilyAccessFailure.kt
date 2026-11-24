@@ -12,6 +12,9 @@ sealed interface FamilyAccessFailure {
     data object InvalidName : FamilyAccessFailure
     data object InvalidOrder : FamilyAccessFailure
     data object AlreadyMember : FamilyAccessFailure
+
+    /** Ya hay una invitación pendiente y vigente para ese correo en la familia (BG-04). */
+    data object InvitationAlreadyPending : FamilyAccessFailure
     data object InvalidEmail : FamilyAccessFailure
 
     /** Dejaría a la familia sin Propietario (RF-11). */

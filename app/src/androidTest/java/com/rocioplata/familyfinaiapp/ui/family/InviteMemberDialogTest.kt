@@ -27,10 +27,12 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.rocioplata.familyfinaiapp.domain.family.FamilyAccessFailure
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -40,6 +42,10 @@ import org.junit.runner.RunWith
 class InviteMemberDialogTest {
     @get:Rule
     val rule = createComposeRule()
+
+    /** Los campos de estos tests toman el foco: el teclado no debe quedar abierto para el test siguiente de la suite. */
+    @After
+    fun hideKeyboard() = closeSoftKeyboard()
 
     /** Hace de ViewModel: el estado vive fuera de la composición, como en la app. */
     private class Holder(initial: InviteFormState = InviteFormState(email = "", role = FamilyRole.MEMBER)) {

@@ -382,6 +382,7 @@ class FamilyAccessRemoteDataSourceTest {
         "FAMILY_ACCESS.INVALID_FAMILY_NAME" to FamilyAccessFailure.InvalidName,
         "FAMILY_ACCESS.INVALID_FAMILY_ORDER" to FamilyAccessFailure.InvalidOrder,
         "FAMILY_ACCESS.ALREADY_MEMBER" to FamilyAccessFailure.AlreadyMember,
+        "FAMILY_ACCESS.INVITATION_ALREADY_PENDING" to FamilyAccessFailure.InvitationAlreadyPending,
         "SHARED.INVALID_EMAIL" to FamilyAccessFailure.InvalidEmail,
         "FAMILY_ACCESS.CANNOT_REMOVE_LAST_OWNER" to FamilyAccessFailure.LastOwner,
         "FAMILY_ACCESS.MEMBER_NOT_FOUND" to FamilyAccessFailure.MemberNotFound,

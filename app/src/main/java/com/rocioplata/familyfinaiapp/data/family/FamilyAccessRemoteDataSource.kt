@@ -212,6 +212,7 @@ class FamilyAccessRemoteDataSource(
             code == "FAMILY_ACCESS.INVALID_FAMILY_NAME" -> FamilyAccessFailure.InvalidName
             code == "FAMILY_ACCESS.INVALID_FAMILY_ORDER" -> FamilyAccessFailure.InvalidOrder
             code == "FAMILY_ACCESS.ALREADY_MEMBER" -> FamilyAccessFailure.AlreadyMember
+            code == "FAMILY_ACCESS.INVITATION_ALREADY_PENDING" -> FamilyAccessFailure.InvitationAlreadyPending
             code == "SHARED.INVALID_EMAIL" -> FamilyAccessFailure.InvalidEmail
             code == "FAMILY_ACCESS.CANNOT_REMOVE_LAST_OWNER" -> FamilyAccessFailure.LastOwner
             code == "FAMILY_ACCESS.MEMBER_NOT_FOUND" -> FamilyAccessFailure.MemberNotFound

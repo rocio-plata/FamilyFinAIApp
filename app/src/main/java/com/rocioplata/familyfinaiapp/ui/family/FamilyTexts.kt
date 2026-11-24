@@ -15,6 +15,7 @@ fun FamilyAccessFailure.messageRes(): Int = when (this) {
     FamilyAccessFailure.NotAMember -> R.string.family_error_not_a_member
     FamilyAccessFailure.LastOwner -> R.string.family_error_last_owner
     FamilyAccessFailure.AlreadyMember -> R.string.family_error_already_member
+    FamilyAccessFailure.InvitationAlreadyPending -> R.string.family_invite_error_already_invited
     FamilyAccessFailure.InvalidEmail -> R.string.family_error_invalid_email
     FamilyAccessFailure.MemberNotFound -> R.string.family_error_member_not_found
     FamilyAccessFailure.InvitationNotFound -> R.string.family_error_invitation_not_found
