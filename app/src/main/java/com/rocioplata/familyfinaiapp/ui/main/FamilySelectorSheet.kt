@@ -75,6 +75,7 @@ import com.rocioplata.familyfinaiapp.R
 import com.rocioplata.familyfinaiapp.domain.family.FamilyAccessFailure
 import com.rocioplata.familyfinaiapp.domain.header.Family
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
+import com.rocioplata.familyfinaiapp.ui.common.RoleBadge
 import com.rocioplata.familyfinaiapp.ui.common.dragShift
 import com.rocioplata.familyfinaiapp.ui.common.dragTargetIndex
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
@@ -357,23 +358,6 @@ private fun FamilyRow(
                 Spacer(Modifier.width(8.dp))
             }
         }
-    }
-}
-
-@Composable
-private fun RoleBadge(role: FamilyRole, label: String) {
-    val owner = role == FamilyRole.OWNER
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = if (owner) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = if (owner) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            maxLines = 1,
-        )
     }
 }
 

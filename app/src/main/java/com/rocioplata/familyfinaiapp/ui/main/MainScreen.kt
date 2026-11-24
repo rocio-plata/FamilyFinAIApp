@@ -36,6 +36,7 @@ import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
 import com.rocioplata.familyfinaiapp.ui.dashboard.DashboardScreen
 import com.rocioplata.familyfinaiapp.ui.family.FamilyCreateScreen
+import com.rocioplata.familyfinaiapp.ui.family.FamilyManagementScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementDetailScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementFormScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementsScreen
@@ -125,7 +126,13 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
                 route == InvitationsRoute ->
                     ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
                 family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
-                route == FamilyRoute.Manage -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
+                route == FamilyRoute.Manage -> FamilyManagementScreen(
+                    familyId = family.id,
+                    viewModelKey = "${viewModelKey ?: "main"}-family-${family.id}",
+                    onBack = viewModel::managementBack,
+                    onInsufficientRole = viewModel::onInsufficientRole,
+                    modifier = modifier,
+                )
                 route is MovementRoute.Create -> MovementFormScreen(
                     familyId = family.id,
                     familyName = family.name,
