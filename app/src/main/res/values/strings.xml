@@ -191,6 +191,24 @@
     <string name="family_manage_title">Mi familia</string>
     <string name="family_create_title">Nueva familia</string>
     <string name="invitations_title">Invitaciones</string>
+    <string name="invitations_loading">Cargando invitaciones…</string>
+    <string name="invitations_empty_title">No tienes invitaciones pendientes</string>
+    <string name="invitations_empty_message">Cuando alguien te invite a una familia, la verás aquí.</string>
+    <string name="invitations_retry">Reintentar</string>
+    <string name="invitations_invited_by">Te invita %1$s</string>
+    <string name="invitations_invited_by_unknown">Te invita un miembro de la familia</string>
+    <string name="invitations_expires">Vence el %1$s</string>
+    <string name="invitations_accept">Aceptar</string>
+    <string name="invitations_accept_description">Aceptar la invitación a %1$s</string>
+    <string name="invitations_decline">Rechazar</string>
+    <string name="invitations_decline_description">Rechazar la invitación a %1$s</string>
+    <string name="invitations_decline_title">Rechazar la invitación a %1$s</string>
+    <string name="invitations_decline_message">Si cambias de opinión, necesitarás que te envíen una invitación nueva.</string>
+    <string name="invitations_decline_confirm">Rechazar</string>
+    <string name="invitations_busy">Respondiendo la invitación…</string>
+    <string name="invitations_accepted">Ahora eres parte de %1$s</string>
+    <string name="invitations_switch">Cambiar a esta familia</string>
+    <string name="invitations_declined">Invitación rechazada</string>
 
     <string name="family_currency_title">Moneda de la familia</string>
     <string name="family_currency_change">Cambiar moneda</string>
