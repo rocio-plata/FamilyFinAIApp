@@ -1,6 +1,6 @@
 # SPEC: Categorías reversibles y ordenables (reactivar, orden y fecha de archivado)
 
-**Estado:** Borrador <!-- Borrador | En revisión | Aprobada -->
+**Estado:** Aprobada (2026-11-24) <!-- Borrador | En revisión | Aprobada -->
 
 <!-- PARA LA PERSONA
 Copia esta plantilla como SPEC.md en una carpeta de la funcionalidad.
@@ -138,11 +138,17 @@ criterios, decisiones del plan y tareas. -->
   reordenan. Requiere conexión (RF-06) y no está disponible para el Integrante.
   Mientras haya texto en el buscador (RF-05 de la 005) «Reordenar» está
   desactivada, porque la lista filtrada daría un orden parcial; al borrar el
-  texto vuelve a estar disponible.
+  texto vuelve a estar disponible. «Reordenar» abre un modo de orden: las
+  activas muestran el asa y subir/bajar, tocarlas no abre la categoría, no se
+  muestran «Crear nueva categoría» ni las archivadas, y «Listo» (o atrás)
+  cierra el modo. Cada movimiento se guarda en el momento.
 - **RF-11:** Las categorías archivadas se muestran siempre después de las
   activas de su tipo. Al reactivar una categoría, queda como la **última de las
   activas** de su tipo, no en su posición anterior. Lo mismo vale para un tag
   reactivado dentro de su categoría: queda como el último de los activos.
+  Si la reactivación se confirma pero no se puede guardar su nueva posición,
+  queda activa donde la deje el backend y el aviso lo dice («Categoría
+  reactivada, pero no se pudo mover al final»; igual con el tag).
 - **RF-12:** Si el backend rechaza el orden (la lista de categorías cambió desde
   otro dispositivo o una ya no existe), se informa, la lista se actualiza con lo
   que devuelve el backend y no queda un orden a medias.
@@ -198,6 +204,9 @@ y comportamiento, sin diseñar tablas, DTO, DAO ni almacenamiento. -->
   backend tienen todas la misma posición: se muestran en el orden que devuelve
   el backend hasta que el Propietario las ordena por primera vez.
 - Fecha de archivado: solo informativa; si falta, no se inventa (RF-09).
+- Color de respaldo (RF-14 de la 008): una categoría sin color sigue usando el
+  de su posición, así que reordenar o reactivar puede cambiar su color, igual en
+  la gestión y en el dashboard. Archivar no cambia el color de las demás.
 
 ## Comportamiento mobile y casos alternativos
 
@@ -301,6 +310,10 @@ reordenar con arrastre y alternativa subir/bajar, guardado al soltar, solo
 activas y Propietario (RF-10).
 
 Con texto en el buscador «Reordenar» se desactiva (RF-10, CA-15).
+
+Resueltas el 2026-11-24 al planificar: «Reordenar» abre un modo con «Listo» (RF-10);
+si se reactiva pero no se puede mover al final, se avisa (RF-11); el color de
+respaldo sigue a la posición (Datos y reglas de negocio).
 
 Ninguna.
 
