@@ -95,13 +95,155 @@ class MainScreenTest {
     }
 
     @Test
-    fun singleFamilyHasNoSelector() {
+    fun aSingleFamilyOpensTheSelector_withManageAndCreate() {
         setHost(MainUiState(families = contentState(listOf(OwnerFamily)), displayName = "rocío"))
 
         composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).performClick()
 
+        composeTestRule.onNodeWithText("Elegir familia").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("family_manage").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("family_selector_create").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("family_handle_f1").assertCountEquals(0)
+    }
+
+    @Test
+    fun manageInTheSelectorOpensMyFamilyFullScreen_andBackReturnsToTheTab() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).performClick()
+
+        composeTestRule.onNodeWithTag("family_manage").performClick()
+
+        composeTestRule.onNodeWithTag("family_manage_screen").assertIsDisplayed()
         composeTestRule.onAllNodesWithText("Elegir familia").assertCountEquals(0)
-        composeTestRule.onNodeWithTag("test_dashboard_family").assertTextEquals("Familia Plata")
+        composeTestRule.onAllNodesWithContentDescription(OWNER_SELECTOR).assertCountEquals(0)
+        composeTestRule.onNodeWithTag("family_route_back").performClick()
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Inicio").assertIsSelected()
+    }
+
+    @Test
+    fun createInTheSelectorOpensTheCreateScreen_andTheSystemBackReturns() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).performClick()
+
+        composeTestRule.onNodeWithTag("family_selector_create").performClick()
+
+        composeTestRule.onNodeWithTag("family_create_screen").assertIsDisplayed()
+        pressBack()
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).assertIsDisplayed()
+    }
+
+    @Test
+    fun theSelectorListsEveryFamilyWithRoleAndOnlyTheActiveOneCanBeManaged() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithContentDescription(OWNER_SELECTOR).performClick()
+
+        composeTestRule.onNodeWithContentDescription("Familia Plata, Propietario, seleccionada").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Familia Gómez, Integrante").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("family_manage").assertCountEquals(1)
+    }
+
+    @Test
+    fun theBellOpensTheInvitations_withPending() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithContentDescription("Notificaciones, 3 invitaciones pendientes").performClick()
+
+        composeTestRule.onNodeWithTag("invitations_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("family_route_back").performClick()
+        composeTestRule.onNodeWithContentDescription("Notificaciones, 3 invitaciones pendientes").assertIsDisplayed()
+    }
+
+    @Test
+    fun theBellOpensTheInvitations_alsoWithoutPending() {
+        setHost(MainUiState(families = contentState(), pendingInvitations = 0))
+
+        composeTestRule.onNodeWithContentDescription("Notificaciones").performClick()
+
+        composeTestRule.onNodeWithTag("invitations_screen").assertIsDisplayed()
+    }
+
+    @Test
+    fun theBellIsAtLeast48dp() {
+        setHost(severalFamilies)
+
+        composeTestRule.onNodeWithContentDescription("Notificaciones, 3 invitaciones pendientes")
+            .assertTouchHeightIsEqualTo(48.dp).assertWidthIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun theBellOpensTheInvitationsFromAnyTab() {
+        setHost(severalFamilies)
+        composeTestRule.onNodeWithText("Reportes").performClick()
+
+        composeTestRule.onNodeWithContentDescription("Notificaciones, 3 invitaciones pendientes").performClick()
+        composeTestRule.onNodeWithTag("invitations_screen").assertIsDisplayed()
+        pressBack()
+
+        composeTestRule.onNodeWithText("Reportes").assertIsSelected()
+    }
+
+    // --- Sin familias (RF-24) ---
+
+    private val noFamilies = MainUiState(families = FamiliesState.NoData, pendingInvitations = 2, displayName = "rocío")
+
+    @Test
+    fun withoutFamilies_everyTabShowsTheMessageWithCreateAndInvitations_andNoAddButton() {
+        setHost(noFamilies)
+
+        listOf("Inicio", "Movimientos", "Reportes", "Presupuestos", "Asistente").forEach { tab ->
+            composeTestRule.onNodeWithText(tab).performClick()
+            composeTestRule.onNodeWithTag("no_families_content").assertIsDisplayed()
+            composeTestRule.onNodeWithText("Todavía no perteneces a ninguna familia").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("no_families_create").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("no_families_invitations").assertIsDisplayed()
+            composeTestRule.onAllNodesWithContentDescription("Agregar").assertCountEquals(0)
+        }
+    }
+
+    @Test
+    fun withoutFamilies_theHeaderSaysSo_andTheBellStillWorks() {
+        setHost(noFamilies)
+
+        composeTestRule.onNodeWithContentDescription("Sin familias").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Notificaciones, 2 invitaciones pendientes").performClick()
+        composeTestRule.onNodeWithTag("invitations_screen").assertIsDisplayed()
+    }
+
+    @Test
+    fun withoutFamilies_createAndSeeInvitationsOpenTheirScreens() {
+        setHost(noFamilies)
+
+        composeTestRule.onNodeWithTag("no_families_create").performClick()
+        composeTestRule.onNodeWithTag("family_create_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("family_route_back").performClick()
+        composeTestRule.onNodeWithTag("no_families_invitations").performClick()
+        composeTestRule.onNodeWithTag("invitations_screen").assertIsDisplayed()
+    }
+
+    @Test
+    fun withFamilies_theNoFamiliesMessageIsNotShown() {
+        setHost(severalFamilies)
+
+        composeTestRule.onAllNodesWithTag("no_families_content").assertCountEquals(0)
+        composeTestRule.onNodeWithContentDescription("Agregar").assertIsDisplayed()
+    }
+
+    // --- Aviso (RF-22) ---
+
+    @Test
+    fun aNoLongerMemberNotice_isShownOnceAndConfirmed() {
+        setHost(severalFamilies.copy(notice = MainNotice.NoLongerMember("Familia Gómez")))
+
+        composeTestRule.onNodeWithText("Ya no perteneces a Familia Gómez").assertIsDisplayed()
+    }
+
+    @Test
+    fun aNoticeWithoutAFamilyName_usesTheGenericText() {
+        setHost(severalFamilies.copy(notice = MainNotice.NoLongerMember("")))
+
+        composeTestRule.onNodeWithText("Ya no perteneces a esa familia").assertIsDisplayed()
     }
 
     @Test

@@ -21,15 +21,27 @@
     <string name="header_family_error">No se pudieron cargar las familias</string>
     <string name="header_family_error_description">No se pudieron cargar las familias. Toca para reintentar</string>
     <string name="header_retry">Reintentar</string>
-    <string name="header_no_data">Sin datos todavía</string>
+    <string name="header_no_data">Sin familias</string>
     <string name="header_stale_data_banner">Los datos podrían estar desactualizados. Conéctate para actualizarlos.</string>
 
     <string name="role_owner">Propietario</string>
     <string name="role_member">Integrante</string>
 
     <string name="family_selector_title">Elegir familia</string>
-    <string name="family_selector_item_description">%1$s, %2$s</string>
-    <string name="family_selector_item_selected_description">%1$s, %2$s, seleccionada</string>
+    <string name="family_selector_selected">seleccionada</string>
+    <plurals name="family_selector_members">
+        <item quantity="one">%d miembro</item>
+        <item quantity="other">%d miembros</item>
+    </plurals>
+    <string name="family_selector_manage_description">Gestionar %1$s</string>
+    <string name="family_selector_handle_description">Arrastrar para reordenar %1$s</string>
+    <string name="family_selector_move_up">Subir en la lista</string>
+    <string name="family_selector_move_down">Bajar en la lista</string>
+    <string name="family_selector_create">Crear nueva familia</string>
+    <string name="family_selector_error_offline">Reordenar las familias requiere conexión. Se mantiene el orden anterior.</string>
+    <string name="family_selector_error_network">No se pudo guardar el orden. Se mantiene el anterior; inténtalo de nuevo.</string>
+    <string name="family_selector_error_invalid_order">Tus familias cambiaron y se actualizó la lista. Inténtalo de nuevo.</string>
+    <string name="family_selector_error_generic">No se pudo guardar el orden. Se mantiene el anterior.</string>
     <string name="tab_content_title_with_family">%1$s · %2$s</string>
 
     <string name="fab_add_description">Agregar</string>
@@ -169,6 +181,18 @@
     <!-- Medios de pago (006-payment-methods). -->
     <string name="payment_methods_home_title">Medios de pago</string>
     <string name="payment_methods_home_manage_description">Gestionar medios de pago</string>
+    <string name="no_families_title">Todavía no perteneces a ninguna familia</string>
+    <string name="no_families_message">Crea una familia o acepta una invitación para empezar a registrar movimientos.</string>
+    <string name="no_families_create">Crear familia</string>
+    <string name="no_families_invitations">Ver invitaciones</string>
+    <string name="main_notice_no_longer_member">Ya no perteneces a %1$s</string>
+    <string name="main_notice_no_longer_member_unnamed">Ya no perteneces a esa familia</string>
+
+    <string name="family_manage_title">Mi familia</string>
+    <string name="family_create_title">Nueva familia</string>
+    <string name="invitations_title">Invitaciones</string>
+    <string name="family_back_description">Volver</string>
+
     <string name="payment_methods_title">Medios de pago</string>
     <string name="payment_methods_back_description">Volver</string>
     <string name="payment_methods_loading">Cargando medios de pago…</string>

@@ -95,6 +95,19 @@ fun TestMainHost(
             )
         },
         onDismissSelector = { state = state.copy(selectorOpen = false) },
+        onMoveFamily = { id, target ->
+            val content = state.families as FamiliesState.Content
+            val ids = content.families.map { it.id }.toMutableList()
+            val from = ids.indexOf(id)
+            if (from >= 0) {
+                ids.add(target.coerceIn(0, ids.lastIndex), ids.removeAt(from))
+                state = state.copy(families = content.copy(families = ids.map { f -> content.families.first { it.id == f } }))
+            }
+        },
+        onManageFamily = { state = state.copy(selectorOpen = false, managementRoute = FamilyRoute.Manage) },
+        onCreateFamily = { state = state.copy(selectorOpen = false, managementRoute = FamilyRoute.Create) },
+        onInvitationsClick = { state = state.copy(selectorOpen = false, managementRoute = InvitationsRoute) },
+        onNoticeConsumed = { state = state.copy(notice = null) },
         homeDashboardContent = { contentModifier ->
             val family = (state.families as? FamiliesState.Content)?.activeFamily
             if (family != null) {
@@ -134,6 +147,7 @@ fun TestMainHost(
                 PaymentMethodsRoute -> PaymentMethodsPlaceholder(onBack = back)
                 is CategoriesRoute -> CategoriesPlaceholder(onBack = back)
                 is MovementRoute -> MovementRoutePlaceholder(route, onBack = back)
+                is FamilyRoute, InvitationsRoute -> FamilyRoutePlaceholder(route, onBack = back)
             }
         },
         modifier = modifier,

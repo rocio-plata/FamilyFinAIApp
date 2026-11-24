@@ -2,6 +2,9 @@ package com.rocioplata.familyfinaiapp.ui.main
 
 import com.rocioplata.familyfinaiapp.data.network.ConnectivityObserver
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.family.FamilyAccessFailure
+import com.rocioplata.familyfinaiapp.domain.family.FamilyAccessResult
+import com.rocioplata.familyfinaiapp.domain.family.FamilyManagementRepository
 import com.rocioplata.familyfinaiapp.domain.header.Family
 import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.header.HeaderData
@@ -59,6 +62,34 @@ class MainViewModelTest {
         override suspend fun setPendingInvitations(count: Int) = Unit
     }
 
+    /** Solo reordena (lo único que usa el `MainViewModel`); al tener éxito actualiza la cabecera como el repositorio real. */
+    private class FakeFamilyManagement(private val header: FakeRepository) : FamilyManagementRepository {
+        val reorders = mutableListOf<List<String>>()
+        var result: FamilyAccessResult<Unit> = FamilyAccessResult.Success(Unit)
+        var gate: CompletableDeferred<Unit>? = null
+
+        override suspend fun reorderFamilies(orderedFamilyIds: List<String>): FamilyAccessResult<Unit> {
+            reorders += orderedFamilyIds
+            gate?.await()
+            if (result is FamilyAccessResult.Success) {
+                val families = header.data.value.families!!.value
+                val ordered = orderedFamilyIds.mapNotNull { id -> families.firstOrNull { it.id == id } }
+                header.data.value = header.data.value.copy(families = Timed(ordered, 1L))
+            }
+            return result
+        }
+
+        override suspend fun createFamily(name: String) = error("no se usa")
+        override suspend fun settings(familyId: String) = error("no se usa")
+        override suspend fun changeCurrency(familyId: String, currency: String) = error("no se usa")
+        override suspend fun changeMemberRole(familyId: String, memberId: String, newRole: FamilyRole) = error("no se usa")
+        override suspend fun removeMember(familyId: String, memberId: String) = error("no se usa")
+        override suspend fun leaveFamily(familyId: String) = error("no se usa")
+        override suspend fun sentInvitations(familyId: String) = error("no se usa")
+        override suspend fun invite(familyId: String, email: String, role: FamilyRole) = error("no se usa")
+        override suspend fun revokeInvitation(invitationId: String) = error("no se usa")
+    }
+
     private class FakeConnectivity : ConnectivityObserver {
         val flow = MutableSharedFlow<Boolean>(replay = 1)
         override val isOnline: Flow<Boolean> = flow
@@ -73,8 +104,12 @@ class MainViewModelTest {
     private fun families(vararg f: Family, stale: Boolean = false) =
         HeaderData(families = Timed(f.toList(), 1L), isStale = stale)
 
+    private val managements = mutableMapOf<FakeRepository, FakeFamilyManagement>()
+
+    private fun management(repo: FakeRepository) = managements.getOrPut(repo) { FakeFamilyManagement(repo) }
+
     private fun TestScope.create(repo: FakeRepository, connectivity: FakeConnectivity = FakeConnectivity()): MainViewModel {
-        val vm = MainViewModel(repo, connectivity)
+        val vm = MainViewModel(repo, connectivity, management(repo))
         backgroundScope.launch { vm.uiState.collect {} }
         advanceUntilIdle()
         return vm
@@ -122,15 +157,14 @@ class MainViewModelTest {
     }
 
     @Test
-    fun unaSolaFamilia_noAbreElSelector() = runTest {
+    fun unaSolaFamilia_abreElSelector() = runTest {
         val repo = FakeRepository().apply { onRefresh = { it.data.value = families(plata); HeaderRefreshResult() } }
         val vm = create(repo)
 
         vm.openSelector()
         advanceUntilIdle()
 
-        assertFalse(vm.content().hasSelector)
-        assertFalse(vm.uiState.value.selectorOpen)
+        assertTrue(vm.uiState.value.selectorOpen)
     }
 
     @Test
@@ -1043,5 +1077,467 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertNull(vm.route())
+    }
+
+    // --- Gestión de familias (009, T-14) ---
+
+    private val nueva = Family("f-3", "Nueva", FamilyRole.OWNER, "CLP", memberCount = 1)
+
+    private fun MainViewModel.open(route: ManagementRoute) = when (route) {
+        FamilyRoute.Manage -> openFamilyManagement()
+        FamilyRoute.Create -> openFamilyCreate()
+        InvitationsRoute -> openInvitations()
+        else -> error("no es una ruta de familias")
+    }
+
+    private val familyRoutes = listOf(FamilyRoute.Manage, FamilyRoute.Create, InvitationsRoute)
+
+    @Test
+    fun familias_cadaRutaSeAbreYAtrasVuelveALaPestanaDeOrigen() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+
+        for (route in familyRoutes) {
+            for (tab in MainDestination.entries) {
+                vm.selectTab(tab)
+                vm.open(route)
+                advanceUntilIdle()
+                assertEquals("$route desde $tab", route, vm.route())
+
+                vm.managementBack()
+                advanceUntilIdle()
+                assertNull("$route desde $tab", vm.route())
+                assertEquals(tab, vm.uiState.value.selectedTab)
+            }
+        }
+    }
+
+    @Test
+    fun miFamilia_seLigaALaFamiliaActiva_yNoSePuedeCambiarDeFamiliaMientrasEstaAbierta() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        vm.selectFamily("f-2")
+
+        vm.openFamilyManagement()
+        advanceUntilIdle()
+        vm.selectFamily("f-1")
+        advanceUntilIdle()
+
+        assertEquals(FamilyRoute.Manage, vm.route())
+        assertEquals(depto, vm.content().activeFamily)
+    }
+
+    @Test
+    fun crearFamiliaEInvitaciones_seAbrenSinNingunaFamilia_peroMiFamiliaNo() = runTest {
+        val (_, vm) = createWithFamilies()
+        assertEquals(FamiliesState.NoData, vm.uiState.value.families)
+
+        vm.openFamilyManagement()
+        advanceUntilIdle()
+        assertNull(vm.route())
+
+        vm.openFamilyCreate()
+        advanceUntilIdle()
+        assertEquals(FamilyRoute.Create, vm.route())
+        vm.managementBack()
+        vm.openInvitations()
+        advanceUntilIdle()
+        assertEquals(InvitationsRoute, vm.route())
+    }
+
+    @Test
+    fun conLasFamiliasSinCargar_soloSePuedeCrearOVerInvitaciones() = runTest {
+        val repo = FakeRepository().apply { onRefresh = { HeaderRefreshResult(families = HeaderFailure.Network) } }
+        val vm = create(repo)
+        assertEquals(FamiliesState.Error, vm.uiState.value.families)
+
+        vm.openFamilyManagement()
+        advanceUntilIdle()
+        assertNull(vm.route())
+
+        vm.openInvitations()
+        advanceUntilIdle()
+        assertEquals(InvitationsRoute, vm.route())
+    }
+
+    @Test
+    fun noSeAbreUnaGestionSobreOtra() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        val others = familyRoutes + listOf(CategoriesRoute.List, PaymentMethodsRoute, MovementRoute.Create())
+
+        for (first in familyRoutes) {
+            for (second in others.filter { it != first }) {
+                vm.open(first)
+                advanceUntilIdle()
+                when (second) {
+                    CategoriesRoute.List -> vm.openCategories()
+                    PaymentMethodsRoute -> vm.openPaymentMethods()
+                    is MovementRoute.Create -> vm.openMovementCreate()
+                    else -> vm.open(second)
+                }
+                advanceUntilIdle()
+                assertEquals("$second sobre $first", first, vm.route())
+                vm.managementBack()
+                advanceUntilIdle()
+            }
+        }
+    }
+
+    @Test
+    fun lasGestionesDeCategoriasYMediosDePago_noSeAbrenSobreLasDeFamilias() = runTest {
+        val (_, vm) = createWithFamilies(plata)
+        vm.openCategories()
+        advanceUntilIdle()
+
+        vm.openFamilyManagement()
+        vm.openFamilyCreate()
+        vm.openInvitations()
+        advanceUntilIdle()
+
+        assertEquals(CategoriesRoute.List, vm.route())
+    }
+
+    @Test
+    fun abrirUnaGestionDesdeElSelector_loCierra() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        vm.openSelector()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.selectorOpen)
+
+        vm.openFamilyManagement()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.selectorOpen)
+        assertEquals(FamilyRoute.Manage, vm.route())
+    }
+
+    @Test
+    fun familiaCreada_pasaAActiva_vaAInicio_yAbreSuGestion() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.selectTab(MainDestination.Movements)
+        vm.openFamilyCreate()
+        advanceUntilIdle()
+        val createInstance = vm.uiState.value.managementRouteInstance
+
+        repo.data.value = families(plata, depto, nueva)
+        vm.onFamilyCreated(nueva)
+        advanceUntilIdle()
+
+        assertEquals(nueva, vm.content().activeFamily)
+        assertEquals(MainDestination.Home, vm.uiState.value.selectedTab)
+        assertEquals(FamilyRoute.Manage, vm.route())
+        assertTrue(vm.uiState.value.managementRouteInstance > createInstance)
+        assertNull(vm.uiState.value.notice)
+
+        vm.managementBack()
+        advanceUntilIdle()
+        assertNull(vm.route())
+        assertEquals(nueva, vm.content().activeFamily)
+        assertEquals(MainDestination.Home, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun familiaCreada_sinElFormularioAbierto_seIgnora() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        repo.data.value = families(plata, depto, nueva)
+
+        vm.onFamilyCreated(nueva)
+        advanceUntilIdle()
+
+        assertEquals(plata, vm.content().activeFamily)
+        assertNull(vm.route())
+    }
+
+    @Test
+    fun familiaCreadaSinNingunaFamiliaAntes_tambienPasaAActivaYAbreSuGestion() = runTest {
+        val (repo, vm) = createWithFamilies()
+        vm.openFamilyCreate()
+        advanceUntilIdle()
+
+        repo.data.value = families(nueva)
+        vm.onFamilyCreated(nueva)
+        advanceUntilIdle()
+
+        assertEquals(nueva, vm.content().activeFamily)
+        assertEquals(FamilyRoute.Manage, vm.route())
+    }
+
+    @Test
+    fun cambiarAUnaFamilia_cierraLaGestion_laActivaYVaAInicio() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        vm.selectTab(MainDestination.Reports)
+        vm.openInvitations()
+        advanceUntilIdle()
+
+        vm.switchToFamily("f-2")
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        assertEquals(depto, vm.content().activeFamily)
+        assertEquals(MainDestination.Home, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun cambiarAUnaFamiliaQueNoEsta_soloCierraLaGestion() = runTest {
+        val (_, vm) = createWithFamilies(plata, depto)
+        vm.selectTab(MainDestination.Reports)
+        vm.openInvitations()
+        advanceUntilIdle()
+
+        vm.switchToFamily("f-9")
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        assertEquals(plata, vm.content().activeFamily)
+        assertEquals(MainDestination.Reports, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun laFamiliaDeMiFamiliaDesaparece_cierraAvisaConSuNombreYVuelveAInicioConLaFavorita() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.selectFamily("f-2")
+        vm.selectTab(MainDestination.Budgets)
+        vm.openFamilyManagement()
+        advanceUntilIdle()
+
+        repo.data.value = families(plata)
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        assertEquals(MainNotice.NoLongerMember("Depto"), vm.uiState.value.notice)
+        assertEquals(plata, vm.content().activeFamily)
+        assertEquals(MainDestination.Home, vm.uiState.value.selectedTab)
+
+        vm.consumeNotice()
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.notice)
+    }
+
+    @Test
+    fun laFamiliaDeOtraGestionDesaparece_cierraYAvisa_peroSinCambiarDePestana() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.selectFamily("f-2")
+        vm.selectTab(MainDestination.Movements)
+        vm.openPaymentMethods()
+        advanceUntilIdle()
+
+        repo.data.value = families(plata)
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        assertEquals(MainNotice.NoLongerMember("Depto"), vm.uiState.value.notice)
+        assertEquals(MainDestination.Movements, vm.uiState.value.selectedTab)
+    }
+
+    @Test
+    fun siUnaFamiliaDesapareceSinGestionAbierta_noHayAviso() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+
+        repo.data.value = families(plata)
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.notice)
+    }
+
+    @Test
+    fun crearFamiliaEInvitaciones_noSeCierranNiAvisanSiCambianLasFamilias() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.openInvitations()
+        advanceUntilIdle()
+
+        repo.data.value = families(plata)
+        advanceUntilIdle()
+        assertEquals(InvitationsRoute, vm.route())
+        assertNull(vm.uiState.value.notice)
+
+        vm.managementBack()
+        vm.openFamilyCreate()
+        repo.data.value = families()
+        advanceUntilIdle()
+        assertEquals(FamilyRoute.Create, vm.route())
+        assertNull(vm.uiState.value.notice)
+    }
+
+    @Test
+    fun siSePierdenLosDatosDeFamilias_laGestionLigadaSeCierraSinAviso() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        vm.openFamilyManagement()
+        advanceUntilIdle()
+
+        repo.data.value = HeaderData()
+        advanceUntilIdle()
+
+        assertNull(vm.route())
+        assertNull(vm.uiState.value.notice)
+    }
+
+    // --- Reordenar las familias (009, T-15) ---
+
+    private fun MainViewModel.order() = content().families.map { it.id }
+
+    @Test
+    fun reordenar_seVeEnseguida_yAlTenerExitoQuedaGuardado_sinCambiarLaActiva() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto, nueva)
+        vm.selectFamily("f-2")
+        vm.openSelector()
+        management(repo).gate = CompletableDeferred()
+
+        vm.moveFamily("f-3", 0)
+        advanceUntilIdle()
+
+        // Mientras se guarda: orden nuevo a la vista y el selector no admite otro movimiento.
+        assertEquals(listOf("f-3", "f-1", "f-2"), vm.order())
+        assertTrue(vm.uiState.value.isReordering)
+        assertEquals(listOf(listOf("f-3", "f-1", "f-2")), management(repo).reorders)
+
+        management(repo).gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf("f-3", "f-1", "f-2"), vm.order())
+        assertFalse(vm.uiState.value.isReordering)
+        assertNull(vm.uiState.value.selectorError)
+        assertEquals(depto, vm.content().activeFamily)
+        assertTrue(vm.uiState.value.selectorOpen)
+    }
+
+    @Test
+    fun reordenar_conFallo_vuelveElOrdenAnteriorYSeMuestraElError() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto, nueva)
+        management(repo).result = FamilyAccessResult.Failure(FamilyAccessFailure.Network)
+        vm.openSelector()
+
+        vm.moveFamily("f-3", 0)
+        advanceUntilIdle()
+
+        assertEquals(listOf("f-1", "f-2", "f-3"), vm.order())
+        assertEquals(FamilyAccessFailure.Network, vm.uiState.value.selectorError)
+        assertFalse(vm.uiState.value.isReordering)
+        assertEquals(1, repo.calls)
+    }
+
+    @Test
+    fun reordenar_sinConexion_informaYDejaElOrden() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        management(repo).result = FamilyAccessResult.Failure(FamilyAccessFailure.Offline)
+
+        vm.moveFamily("f-2", 0)
+        advanceUntilIdle()
+
+        assertEquals(listOf("f-1", "f-2"), vm.order())
+        assertEquals(FamilyAccessFailure.Offline, vm.uiState.value.selectorError)
+    }
+
+    @Test
+    fun reordenar_ordenInvalido_vuelveAConsultarLaCabecera() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        management(repo).result = FamilyAccessResult.Failure(FamilyAccessFailure.InvalidOrder)
+
+        vm.moveFamily("f-2", 0)
+        advanceUntilIdle()
+
+        assertEquals(FamilyAccessFailure.InvalidOrder, vm.uiState.value.selectorError)
+        assertEquals(2, repo.calls)
+    }
+
+    @Test
+    fun reordenar_dosSeguidos_soloUnaLlamada() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto, nueva)
+        management(repo).gate = CompletableDeferred()
+
+        vm.moveFamily("f-3", 0)
+        advanceUntilIdle()
+        vm.moveFamily("f-2", 0)
+        vm.moveFamily("f-3", 2)
+        advanceUntilIdle()
+        management(repo).gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, management(repo).reorders.size)
+        assertEquals(listOf("f-3", "f-1", "f-2"), vm.order())
+    }
+
+    @Test
+    fun reordenar_laActivaImplicitaSeConserva() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        assertEquals(plata, vm.content().activeFamily)
+
+        vm.moveFamily("f-2", 0)
+        advanceUntilIdle()
+
+        assertEquals(listOf("f-2", "f-1"), vm.order())
+        assertEquals(plata, vm.content().activeFamily)
+        assertEquals(1, management(repo).reorders.size)
+    }
+
+    @Test
+    fun reordenar_laPrimeraEsLaFavoritaDeUnViewModelNuevo() = runTest {
+        val (repo, first) = createWithFamilies(plata, depto)
+        first.moveFamily("f-2", 0)
+        advanceUntilIdle()
+        // El backend ya tiene el orden nuevo: el siguiente arranque lo recibe en el refresco inicial.
+        repo.onRefresh = { it.data.value = families(depto, plata); HeaderRefreshResult() }
+
+        val second = create(repo)
+
+        assertEquals(depto, second.content().activeFamily)
+    }
+
+    @Test
+    fun reordenar_aLaMismaPosicion_conUnaFamiliaDesconocida_oConUnaSola_noHaceNada() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+
+        vm.moveFamily("f-1", 0)
+        vm.moveFamily("f-9", 0)
+        vm.moveFamily("f-2", 5)
+        advanceUntilIdle()
+        assertEquals(emptyList<List<String>>(), management(repo).reorders)
+
+        val (solo, one) = createWithFamilies(plata)
+        one.moveFamily("f-1", 0)
+        advanceUntilIdle()
+        assertEquals(emptyList<List<String>>(), management(solo).reorders)
+    }
+
+    @Test
+    fun reordenar_elIndiceSeAjustaALosLimites() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto, nueva)
+
+        vm.moveFamily("f-1", 99)
+        advanceUntilIdle()
+
+        assertEquals(listOf(listOf("f-2", "f-3", "f-1")), management(repo).reorders)
+    }
+
+    @Test
+    fun elErrorDelSelector_seLimpiaAlCerrarloYAlMoverOtra() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto)
+        management(repo).result = FamilyAccessResult.Failure(FamilyAccessFailure.Network)
+        vm.openSelector()
+        vm.moveFamily("f-2", 0)
+        advanceUntilIdle()
+        assertEquals(FamilyAccessFailure.Network, vm.uiState.value.selectorError)
+
+        vm.dismissSelector()
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.selectorError)
+
+        vm.openSelector()
+        vm.moveFamily("f-2", 0)
+        advanceUntilIdle()
+        management(repo).result = FamilyAccessResult.Success(Unit)
+        vm.moveFamily("f-2", 0)
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.selectorError)
+    }
+
+    @Test
+    fun reordenar_siUnaFamiliaDesapareceMientrasSeGuarda_laListaMostradaNoLaResucita() = runTest {
+        val (repo, vm) = createWithFamilies(plata, depto, nueva)
+        management(repo).gate = CompletableDeferred()
+        vm.moveFamily("f-3", 0)
+        advanceUntilIdle()
+
+        repo.data.value = families(plata, nueva)
+        advanceUntilIdle()
+
+        assertEquals(listOf("f-3", "f-1"), vm.order())
     }
 }

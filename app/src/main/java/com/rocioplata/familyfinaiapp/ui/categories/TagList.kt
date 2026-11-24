@@ -59,12 +59,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.rocioplata.familyfinaiapp.R
+import com.rocioplata.familyfinaiapp.ui.common.dragShift
+import com.rocioplata.familyfinaiapp.ui.common.dragTargetIndex
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryValidation
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
-import kotlin.math.roundToInt
 
 /** Lo que la lista de tags le pide al ViewModel (RF-15 a RF-19). */
 data class TagActions(
@@ -417,24 +418,6 @@ private fun DragHandle(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-}
-
-/**
- * Posición entre los activos a la que corresponde un arrastre de [offsetPx] desde [from], siendo [stepPx] lo
- * que ocupa una fila más su separación. Se ajusta a los límites; sin paso medido no hay movimiento.
- */
-internal fun dragTargetIndex(from: Int, offsetPx: Float, stepPx: Float, count: Int): Int {
-    if (count <= 0) return 0
-    if (stepPx <= 0f) return from.coerceIn(0, count - 1)
-    return (from + (offsetPx / stepPx).roundToInt()).coerceIn(0, count - 1)
-}
-
-/** Cuánto se aparta (en px) la fila [index] para dejar sitio al tag que se arrastra de [from] a [target]. */
-internal fun dragShift(index: Int, from: Int, target: Int, stepPx: Float): Float = when {
-    index == from -> 0f
-    from < target && index in (from + 1)..target -> -stepPx
-    from > target && index in target until from -> stepPx
-    else -> 0f
 }
 
 @Composable

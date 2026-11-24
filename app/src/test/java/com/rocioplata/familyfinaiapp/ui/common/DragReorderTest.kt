@@ -1,9 +1,9 @@
-package com.rocioplata.familyfinaiapp.ui.categories
+package com.rocioplata.familyfinaiapp.ui.common
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class TagDragTest {
+class DragReorderTest {
     private val step = 100f
 
     // --- dragTargetIndex ---
