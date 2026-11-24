@@ -177,4 +177,51 @@ class FamilyMembersRemoteDataSourceTest {
 
         assertThrows(CancellationException::class.java) { runBlocking { source.members("f-1") } }
     }
+
+    @Test
+    fun conCorreos_devuelveElCorreoDeCadaMiembroQueLoTrae_recortadoYSinVacios() = runTest {
+        val body = """[{"userId":"u-1","role":"OWNER","displayName":"A","email":" a@example.com "},""" +
+            """{"userId":"u-2","role":"MEMBER","displayName":"B","email":null},""" +
+            """{"userId":"u-3","role":"MEMBER","email":"  "},""" +
+            """{"userId":"u-4","role":"MEMBER"}]"""
+
+        val payload = (source(reply(HttpStatusCode.OK, body)).membersWithEmails("f-1") as FamilyMembersResult.Success).value
+
+        assertEquals(mapOf("u-1" to "a@example.com"), payload.emails)
+        assertEquals(listOf("u-1", "u-2", "u-3", "u-4"), payload.members.map { it.userId })
+    }
+
+    @Test
+    fun conCorreos_unIntegrante_noRecibeCorreos() = runTest {
+        val body = """[{"userId":"u-1","role":"OWNER","displayName":"A"}]"""
+
+        val payload = (source(reply(HttpStatusCode.OK, body)).membersWithEmails("f-1") as FamilyMembersResult.Success).value
+
+        assertEquals(emptyMap<String, String>(), payload.emails)
+    }
+
+    @Test
+    fun conCorreos_losMismosFallosQueSinCorreos() = runTest {
+        assertEquals(
+            FamilyMembersResult.Failure(FamilyMembersFailure.NotAllowed),
+            source(reply(HttpStatusCode.Forbidden)).membersWithEmails("f-1"),
+        )
+        assertEquals(
+            FamilyMembersResult.Failure(FamilyMembersFailure.InvalidData),
+            source(reply(HttpStatusCode.OK, """[{"userId":"u-1","role":"JEFE"}]""")).membersWithEmails("f-1"),
+        )
+        assertEquals(
+            FamilyMembersResult.Failure(FamilyMembersFailure.Network),
+            source { throw IOException("sin red") }.membersWithEmails("f-1"),
+        )
+    }
+
+    @Test
+    fun conCorreos_elTextoDelResultadoNoLlevaCorreos() = runTest {
+        val body = """[{"userId":"u-1","role":"OWNER","displayName":"Ana","email":"a@example.com"}]"""
+
+        val payload = (source(reply(HttpStatusCode.OK, body)).membersWithEmails("f-1") as FamilyMembersResult.Success).value
+
+        assertEquals(false, payload.toString().contains("example.com"))
+    }
 }

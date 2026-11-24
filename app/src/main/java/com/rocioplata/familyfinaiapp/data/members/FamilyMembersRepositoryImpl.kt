@@ -1,6 +1,7 @@
 package com.rocioplata.familyfinaiapp.data.members
 
 import com.rocioplata.familyfinaiapp.data.cache.CachePolicy
+import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMember
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersData
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersFailure
@@ -40,6 +41,10 @@ class FamilyMembersRepositoryImpl(
     private val storageLock = Mutex()
     private var clearEpoch = 0
 
+    // Se sube con cada cambio local (rol o baja): un refresco que empezó antes descarta lo que trae, porque desharía el
+    // cambio hasta el refresco siguiente. Solo se lee y escribe con `storageLock`.
+    private var changeVersion = 0
+
     // Familias que el backend dice que siguen siendo del usuario (nulo hasta que se sabe). Una descarga en curso de una
     // que no está no se guarda, aunque no hubiera nada suyo en memoria ni en disco cuando se olvidaron (RF-23).
     // Solo se lee y escribe con `storageLock`.
@@ -72,13 +77,22 @@ class FamilyMembersRepositoryImpl(
         }
         try {
             synchronized(lastRefreshResults) { lastRefreshResults.remove(familyId) }
-            val result = fetch(familyId)
+            val result = fetch(familyId).map { }
             synchronized(lastRefreshResults) { lastRefreshResults[familyId] = result }
             return result
         } finally {
             lock.unlock()
         }
     }
+
+    /** Sin compartir resultado con otro refresco en curso: los correos solo los recibe quien los pide. */
+    override suspend fun refreshWithEmails(familyId: String): FamilyMembersResult<Map<String, String>> = fetch(familyId)
+
+    override suspend fun applyRole(familyId: String, userId: String, role: FamilyRole) =
+        changeMembers(familyId) { members -> members.map { if (it.userId == userId) it.copy(role = role) else it } }
+
+    override suspend fun applyRemoval(familyId: String, userId: String) =
+        changeMembers(familyId) { members -> members.filterNot { it.userId == userId } }
 
     // No espera a un refresco en curso: subir `clearEpoch` hace que ese refresco descarte lo que
     // obtenga en vez de guardarlo tras el borrado.
@@ -96,26 +110,42 @@ class FamilyMembersRepositoryImpl(
         state.update { entries -> entries.filterKeys { it in familyIds } }
     }
 
-    private suspend fun fetch(familyId: String): FamilyMembersResult<Unit> {
+    private suspend fun fetch(familyId: String): FamilyMembersResult<Map<String, String>> {
         val session = when (val current = session()) {
             is FamilyMembersResult.Failure -> return current
             is FamilyMembersResult.Success -> current.value
         }
-        val epoch = storageLock.withLock {
+        val (epoch, version) = storageLock.withLock {
             loadCache(familyId, session.userId)
-            clearEpoch
+            clearEpoch to changeVersion
         }
-        val remoteResult = remote.members(familyId)
+        val remoteResult = remote.membersWithEmails(familyId)
         if (remoteResult is FamilyMembersResult.Failure) return remoteResult
-        val members = (remoteResult as FamilyMembersResult.Success).value
+        val payload = (remoteResult as FamilyMembersResult.Success).value
         val now = clock()
         storageLock.withLock {
-            // Si se borró la caché mientras se esperaba la red, no se guarda nada.
-            if (epoch != clearEpoch || !isKnown(familyId)) return@withLock
-            local.save(familyId, session.userId, now, members)
-            state.update { it + (familyId to Entry(members, now)) }
+            // Si se borró la caché o se aplicó un cambio local mientras se esperaba la red, no se guarda nada.
+            if (epoch != clearEpoch || version != changeVersion || !isKnown(familyId)) return@withLock
+            local.save(familyId, session.userId, now, payload.members)
+            state.update { it + (familyId to Entry(payload.members, now)) }
         }
-        return FamilyMembersResult.Success(Unit)
+        return FamilyMembersResult.Success(payload.emails)
+    }
+
+    // Aplica un cambio a la lista ya cargada de la familia, conservando el `savedAt` de la última descarga.
+    private suspend fun changeMembers(familyId: String, change: (List<FamilyMember>) -> List<FamilyMember>) =
+        storageLock.withLock {
+            val entry = state.value[familyId] ?: return@withLock
+            val current = session() as? FamilyMembersResult.Success ?: return@withLock
+            changeVersion++
+            val updated = entry.copy(members = change(entry.members))
+            local.save(familyId, current.value.userId, updated.savedAtMillis, updated.members)
+            state.update { it + (familyId to updated) }
+        }
+
+    private fun <T, R> FamilyMembersResult<T>.map(transform: (T) -> R): FamilyMembersResult<R> = when (this) {
+        is FamilyMembersResult.Failure -> this
+        is FamilyMembersResult.Success -> FamilyMembersResult.Success(transform(value))
     }
 
     private suspend fun session(): FamilyMembersResult<Session> = try {

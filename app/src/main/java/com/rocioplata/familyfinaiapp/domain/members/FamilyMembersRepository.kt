@@ -1,5 +1,6 @@
 package com.rocioplata.familyfinaiapp.domain.members
 
+import com.rocioplata.familyfinaiapp.domain.header.FamilyRole
 import kotlinx.coroutines.flow.Flow
 
 sealed interface FamilyMembersFailure {
@@ -23,6 +24,22 @@ interface FamilyMembersRepository {
 
     /** Descarga la lista de miembros; nunca lanza por fallos de red o de servidor. */
     suspend fun refresh(familyId: String): FamilyMembersResult<Unit>
+
+    /**
+     * Como [refresh] y devuelve además el correo de cada miembro por su `userId` (RF-07). El backend solo los envía a un
+     * Propietario, así que el mapa puede venir vacío. Los correos no se guardan en memoria compartida ni en disco: quien
+     * los pide los conserva solo mientras los muestra.
+     */
+    suspend fun refreshWithEmails(familyId: String): FamilyMembersResult<Map<String, String>>
+
+    /**
+     * Aplica un cambio de rol ya confirmado por el backend (RF-09) a memoria y caché, conservando el `savedAt` de la última
+     * descarga. Sin lista cargada de la familia o sin sesión no hace nada.
+     */
+    suspend fun applyRole(familyId: String, userId: String, role: FamilyRole)
+
+    /** Quita a un miembro ya eliminado en el backend (RF-10); mismas reglas que [applyRole]. */
+    suspend fun applyRemoval(familyId: String, userId: String)
 
     /** Borra los datos guardados y en memoria al terminar la sesión; no espera a la red. */
     suspend fun clear()

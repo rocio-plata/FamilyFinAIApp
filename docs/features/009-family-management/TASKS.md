@@ -59,51 +59,51 @@ verificado.
 
 ## Dominio
 
-- [ ] **T-07 · Modelos, fallos y contratos**
+- [x] **T-07 · Modelos, fallos y contratos**
   - **Cubre:** RF-02, RF-05, RF-09 a RF-22 · **Depende de:** T-01
   - **Alcance:** `domain/family/`: `SentInvitation`, `ReceivedInvitation` (`toString()` sin correo ni nombres), `FamilySettings`, `FamilyAccessFailure` y `FamilyAccessResult`, `FamilyManagementRepository` e `InvitationsRepository`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.family.*"` (vigente o vencida justo antes, en y después de su fecha; `toString`). `grep` sin imports de `android`, `androidx`, `io.ktor` ni `kotlinx.serialization`.
   - **Hecho cuando:** los tests pasan y el dominio es puro.
-  - **Evidencia:** —
-- [ ] **T-08 · Validaciones de nombre y correo**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL; suite JVM completa: 1356 tests, 0 fallos, 0 errores, 0 omitidos (suma de `app/build/test-results/testDebugUnitTest`, de esta ejecución). `domain/family/`: `SentInvitation` (vencida a partir de un instante después de `expiresAt`, como el backend) y `ReceivedInvitation`, ambas con `toString()` sin correo ni nombres; `FamilySettings` con `CurrencyLockReason`; `FamilyAccessFailure` y `FamilyAccessResult`; las interfaces `FamilyManagementRepository` e `InvitationsRepository`. `FamilyInvitationTest` 2 tests (justo antes, en y después de la fecha; `toString`). `grep -rnE "import (android|androidx|io\.ktor|kotlinx\.serialization)"` sobre `domain/family` → sin resultados (el dominio es puro).
+- [x] **T-08 · Validaciones de nombre y correo**
   - **Cubre:** RF-04, RF-14, RF-17 (CA-05, CA-19) · **Depende de:** T-07
   - **Alcance:** `FamilyNameValidation` (recorte, vacío, 60, emojis por rangos de puntos de código, repetido sin distinguir mayúsculas) e `InvitationValidation` (recorte, vacío, formato con `AuthValidation`, 255, invitación vigente al mismo correo sin distinguir mayúsculas).
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.domain.family.*"`: límites 60/61 y 255/256; tildes, ñ y signos permitidos; emoji simple, compuesto, bandera y tecla rechazados; repetido con otras mayúsculas y espacios; invitación vencida permitida.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** Mismo resultado de la suite completa. `FamilyNameRulesTest` 10 y `InvitationValidationTest` 8 tests: límites 60/61 y 255/256, espacios extremos que no cuentan, tildes, ñ, signos y © ® ™ permitidos; rechazados emoji simple, compuesto, bandera, tecla, con tono de piel y símbolo del bloque de símbolos varios; repetido sin distinguir mayúsculas ni espacios; invitación vencida permitida y la que vence justo ahora todavía bloquea; orden de los errores. Los objetos se llaman `FamilyNameRules` e `InvitationValidation`, y los resultados `FamilyNameValidation` e `InvitationEmailValidation` (mismo patrón que `PaymentMethodValidation`).
 
 ## Datos de gestión e invitaciones
 
-- [ ] **T-09 · Origen remoto: familias y miembros**
+- [x] **T-09 · Origen remoto: familias y miembros**
   - **Cubre:** RF-02, RF-05, RF-09 a RF-13 · **Depende de:** T-07
   - **Alcance:** `data/family/FamilyAccessRemoteDataSource.kt`: crear, reordenar, ajustes, moneda, rol, quitar o salir, y la traducción de errores del plan. Un motivo de bloqueo desconocido se conserva como bloqueo sin motivo.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.family.FamilyAccessRemoteDataSourceTest"` (`ktor-client-mock`): método, ruta, cuerpo y estado de cada llamada; cada fila de la tabla de errores; JSON y rol desconocidos; red; cancelación relanzada.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-10 · Origen remoto: invitaciones**
+  - **Evidencia:** `FamilyAccessRemoteDataSourceTest` 37 tests (`ktor-client-mock`): método, ruta, cuerpo y Bearer de cada llamada; ajustes desbloqueada, bloqueada por movimientos y presupuestos y con un motivo desconocido (sigue bloqueada, sin motivos conocidos); moneda desconocida, rol desconocido y JSON ilegible → `InvalidData`; cada fila de la tabla de errores, probada en las 12 operaciones; `401` → `Unauthorized`; sin código o `500` → `Unknown`; un `200` donde se espera `204` no es éxito; red y espera excesiva → `Network`; cancelación relanzada en todas; identificadores codificados en la ruta. `FamilyAccessRemoteDataSource` (`data/family/`).
+- [x] **T-10 · Origen remoto: invitaciones**
   - **Cubre:** RF-14 a RF-21 · **Depende de:** T-09
   - **Alcance:** Listar enviadas, invitar, revocar, listar recibidas, aceptar y rechazar (las dos últimas sin cuerpo ni `Content-Type`).
   - **Validación:** el mismo test: cada llamada y sus errores, nombre de quien invita nulo, fecha ilegible → `InvalidData`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-11 · Miembros: correos y cambios**
+  - **Evidencia:** Mismo test y mismo resultado: enviadas (orden conservado, solo `PENDING`, vencidas devueltas, rol o fecha ilegibles → `InvalidData`), invitar (cuerpo `email` y `role`, `201`), revocar, recibidas (quien invita sin nombre o sin datos → nulo, vacías, fecha o rol ilegibles → `InvalidData`), aceptar y rechazar sin cuerpo ni `Content-Type` (se comprueba en la petición). Una sola clase para T-09 y T-10, como decía el plan.
+- [x] **T-11 · Miembros: correos y cambios**
   - **Cubre:** RF-07, RF-09, RF-10 (CA-08, CA-10, CA-12) · **Depende de:** T-05
   - **Alcance:** `FamilyMembersRepository`: refresco que además devuelve los correos sin guardarlos en memoria ni en disco, y aplicar un rol o una baja a memoria y caché; un refresco en curso no deshace el cambio.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.members.*"`: correos presentes, ausentes y nulos; lo guardado no contiene ningún correo; rol y baja aplicados con `savedAt` intacto; refresco en curso.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-12 · Repositorio de gestión**
+  - **Evidencia:** `FamilyMembersRemoteDataSourceTest` 16 (4 nuevos: correos recortados y sin vacíos, Integrante sin correos, mismos fallos que sin correos, el texto del resultado sin correos), `FamilyMembersRepositoryImplTest` 38 (10 nuevos: correos devueltos y lista actualizada; **lo guardado en disco contiene el nombre y ningún correo ni `@`**, leyendo los archivos del DataStore; Integrante sin correos; fallo sin cambiar lo guardado; rol y baja aplicados con `savedAt` intacto, también cuando los datos ya eran antiguos; sin lista cargada o sin sesión no hacen nada; un refresco en curso no deshace una baja ni un rol y uno posterior al cambio manda el backend; con correos y un cambio local en curso devuelve los correos sin pisar la lista). `FamilyMembersRepository` gana `refreshWithEmails`, `applyRole` y `applyRemoval`; versión de cambios local en el repositorio, como en la cabecera. Los correos solo existen en `MembersWithEmails`, cuyo `toString()` no los incluye.
+- [x] **T-12 · Repositorio de gestión**
   - **Cubre:** RF-02, RF-05, RF-09 a RF-17, RF-25 (CA-06, CA-11, CA-14, CA-16) · **Depende de:** T-02, T-09, T-10, T-11
   - **Alcance:** `FamilyManagementRepositoryImpl` y su alta en `AppContainer`: sin conexión devuelve `Offline` sin llamar; con éxito aplica a cabecera y miembros (alta al final, orden, rol propio, número de miembros, moneda, salida).
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.family.FamilyManagementRepositoryImplTest"`: cada operación con éxito, con fallo (nada cambia) y sin conexión (cero llamadas). `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-13 · Repositorio de invitaciones recibidas**
+  - **Evidencia:** `FamilyManagementRepositoryImplTest` 22 tests con la cabecera y los miembros falsos: crear (al final, Propietaria, un miembro), reordenar, ajustes sin tocar nada, moneda, rol de otro y rol propio (este también cambia la cabecera), quitar (baja el número de miembros, nunca por debajo de uno, ni lo inventa si no se conoce), salir (borra la familia de la cabecera; único Propietario, rol insuficiente y sin sesión sin cambios), invitaciones sin tocar cabecera ni miembros; cada operación con fallo no cambia nada; sin conexión: las 10 devuelven `Offline` con 0 llamadas. `AppContainer` gana `familyManagementRepository` (`assembleDebug` incluido en la ejecución anterior). Salir usa `DELETE …/members/<propio>` (BG-01).
+- [x] **T-13 · Repositorio de invitaciones recibidas**
   - **Cubre:** RF-18 a RF-21, RF-25 (CA-23, CA-24) · **Depende de:** T-02, T-10
   - **Alcance:** `InvitationsRepositoryImpl` y su alta en `AppContainer`: listar (fija el contador), aceptar (añade la familia de la invitación, baja el contador y refresca la cabecera) y rechazar (baja el contador).
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.family.InvitationsRepositoryImplTest"`: éxito, fallo, sin conexión; aceptar con el refresco fallido deja la familia en la lista sin moneda.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `InvitationsRepositoryImplTest` 11 tests: recibidas fija el contador con la lista (también a cero); aceptar añade la familia con nombre y rol de la invitación y sin moneda ni miembros, baja el contador (sin inventarlo si no se conoce y sin bajar de cero) y refresca, con la familia ya en la lista cuando se refresca; con fallo no cambia nada ni refresca; rechazar baja el contador sin refrescar; sin conexión: 0 llamadas. `AppContainer` gana `invitationsRepository`. Los tests con concurrencia de miembros y de estos repositorios se repitieron 3 veces con `--rerun` sin fallos. No se ejecutó `lintDebug` ni la suite instrumentada en esta sección.
 
 ## Navegación y selector
 

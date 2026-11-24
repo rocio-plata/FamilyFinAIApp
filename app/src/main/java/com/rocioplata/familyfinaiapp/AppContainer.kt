@@ -9,6 +9,9 @@ import com.rocioplata.familyfinaiapp.data.auth.AuthRepositoryImpl
 import com.rocioplata.familyfinaiapp.data.categories.CategoriesLocalDataSource
 import com.rocioplata.familyfinaiapp.data.categories.CategoriesRemoteDataSource
 import com.rocioplata.familyfinaiapp.data.categories.CategoriesRepositoryImpl
+import com.rocioplata.familyfinaiapp.data.family.FamilyAccessRemoteDataSource
+import com.rocioplata.familyfinaiapp.data.family.FamilyManagementRepositoryImpl
+import com.rocioplata.familyfinaiapp.data.family.InvitationsRepositoryImpl
 import com.rocioplata.familyfinaiapp.data.header.HeaderLocalDataSource
 import com.rocioplata.familyfinaiapp.data.header.HeaderRemoteDataSource
 import com.rocioplata.familyfinaiapp.data.header.HeaderRepositoryImpl
@@ -28,6 +31,8 @@ import com.rocioplata.familyfinaiapp.data.session.EncryptedSessionStore
 import com.rocioplata.familyfinaiapp.data.session.KeystoreSessionCipher
 import com.rocioplata.familyfinaiapp.domain.auth.AuthRepository
 import com.rocioplata.familyfinaiapp.domain.categories.CategoriesRepository
+import com.rocioplata.familyfinaiapp.domain.family.FamilyManagementRepository
+import com.rocioplata.familyfinaiapp.domain.family.InvitationsRepository
 import com.rocioplata.familyfinaiapp.domain.header.HeaderRepository
 import com.rocioplata.familyfinaiapp.domain.members.FamilyMembersRepository
 import com.rocioplata.familyfinaiapp.domain.movements.MovementDates
@@ -156,6 +161,26 @@ class AppContainer(context: Context) {
             sessionProvider = sessionManager,
             connectivity = connectivityObserver,
             dates = movementDates,
+        )
+    }
+
+    private val familyAccessRemote by lazy { FamilyAccessRemoteDataSource(apiClient, BuildConfig.BACKEND_BASE_URL) }
+
+    val familyManagementRepository: FamilyManagementRepository by lazy {
+        FamilyManagementRepositoryImpl(
+            remote = familyAccessRemote,
+            header = headerRepository,
+            members = membersRepository,
+            sessionProvider = sessionManager,
+            connectivity = connectivityObserver,
+        )
+    }
+
+    val invitationsRepository: InvitationsRepository by lazy {
+        InvitationsRepositoryImpl(
+            remote = familyAccessRemote,
+            header = headerRepository,
+            connectivity = connectivityObserver,
         )
     }
 
