@@ -191,6 +191,41 @@
     <string name="family_manage_title">Mi familia</string>
     <string name="family_create_title">Nueva familia</string>
     <string name="invitations_title">Invitaciones</string>
+
+    <string name="family_create_name_label">Nombre de la familia</string>
+    <string name="family_create_name_placeholder">Ej. Familia Silva, Casa Playa</string>
+    <string name="family_create_counter">%1$d / %2$d</string>
+    <string name="family_create_intro_title">Un espacio compartido</string>
+    <string name="family_create_intro_message">Crea una familia para llevar juntos los gastos, los ingresos y los presupuestos.</string>
+    <string name="family_create_info_name">Este nombre lo verán todas las personas que invites a la familia.</string>
+    <string name="family_create_info_currency">La familia se crea en pesos chilenos (CLP). Podrás cambiar la moneda en «Mi familia» antes de registrar el primer movimiento.</string>
+    <string name="family_create_save">Crear familia</string>
+    <string name="family_create_saving">Creando la familia…</string>
+    <string name="family_create_discard_title">¿Salir sin crear la familia?</string>
+    <string name="family_create_discard_message">Se perderá el nombre que escribiste.</string>
+    <string name="family_create_discard_confirm">Salir sin crear</string>
+    <string name="family_create_discard_keep">Seguir editando</string>
+    <string name="family_create_error_required">El nombre es obligatorio</string>
+    <string name="family_create_error_too_long">El nombre admite hasta 60 caracteres</string>
+    <string name="family_create_error_emoji">El nombre no puede llevar emojis</string>
+    <string name="family_create_error_duplicate">Ya perteneces a una familia con ese nombre</string>
+
+    <string name="family_error_offline">Esta acción requiere conexión. Lo que escribiste se conserva.</string>
+    <string name="family_error_network">No se pudo completar la acción. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="family_error_invalid_name">El nombre no es válido: debe tener entre 1 y 60 caracteres.</string>
+    <string name="family_error_invalid_order">Tus familias cambiaron y se actualizó la lista. Inténtalo de nuevo.</string>
+    <string name="family_error_insufficient_role">Ya no tienes permisos para hacer esto.</string>
+    <string name="family_error_not_a_member">Ya no perteneces a esta familia.</string>
+    <string name="family_error_last_owner">La familia debe tener al menos un Propietario. Nombra a otro antes.</string>
+    <string name="family_error_already_member">Esa persona ya es miembro de la familia.</string>
+    <string name="family_error_invalid_email">El correo no es válido.</string>
+    <string name="family_error_member_not_found">Esa persona ya no pertenece a la familia.</string>
+    <string name="family_error_invitation_not_found">La invitación ya no existe.</string>
+    <string name="family_error_invitation_expired">La invitación venció.</string>
+    <string name="family_error_invitation_not_pending">La invitación ya no está pendiente.</string>
+    <string name="family_error_invitation_not_for_user">Esta invitación no es para tu cuenta.</string>
+    <string name="family_error_currency_locked">No puedes cambiar la moneda mientras haya movimientos o presupuestos activos.</string>
+    <string name="family_error_generic">Algo salió mal. Inténtalo de nuevo.</string>
     <string name="family_back_description">Volver</string>
 
     <string name="payment_methods_title">Medios de pago</string>

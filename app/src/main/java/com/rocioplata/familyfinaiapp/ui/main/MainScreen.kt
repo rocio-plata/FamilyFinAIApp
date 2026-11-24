@@ -35,6 +35,7 @@ import com.rocioplata.familyfinaiapp.domain.movements.MovementType
 import com.rocioplata.familyfinaiapp.ui.categories.CategoriesScreen
 import com.rocioplata.familyfinaiapp.ui.categories.CategoryEditScreen
 import com.rocioplata.familyfinaiapp.ui.dashboard.DashboardScreen
+import com.rocioplata.familyfinaiapp.ui.family.FamilyCreateScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementDetailScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementFormScreen
 import com.rocioplata.familyfinaiapp.ui.movements.MovementsScreen
@@ -115,7 +116,13 @@ fun MainScreen(modifier: Modifier = Modifier, viewModelKey: String? = null) {
             val canManage = family?.role == FamilyRole.OWNER
             when {
                 // Crear familia e invitaciones no dependen de una familia: se abren también sin ninguna (RF-24).
-                route == FamilyRoute.Create || route == InvitationsRoute ->
+                route == FamilyRoute.Create -> FamilyCreateScreen(
+                    viewModelKey = "${viewModelKey ?: "main"}-family-create-${uiState.managementRouteInstance}",
+                    onCreated = viewModel::onFamilyCreated,
+                    onClose = viewModel::managementBack,
+                    modifier = modifier,
+                )
+                route == InvitationsRoute ->
                     ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
                 family == null -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)
                 route == FamilyRoute.Manage -> ManagementPlaceholder(route, onBack = viewModel::managementBack, modifier = modifier)

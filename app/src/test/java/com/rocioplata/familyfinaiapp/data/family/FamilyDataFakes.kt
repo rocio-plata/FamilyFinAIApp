@@ -46,6 +46,9 @@ internal class FakeHeaderRepository(
     )
     var refreshes = 0
 
+    /** Resultado de cada refresco; por defecto, todo correcto. */
+    var refreshResult: HeaderRefreshResult = HeaderRefreshResult()
+
     /** Se ejecuta al refrescar: permite comprobar qué había ya en la lista en ese momento. */
     var onRefresh: () -> Unit = {}
     override val header: Flow<HeaderData> = data
@@ -56,7 +59,7 @@ internal class FakeHeaderRepository(
     override suspend fun refresh(): HeaderRefreshResult {
         refreshes++
         onRefresh()
-        return HeaderRefreshResult()
+        return refreshResult
     }
 
     override suspend fun clear() {
