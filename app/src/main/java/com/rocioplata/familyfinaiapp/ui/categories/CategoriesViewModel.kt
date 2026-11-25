@@ -10,6 +10,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryResult
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
+import com.rocioplata.familyfinaiapp.domain.categories.ReactivationResult
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.Normalizer
+import java.time.YearMonth
+import java.time.ZoneId
 import java.util.Locale
 
 /**
@@ -34,6 +37,8 @@ class CategoriesViewModel(
     private val repository: CategoriesRepository,
     private val familyId: String,
     connectivity: ConnectivityObserver,
+    /** Zona en la que se lee el mes de archivado (RF-09 de la 010). */
+    private val zone: ZoneId = ZoneId.systemDefault(),
     private val onInsufficientRole: () -> Unit = {},
 ) : ViewModel() {
     private val selectedType = MutableStateFlow(CategoryType.EXPENSE)
@@ -96,6 +101,31 @@ class CategoriesViewModel(
                 when (val result = repository.deleteCategory(familyId, categoryId)) {
                     is CategoryResult.Success -> Unit
                     is CategoryResult.Failure -> handle(result.failure)
+                }
+            } finally {
+                opState.value = opState.value.copy(busy = false)
+            }
+        }
+    }
+
+    /**
+     * Reactivar una categoría archivada, ya confirmado por la persona (RF-01 de la 010). Queda como la última activa de
+     * su tipo; si eso no se pudo guardar, se avisa y se actualiza la lista (RF-11). Una operación a la vez (RF-06).
+     */
+    fun reactivate(categoryId: String) {
+        val category = latest.value?.firstOrNull { it.id == categoryId } ?: return
+        if (category.status != CategoryStatus.DEPRECATED) return
+        if (opState.getAndUpdate { it.copy(busy = true) }.busy) return
+        viewModelScope.launch {
+            try {
+                when (val result = repository.reactivateCategory(familyId, categoryId)) {
+                    ReactivationResult.Success -> setEvent(CategoriesEvent.Reactivated)
+                    is ReactivationResult.Partial -> {
+                        setEvent(CategoriesEvent.ReactivatedNotMoved)
+                        if (result.orderFailure == CategoryFailure.InsufficientRole) onInsufficientRole()
+                        refresh()
+                    }
+                    is ReactivationResult.Failure -> handle(result.failure)
                 }
             } finally {
                 opState.value = opState.value.copy(busy = false)
@@ -183,6 +213,7 @@ class CategoriesViewModel(
         category = this,
         activeTags = tags.filter { it.status == TagStatus.ACTIVE }.sortedBy { it.displayOrder },
         color = CategoryColors.resolve(this, all),
+        archivedAt = deprecatedAt?.takeIf { status == CategoryStatus.DEPRECATED }?.let { YearMonth.from(it.atZone(zone)) },
     )
 
     /**

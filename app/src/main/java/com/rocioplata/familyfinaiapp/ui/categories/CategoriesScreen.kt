@@ -36,7 +36,8 @@ fun CategoriesScreen(
         factory = viewModelFactory {
             initializer {
                 CategoriesViewModel(
-                    container.categoriesRepository, familyId, container.connectivityObserver, onInsufficientRole,
+                    container.categoriesRepository, familyId, container.connectivityObserver,
+                    onInsufficientRole = onInsufficientRole,
                 )
             }
         },
@@ -57,6 +58,7 @@ fun CategoriesScreen(
         onCreateClick = onCreateClick,
         onToggleArchived = viewModel::toggleArchived,
         onDeleteArchived = viewModel::deleteArchived,
+        onReactivateArchived = viewModel::reactivate,
         onEventConsumed = viewModel::consumeEvent,
         modifier = modifier,
     )

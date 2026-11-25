@@ -60,27 +60,27 @@ funcionalidad y se consulta antes de adaptar la app.
 
 ## Textos de archivar
 
-- [ ] **T-07 · Archivar ya no es irreversible**
+- [x] **T-07 · Archivar ya no es irreversible**
   - **Cubre:** RF-02, RF-05 (CA-04, CA-07) · **Depende de:** —
   - **Alcance:** `res/values/strings.xml`: `categories_dialog_archive_message`, `categories_dialog_has_items_offer_archive_message` y `categories_dialog_tag_has_items_offer_archive_message` indican que se puede reactivar desde «Categorías archivadas» (la de tag, desde la categoría), sin «no podrás reactivarla» ni «irreversible». Los de medios de pago no cambian.
   - **Validación:** `./gradlew :app:assembleDebug`; `CategoryEditContentTest` comprueba los tres textos (`./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.rocioplata.familyfinaiapp.ui.categories.CategoryEditContentTest`).
   - **Hecho cuando:** compila y el test pasa.
-  - **Evidencia:** —
+  - **Evidencia:** `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -P…class=…CategoriesContentTest,…CategoryEditContentTest` → BUILD SUCCESSFUL; `CategoryEditContentTest` 70 tests, 0 fallos (leído de `app/build/outputs/androidTest-results/connected/debug`, emulador «Medium_Phone_API_37.0», de esta ejecución). Los tres textos ya no dicen «no podrás reactivarla»: archivar indica «Podrás reactivarla desde «Categorías archivadas»», la oferta de archivar categoría «…y reactivarla más tarde desde «Categorías archivadas»» y la de tag «…y reactivarla más tarde desde esta categoría». Los tres tests que los comprueban se actualizaron (uno renombrado a `archivingAsksForConfirmationSayingItCanBeReactivatedAndCancelChangesNothing`). Los de medios de pago no cambian. Después de la ejecución se reinstaló la app en el emulador (`installDebug`).
 
 ## Listado: reactivar y fecha
 
-- [ ] **T-08 · Reactivar y «Archivada en …» en el ViewModel**
+- [x] **T-08 · Reactivar y «Archivada en …» en el ViewModel**
   - **Cubre:** RF-01, RF-06, RF-07, RF-09, RF-11 (CA-01, CA-08 a CA-11, CA-13) · **Depende de:** T-06
   - **Alcance:** `CategoriesViewModel.reactivate(categoryId)` (solo si sigue archivada; `busy` con `getAndUpdate`); eventos `Reactivated` y `ReactivatedNotMoved`; `NotFound` → aviso y refresco; `InsufficientRole` → aviso y `onInsufficientRole`. `CategoryItem.archivedAt: YearMonth?` en la zona del dispositivo. `formatShortMonth(YearMonth, locale)` en `ui/movements/MoneyFormat.kt`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.ui.categories.CategoriesViewModelTest"` y el test de `formatShortMonth`: contadores tras reactivar; cada evento; doble llamada → una petición; otra operación ignorada en curso; sin conexión; `archivedAt` con y sin fecha, nulo en activas.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-09 · Reactivar y fecha en el listado**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest :app:lintDebug` → BUILD SUCCESSFUL; `CategoriesViewModelTest` 45 (8 nuevos: reactivar pasa a las activas al final, actualiza contadores y avisa; parcial avisa y refresca; parcial por rol notifica al header; solo archivadas; sin conexión o con error avisa sin cambios; 404 avisa y refresca y rol notifica; dos pulsaciones u otra operación → una sola llamada; mes de archivado solo en archivadas con fecha y en la zona del dispositivo) y `MoneyFormatTest` 14 (1 nuevo: `formatShortMonth` con `Locale.US` → «Sep 2026» y en español empieza por «sep»), 0 fallos. Suite JVM completa: 1583 tests, 0 fallos, 0 errores, 0 omitidos. `CategoriesViewModel` recibe `zone: ZoneId = ZoneId.systemDefault()` antes de `onInsufficientRole` (`CategoriesScreen` lo pasa por nombre). `formatShortMonth` usa la abreviatura de la configuración regional tal cual (en español del JDK puede ser «sept.»); la spec la pide «con el formato del dispositivo».
+- [x] **T-09 · Reactivar y fecha en el listado**
   - **Cubre:** RF-01, RF-03, RF-09 (CA-01 a CA-03, CA-13, CA-19) · **Depende de:** T-07, T-08
   - **Alcance:** `CategoriesContent`: «Reactivar» antes de «Eliminar» en el ⋮ de `ArchivedRow` (solo `canManage`, desactivado en curso), diálogo de confirmación con el id en `rememberSaveable`, avisos de los eventos nuevos y «Archivada en <mes año>» o solo «Archivada». Descripción accesible con el nombre. `CategoriesScreen` conecta la acción.
   - **Validación:** `CategoriesContentTest` (instrumentado): confirmar llama a la acción; cancelar no; Integrante sin «Reactivar»; textos de fecha con y sin ella; avisos. `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** Misma ejecución instrumentada de T-07: `CategoriesContentTest` 43 tests (8 nuevos: el Propietario reactiva tras confirmar; cancelar no hace nada; la opción «Reactivar» mide al menos 48 dp y se anuncia «Reactivar Gimnasio»; un Integrante no la ve y abre la archivada en solo lectura; la confirmación sobrevive a recrear la pantalla; «Archivada en <mes>» o solo «Archivada»; avisos «Categoría reactivada» y «…pero no se pudo mover al final», consumidos una vez), 0 fallos. Lint: 0 errores y 25 avisos, ninguno de estos cambios (versiones de dependencias y AGP, `OldTargetApi`, `RedundantLabel`, `LockedOrientationActivity`, `DiscouragedApi`, `Typos` en «momento» y un recurso de auth sin usar). `CategoriesContent` gana `onReactivateArchived` (con valor por defecto, para no tocar las vistas previas). No se ejecutó la suite instrumentada completa ni se probó contra el backend (T-14, T-15).
 
 ## Listado: orden
 

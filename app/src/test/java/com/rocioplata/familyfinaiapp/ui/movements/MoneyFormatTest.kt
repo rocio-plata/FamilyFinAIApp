@@ -86,6 +86,13 @@ class MoneyFormatTest {
     }
 
     @Test
+    fun mesAbreviado_usaLaAbreviaturaDeLaConfiguracionRegional() {
+        assertEquals("Sep 2026", formatShortMonth(YearMonth.of(2026, 9), us))
+        val spanish = formatShortMonth(YearMonth.of(2026, 9), es)
+        assertTrue(spanish, spanish.startsWith("sep") && spanish.endsWith(" 2026"))
+    }
+
+    @Test
     fun formatoDeFechaCompleta() {
         val text = formatDate(LocalDate.of(2026, 11, 12), es)
 

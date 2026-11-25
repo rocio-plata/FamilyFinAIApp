@@ -10,6 +10,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
+import com.rocioplata.familyfinaiapp.domain.categories.ReactivationResult
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import kotlinx.coroutines.CompletableDeferred
@@ -32,6 +33,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CategoriesViewModelTest {
@@ -80,7 +84,26 @@ class CategoriesViewModelTest {
         override suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String) = unused()
         override suspend fun deleteTag(familyId: String, categoryId: String, tagId: String) = unused()
 
-        override suspend fun reactivateCategory(familyId: String, categoryId: String) = unused()
+        val reactivations = mutableListOf<String>()
+        var reactivateGate: CompletableDeferred<Unit>? = null
+        var reactivateResult: ReactivationResult = ReactivationResult.Success
+
+        override suspend fun reactivateCategory(familyId: String, categoryId: String): ReactivationResult {
+            reactivations += categoryId
+            reactivateGate?.await()
+            if (reactivateResult !is ReactivationResult.Failure) {
+                // Como el repositorio real: activa y, si se pudo, al final de las activas de su tipo.
+                val list = data.value.categories.orEmpty()
+                val target = list.first { it.id == categoryId }.copy(status = CategoryStatus.ACTIVE, deprecatedAt = null)
+                val updated = if (reactivateResult == ReactivationResult.Success) {
+                    list.filterNot { it.id == categoryId } + target
+                } else {
+                    list.map { if (it.id == categoryId) target else it }
+                }
+                data.value = CategoriesData(updated, data.value.isStale)
+            }
+            return reactivateResult
+        }
         override suspend fun reorderCategories(familyId: String, type: CategoryType, activeCategoryIdsInOrder: List<String>) =
             unused()
 
@@ -606,5 +629,137 @@ class CategoriesViewModelTest {
         advanceUntilIdle()
 
         assertNull(vm.content().event)
+    }
+
+    // --- Reactivar y fecha de archivado (T-08 de la 010; RF-01, RF-06, RF-07, RF-09, RF-11) ---
+
+    @Test
+    fun reactivar_pasaALasActivasAlFinal_actualizaContadoresYAvisa() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+
+        vm.reactivate("c-3")
+        advanceUntilIdle()
+
+        assertEquals(listOf("c-3"), repo.reactivations)
+        assertEquals(listOf("c-1", "c-2", "c-3"), vm.content().active.map { it.id() })
+        assertTrue(vm.content().archived.isEmpty())
+        assertEquals(3, vm.content().expenseActiveCount)
+        assertEquals(CategoriesEvent.Reactivated, vm.content().event)
+        assertFalse(vm.content().isBusy)
+    }
+
+    @Test
+    fun reactivar_sinPoderMoverlaAlFinal_avisaYActualizaLaLista() = runTest {
+        val repo = repoWith().apply { reactivateResult = ReactivationResult.Partial(CategoryFailure.Network) }
+        val vm = create(repo)
+        val refreshesBefore = repo.refreshed.size
+
+        vm.reactivate("c-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.ReactivatedNotMoved, vm.content().event)
+        assertEquals(refreshesBefore + 1, repo.refreshed.size)
+        assertTrue(vm.content().archived.isEmpty())
+        assertEquals(0, roleCalls)
+    }
+
+    @Test
+    fun reactivar_parcialPorRol_notificaAlHeader() = runTest {
+        val repo = repoWith().apply { reactivateResult = ReactivationResult.Partial(CategoryFailure.InsufficientRole) }
+        val vm = create(repo)
+
+        vm.reactivate("c-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.ReactivatedNotMoved, vm.content().event)
+        assertEquals(1, roleCalls)
+    }
+
+    @Test
+    fun reactivar_soloUnaCategoriaArchivada() = runTest {
+        val repo = repoWith()
+        val vm = create(repo)
+
+        vm.reactivate("c-1")
+        vm.reactivate("c-404")
+        advanceUntilIdle()
+
+        assertTrue(repo.reactivations.isEmpty())
+    }
+
+    @Test
+    fun reactivar_sinConexionOConError_avisaYNoCambiaNada() = runTest {
+        listOf(CategoryFailure.Offline, CategoryFailure.Network, CategoryFailure.Unknown).forEach { failure ->
+            val repo = repoWith().apply { reactivateResult = ReactivationResult.Failure(failure) }
+            val vm = create(repo)
+
+            vm.reactivate("c-3")
+            advanceUntilIdle()
+
+            assertEquals(CategoriesEvent.Failed(failure), vm.content().event)
+            assertEquals(listOf("c-3"), vm.content().archived.map { it.id() })
+            assertFalse(vm.content().isBusy)
+        }
+    }
+
+    @Test
+    fun reactivar_queYaNoExiste_avisaYActualiza_yPorRol_notificaAlHeader() = runTest {
+        val gone = repoWith().apply { reactivateResult = ReactivationResult.Failure(CategoryFailure.NotFound) }
+        val vm = create(gone)
+        val refreshesBefore = gone.refreshed.size
+
+        vm.reactivate("c-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.Failed(CategoryFailure.NotFound), vm.content().event)
+        assertEquals(refreshesBefore + 1, gone.refreshed.size)
+
+        val noRole = repoWith().apply { reactivateResult = ReactivationResult.Failure(CategoryFailure.InsufficientRole) }
+        val vm2 = create(noRole)
+        vm2.reactivate("c-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.Failed(CategoryFailure.InsufficientRole), vm2.content().event)
+        assertEquals(1, roleCalls)
+    }
+
+    @Test
+    fun reactivar_dosPulsacionesUOtraOperacion_unaSolaLlamada() = runTest {
+        val repo = repoWith().apply { reactivateGate = CompletableDeferred() }
+        val vm = create(repo)
+
+        vm.reactivate("c-3")
+        vm.reactivate("c-3")
+        vm.deleteArchived("c-3")
+        advanceUntilIdle()
+        assertTrue(vm.content().isBusy)
+        repo.reactivateGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.reactivations.size)
+        assertTrue(repo.deletes.isEmpty())
+        assertFalse(vm.content().isBusy)
+    }
+
+    @Test
+    fun mesDeArchivado_soloEnArchivadasConFecha_enLaZonaDelDispositivo() = runTest {
+        val repo = FakeRepository().apply {
+            data.value = CategoriesData(
+                listOf(
+                    comida.copy(deprecatedAt = Instant.parse("2026-09-01T02:00:00Z")),
+                    gimnasio.copy(deprecatedAt = Instant.parse("2026-09-01T02:00:00Z")),
+                    category("c-6", "Viaje", status = CategoryStatus.DEPRECATED),
+                ),
+            )
+        }
+        roleCalls = 0
+        val vm = CategoriesViewModel(repo, "f-1", FakeConnectivity(), ZoneId.of("America/Santiago")) { roleCalls++ }
+        backgroundScope.launch { vm.uiState.collect {} }
+        advanceUntilIdle()
+
+        assertNull(vm.content().active.single().archivedAt)
+        // A las 02:00 UTC del 1 de septiembre en Santiago todavía es agosto.
+        assertEquals(listOf(YearMonth.of(2026, 8), null), vm.content().archived.map { it.archivedAt })
     }
 }

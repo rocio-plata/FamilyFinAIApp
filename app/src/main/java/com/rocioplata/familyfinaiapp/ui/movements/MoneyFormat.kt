@@ -47,6 +47,10 @@ fun formatDay(date: LocalDate, locale: Locale = Locale.getDefault()): String =
 fun formatMonth(month: YearMonth, locale: Locale = Locale.getDefault()): String =
     DateTimeFormatter.ofPattern("LLLL yyyy", locale).format(month).capitalized(locale)
 
+/** Mes abreviado con la abreviatura de la configuración regional, p. ej. "sept 2026" («Archivada en …», RF-09 de la 010). */
+fun formatShortMonth(month: YearMonth, locale: Locale = Locale.getDefault()): String =
+    DateTimeFormatter.ofPattern("LLL yyyy", locale).format(month)
+
 /** Fecha completa del detalle y del formulario, p. ej. "12 de noviembre de 2026". */
 fun formatDate(date: LocalDate, locale: Locale = Locale.getDefault()): String =
     DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale).format(date)

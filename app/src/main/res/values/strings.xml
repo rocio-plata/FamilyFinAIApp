@@ -410,6 +410,7 @@
 
     <string name="categories_icon_generic_description">Icono genérico de categoría</string>
     <string name="categories_status_archived">Archivada</string>
+    <string name="categories_status_archived_on">Archivada en %1$s</string>
     <string name="categories_tag_status_archived">Archivado</string>
 
     <string name="categories_archived_section_title">Categorías archivadas</string>
@@ -421,6 +422,10 @@
     <string name="categories_archived_collapse_description">Ocultar categorías archivadas</string>
     <string name="categories_archived_menu_description">Más acciones de %1$s</string>
     <string name="categories_archived_menu_delete">Eliminar</string>
+    <string name="categories_archived_menu_reactivate">Reactivar</string>
+    <string name="categories_archived_reactivate_description">Reactivar %1$s</string>
+    <string name="categories_reactivated">Categoría reactivada</string>
+    <string name="categories_reactivated_not_moved">Categoría reactivada, pero no se pudo mover al final</string>
 
     <string name="categories_empty_expense">Aún no hay categorías de gasto.</string>
     <string name="categories_empty_income">Aún no hay categorías de ingreso.</string>
@@ -550,11 +555,14 @@
     <string name="categories_dialog_cancel">Cancelar</string>
     <string name="categories_dialog_understood">Entendido</string>
     <string name="categories_dialog_archive_title">¿Archivar la categoría?</string>
-    <string name="categories_dialog_archive_message">Dejará de estar disponible para nuevos movimientos y no podrás reactivarla.</string>
+    <string name="categories_dialog_archive_message">Dejará de estar disponible para nuevos movimientos. Podrás reactivarla desde «Categorías archivadas».</string>
+    <string name="categories_dialog_reactivate_title">¿Reactivar la categoría?</string>
+    <string name="categories_dialog_reactivate_message">Volverá a estar disponible para nuevos movimientos y quedará como la última de las activas.</string>
+    <string name="categories_dialog_reactivate_confirm">Reactivar</string>
     <string name="categories_dialog_delete_title">¿Eliminar la categoría?</string>
     <string name="categories_dialog_delete_message">Se eliminarán la categoría y sus etiquetas. Esta acción no se puede deshacer.</string>
     <string name="categories_dialog_has_items_title">No se puede eliminar</string>
-    <string name="categories_dialog_has_items_offer_archive_message">Esta categoría tiene movimientos asociados. Puedes archivarla en su lugar; no podrás reactivarla.</string>
+    <string name="categories_dialog_has_items_offer_archive_message">Esta categoría tiene movimientos asociados. Puedes archivarla en su lugar y reactivarla más tarde desde «Categorías archivadas».</string>
     <string name="categories_dialog_has_items_archived_message">Esta categoría archivada tiene movimientos asociados y no se puede eliminar.</string>
     <string name="categories_dialog_discard_title">¿Descartar los cambios?</string>
     <string name="categories_dialog_discard_message">Tienes cambios sin guardar.</string>
@@ -564,7 +572,7 @@
     <string name="categories_dialog_tag_remove_message">Se eliminará la etiqueta de esta categoría.</string>
     <string name="categories_dialog_tag_remove_confirm">Quitar</string>
     <string name="categories_dialog_tag_has_items_title">No se puede quitar</string>
-    <string name="categories_dialog_tag_has_items_offer_archive_message">Esta etiqueta tiene movimientos asociados. Puedes archivarla en su lugar; no podrás reactivarla.</string>
+    <string name="categories_dialog_tag_has_items_offer_archive_message">Esta etiqueta tiene movimientos asociados. Puedes archivarla en su lugar y reactivarla más tarde desde esta categoría.</string>
     <string name="categories_dialog_tag_has_items_archived_message">Esta etiqueta archivada tiene movimientos asociados y no se puede eliminar.</string>
     <string name="categories_dialog_tag_archive_confirm">Archivar etiqueta</string>
 

@@ -78,6 +78,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import com.rocioplata.familyfinaiapp.ui.main.StaleDataBanner
+import com.rocioplata.familyfinaiapp.ui.movements.formatShortMonth
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 
 /**
@@ -101,17 +102,24 @@ fun CategoriesContent(
     onDeleteArchived: (String) -> Unit,
     onEventConsumed: () -> Unit,
     modifier: Modifier = Modifier,
+    onReactivateArchived: (String) -> Unit = {},
 ) {
-    // Eliminar una archivada se confirma antes de pedirlo (RF-13); se conserva al recrear la pantalla.
+    // Eliminar o reactivar una archivada se confirma antes de pedirlo (RF-13; RF-01 de la 010); se conserva al recrear.
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingReactivate by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
     var message by remember { mutableStateOf<String?>(null) }
     val event = (state as? CategoriesUiState.Content)?.event
-    val failedText = (event as? CategoriesEvent.Failed)?.failure?.let { stringResource(it.messageRes()) }
+    val eventText = when (event) {
+        is CategoriesEvent.Failed -> stringResource(event.failure.messageRes())
+        CategoriesEvent.Reactivated -> stringResource(R.string.categories_reactivated)
+        CategoriesEvent.ReactivatedNotMoved -> stringResource(R.string.categories_reactivated_not_moved)
+        CategoriesEvent.CannotDelete, null -> null
+    }
     LaunchedEffect(event) {
-        if (event is CategoriesEvent.Failed) {
+        if (eventText != null) {
             onEventConsumed()
-            message = failedText
+            message = eventText
         }
     }
     // El aviso se muestra aparte de la confirmación del evento: consumirlo no debe cancelarlo.
@@ -180,6 +188,7 @@ fun CategoriesContent(
                     onCreateClick = onCreateClick,
                     onToggleArchived = onToggleArchived,
                     onDeleteArchived = { pendingDelete = it },
+                    onReactivateArchived = { pendingReactivate = it },
                 )
             }
         }
@@ -203,6 +212,28 @@ fun CategoriesContent(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }, modifier = Modifier.testTag("delete_cancel")) {
+                    Text(stringResource(R.string.categories_dialog_cancel))
+                }
+            },
+        )
+    }
+    pendingReactivate?.let { id ->
+        AlertDialog(
+            onDismissRequest = { pendingReactivate = null },
+            title = { Text(stringResource(R.string.categories_dialog_reactivate_title)) },
+            text = { Text(stringResource(R.string.categories_dialog_reactivate_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingReactivate = null
+                        onReactivateArchived(id)
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.testTag("reactivate_confirm"),
+                ) { Text(stringResource(R.string.categories_dialog_reactivate_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingReactivate = null }, modifier = Modifier.testTag("reactivate_cancel")) {
                     Text(stringResource(R.string.categories_dialog_cancel))
                 }
             },
@@ -310,6 +341,7 @@ private fun ContentState(
     onCreateClick: (CategoryType) -> Unit,
     onToggleArchived: () -> Unit,
     onDeleteArchived: (String) -> Unit,
+    onReactivateArchived: (String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         TypeTabs(state, onSelectType)
@@ -346,6 +378,7 @@ private fun ContentState(
                             menuEnabled = !state.isBusy,
                             onClick = { onCategoryClick(item.category.id) },
                             onDelete = { onDeleteArchived(item.category.id) },
+                            onReactivate = { onReactivateArchived(item.category.id) },
                         )
                     }
                 }
@@ -505,8 +538,9 @@ private fun ArchivedHeader(count: Int, expanded: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * Fila de una categoría archivada: atenuada y con el texto «Archivada» (no solo el color). Solo el
- * Propietario ve el menú ⋮ con «Eliminar» (RF-13), que pide confirmación.
+ * Fila de una categoría archivada: atenuada y con el texto «Archivada» o «Archivada en <mes año>» (no solo el color;
+ * RF-09 de la 010). Solo el Propietario ve el menú ⋮ con «Reactivar» y «Eliminar» (RF-13; RF-01 de la 010), que piden
+ * confirmación.
  */
 @Composable
 private fun ArchivedRow(
@@ -515,6 +549,7 @@ private fun ArchivedRow(
     menuEnabled: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    onReactivate: () -> Unit,
 ) {
     val icon = CategoryIcons.displayOf(item.category.icon)
     var menuOpen by remember { mutableStateOf(false) }
@@ -551,7 +586,8 @@ private fun ArchivedRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = stringResource(R.string.categories_status_archived),
+                    text = item.archivedAt?.let { stringResource(R.string.categories_status_archived_on, formatShortMonth(it)) }
+                        ?: stringResource(R.string.categories_status_archived),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -570,6 +606,18 @@ private fun ArchivedRow(
                         )
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        val reactivateDescription =
+                            stringResource(R.string.categories_archived_reactivate_description, item.category.name)
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.categories_archived_menu_reactivate)) },
+                            onClick = {
+                                menuOpen = false
+                                onReactivate()
+                            },
+                            modifier = Modifier
+                                .semantics { contentDescription = reactivateDescription }
+                                .testTag("archived_reactivate_${item.category.id}"),
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.categories_archived_menu_delete)) },
                             onClick = {

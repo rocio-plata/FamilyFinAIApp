@@ -523,12 +523,12 @@ class CategoryEditContentTest {
     // --- Archivar y eliminar (CA-11, CA-12) ---
 
     @Test
-    fun archivingAsksForConfirmationWarningItIsIrreversibleAndCancelChangesNothing() {
+    fun archivingAsksForConfirmationSayingItCanBeReactivatedAndCancelChangesNothing() {
         val events = show(form())
 
         rule.onNodeWithTag("category_edit_archive").performScrollTo().performClick()
         rule.onNodeWithText("¿Archivar la categoría?").assertIsDisplayed()
-        rule.onNodeWithText("Dejará de estar disponible para nuevos movimientos y no podrás reactivarla.")
+        rule.onNodeWithText("Dejará de estar disponible para nuevos movimientos. Podrás reactivarla desde «Categorías archivadas».")
             .assertIsDisplayed()
         rule.onNodeWithTag("archive_cancel").performClick()
 
@@ -574,7 +574,7 @@ class CategoryEditContentTest {
         val events = show(form(event = CategoryEditEvent.OfferArchive))
 
         rule.onNodeWithText("No se puede eliminar").assertIsDisplayed()
-        rule.onNodeWithText("Esta categoría tiene movimientos asociados. Puedes archivarla en su lugar; no podrás reactivarla.")
+        rule.onNodeWithText("Esta categoría tiene movimientos asociados. Puedes archivarla en su lugar y reactivarla más tarde desde «Categorías archivadas».")
             .assertIsDisplayed()
         rule.onNodeWithTag("offer_archive_confirm").performClick()
 
@@ -787,7 +787,7 @@ class CategoryEditContentTest {
         val events = show(form(event = CategoryEditEvent.OfferArchiveTag("t1")))
 
         rule.onNodeWithText("No se puede quitar").assertIsDisplayed()
-        rule.onNodeWithText("Esta etiqueta tiene movimientos asociados. Puedes archivarla en su lugar; no podrás reactivarla.")
+        rule.onNodeWithText("Esta etiqueta tiene movimientos asociados. Puedes archivarla en su lugar y reactivarla más tarde desde esta categoría.")
             .assertIsDisplayed()
         rule.onNodeWithTag("tag_offer_archive_confirm").performClick()
 

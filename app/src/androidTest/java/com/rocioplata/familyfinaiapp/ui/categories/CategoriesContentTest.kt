@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -32,6 +33,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
+import com.rocioplata.familyfinaiapp.ui.movements.formatShortMonth
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +41,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.YearMonth
 
 @RunWith(AndroidJUnit4::class)
 class CategoriesContentTest {
@@ -55,6 +58,7 @@ class CategoriesContentTest {
         val opened = mutableListOf<String>()
         val created = mutableListOf<CategoryType>()
         val deleted = mutableListOf<String>()
+        val reactivated = mutableListOf<String>()
         var consumed = 0
     }
 
@@ -142,6 +146,7 @@ class CategoriesContentTest {
             },
             onDeleteArchived = { events.deleted += it },
             onEventConsumed = { events.consumed++ },
+            onReactivateArchived = { events.reactivated += it },
         )
     }
 
@@ -510,5 +515,99 @@ class CategoriesContentTest {
         restoration.emulateSavedInstanceStateRestore()
 
         rule.onNodeWithTag("categories_search_field").assertIsDisplayed()
+    }
+
+    // --- Reactivar y fecha de archivado (T-09 de la 010; RF-01, RF-03, RF-09; CA-01 a CA-03, CA-13, CA-19) ---
+
+    @Test
+    fun theOwnerReactivatesAnArchivedCategoryAfterConfirming() {
+        val events = show(content(archived = listOf(gimnasio), expanded = true), canManage = true)
+
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+        rule.onNodeWithContentDescription("Reactivar Gimnasio").assertIsDisplayed().performClick()
+        rule.onNodeWithText("¿Reactivar la categoría?").assertIsDisplayed()
+        rule.onNodeWithText("Volverá a estar disponible para nuevos movimientos y quedará como la última de las activas.")
+            .assertIsDisplayed()
+        assertEquals(emptyList<String>(), events.reactivated)
+        rule.onNodeWithTag("reactivate_confirm").performClick()
+
+        assertEquals(listOf("c4"), events.reactivated)
+        rule.onAllNodesWithText("¿Reactivar la categoría?").assertCountEquals(0)
+    }
+
+    @Test
+    fun cancellingTheReactivationChangesNothing() {
+        val events = show(content(archived = listOf(gimnasio), expanded = true), canManage = true)
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+        rule.onNodeWithTag("archived_reactivate_c4").performClick()
+
+        rule.onNodeWithTag("reactivate_cancel").performClick()
+
+        rule.onAllNodesWithText("¿Reactivar la categoría?").assertCountEquals(0)
+        assertEquals(emptyList<String>(), events.reactivated)
+    }
+
+    @Test
+    fun theReactivateOptionIsNamedAndHasATouchTargetOfAtLeast48dp() {
+        show(content(archived = listOf(gimnasio), expanded = true), canManage = true)
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+
+        rule.onNodeWithTag("archived_reactivate_c4").assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithTag("archived_reactivate_c4").assert(hasContentDescription("Reactivar Gimnasio"))
+    }
+
+    @Test
+    fun aMemberCannotReactivateAndOpensTheArchivedCategoryInReadOnly() {
+        val events = show(content(archived = listOf(gimnasio), expanded = true), canManage = false)
+
+        rule.onAllNodesWithContentDescription("Reactivar Gimnasio").assertCountEquals(0)
+        rule.onAllNodesWithTag("archived_reactivate_c4").assertCountEquals(0)
+        rule.onNodeWithTag("category_row_c4").performClick()
+
+        assertEquals(listOf("c4"), events.opened)
+    }
+
+    @Test
+    fun theReactivationConfirmationSurvivesRecreatingTheScreen() {
+        val restoration = StateRestorationTester(rule)
+        val events = Events()
+        restoration.setContent {
+            FamilyFinAIAppTheme {
+                Host(content(archived = listOf(gimnasio), expanded = true), canManage = true, events = events)
+            }
+        }
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+        rule.onNodeWithTag("archived_reactivate_c4").performClick()
+
+        restoration.emulateSavedInstanceStateRestore()
+
+        rule.onNodeWithText("¿Reactivar la categoría?").assertIsDisplayed()
+        rule.onNodeWithTag("reactivate_confirm").performClick()
+        assertEquals(listOf("c4"), events.reactivated)
+    }
+
+    @Test
+    fun anArchivedCategoryShowsItsArchiveMonthOrOnlyArchivedWithoutIt() {
+        val september = YearMonth.of(2026, 9)
+        show(content(archived = listOf(gimnasio.copy(archivedAt = september), vacaciones), expanded = true))
+
+        rule.onNodeWithText("Archivada en ${formatShortMonth(september)}").assertIsDisplayed()
+        rule.onAllNodesWithText("Archivada").assertCountEquals(1)
+    }
+
+    @Test
+    fun aReactivationShowsItsNoticeOnce() {
+        val events = show(content(active = listOf(alimentacion), event = CategoriesEvent.Reactivated))
+
+        rule.onNodeWithText("Categoría reactivada").assertIsDisplayed()
+        assertEquals(1, events.consumed)
+    }
+
+    @Test
+    fun aReactivationThatCouldNotMoveToTheEndSaysSo() {
+        val events = show(content(active = listOf(alimentacion), event = CategoriesEvent.ReactivatedNotMoved))
+
+        rule.onNodeWithText("Categoría reactivada, pero no se pudo mover al final").assertIsDisplayed()
+        assertEquals(1, events.consumed)
     }
 }
