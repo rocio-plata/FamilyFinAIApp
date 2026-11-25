@@ -104,8 +104,27 @@ class CategoriesViewModelTest {
             }
             return reactivateResult
         }
-        override suspend fun reorderCategories(familyId: String, type: CategoryType, activeCategoryIdsInOrder: List<String>) =
-            unused()
+        val reorders = mutableListOf<Pair<CategoryType, List<String>>>()
+        var reorderGate: CompletableDeferred<Unit>? = null
+        var reorderResult: CategoryResult<Unit> = CategoryResult.Success(Unit)
+
+        override suspend fun reorderCategories(
+            familyId: String,
+            type: CategoryType,
+            activeCategoryIdsInOrder: List<String>,
+        ): CategoryResult<Unit> {
+            reorders += type to activeCategoryIdsInOrder
+            reorderGate?.await()
+            if (reorderResult is CategoryResult.Success) {
+                // Como el repositorio real: las enviadas primero dentro de su tipo y el resto después.
+                val list = data.value.categories.orEmpty()
+                val byId = list.associateBy { it.id }
+                val sent = activeCategoryIdsInOrder.mapNotNull { byId[it] }
+                val ordered = sent + list.filter { it.type == type && it !in sent } + list.filter { it.type != type }
+                data.value = CategoriesData(ordered, data.value.isStale)
+            }
+            return reorderResult
+        }
 
         override suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String) = unused()
         private fun unused(): Nothing = error("No lo usa el listado")
@@ -761,5 +780,184 @@ class CategoriesViewModelTest {
         assertNull(vm.content().active.single().archivedAt)
         // A las 02:00 UTC del 1 de septiembre en Santiago todavía es agosto.
         assertEquals(listOf(YearMonth.of(2026, 8), null), vm.content().archived.map { it.archivedAt })
+    }
+
+    // --- Modo de orden (T-10 de la 010; RF-06, RF-10, RF-12; CA-14 a CA-16, CA-18) ---
+
+    private val ocio = category("c-6", "Ocio")
+    private val threeActive = listOf(comida, casa, gimnasio, ocio, sueldo, bono)
+
+    private fun TestScope.reordering(repo: FakeRepository = repoWith(threeActive)): CategoriesViewModel {
+        val vm = create(repo)
+        vm.startReorder()
+        advanceUntilIdle()
+        return vm
+    }
+
+    @Test
+    fun reordenar_abreYCierraElModo_conAlMenosDosActivas() = runTest {
+        val vm = create(repoWith(threeActive))
+        assertTrue(vm.content().canReorder)
+        assertFalse(vm.content().reorderMode)
+
+        vm.startReorder()
+        advanceUntilIdle()
+        assertTrue(vm.content().reorderMode)
+
+        vm.finishReorder()
+        advanceUntilIdle()
+        assertFalse(vm.content().reorderMode)
+    }
+
+    @Test
+    fun reordenar_noSeAbreConUnaSolaActivaNiConBusqueda() = runTest {
+        val vm = create(repoWith(threeActive))
+        vm.selectType(CategoryType.INCOME)
+        advanceUntilIdle()
+        assertFalse(vm.content().canReorder)
+        vm.startReorder()
+        advanceUntilIdle()
+        assertFalse(vm.content().reorderMode)
+
+        vm.selectType(CategoryType.EXPENSE)
+        vm.setQuery("a")
+        advanceUntilIdle()
+        assertFalse(vm.content().canReorder)
+        vm.startReorder()
+        advanceUntilIdle()
+        assertFalse(vm.content().reorderMode)
+    }
+
+    @Test
+    fun escribirEnElBuscador_cierraElModo_yBorrarloVuelveAPermitirlo() = runTest {
+        val vm = reordering()
+
+        vm.setQuery("ocio")
+        advanceUntilIdle()
+        assertFalse(vm.content().reorderMode)
+        assertFalse(vm.content().canReorder)
+
+        vm.setQuery("")
+        advanceUntilIdle()
+        assertTrue(vm.content().canReorder)
+    }
+
+    @Test
+    fun mover_muestraElOrdenAlInstante_yLoGuarda() = runTest {
+        val repo = repoWith(threeActive).apply { reorderGate = CompletableDeferred() }
+        val vm = reordering(repo)
+
+        vm.moveCategory("c-6", 0)
+        advanceUntilIdle()
+        assertEquals(listOf("c-6", "c-1", "c-2"), vm.content().active.map { it.id() })
+        assertTrue(vm.content().isBusy)
+        assertFalse(vm.content().canReorder)
+
+        repo.reorderGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(CategoryType.EXPENSE to listOf("c-6", "c-1", "c-2")), repo.reorders)
+        assertEquals(listOf("c-6", "c-1", "c-2"), vm.content().active.map { it.id() })
+        assertEquals(listOf("c-3"), vm.content().archived.map { it.id() })
+        assertFalse(vm.content().isBusy)
+        assertTrue(vm.content().reorderMode)
+        assertNull(vm.content().event)
+    }
+
+    @Test
+    fun subirYBajar_muevenUnaPosicion_yEnLosExtremosNoHacenNada() = runTest {
+        val repo = repoWith(threeActive)
+        val vm = reordering(repo)
+
+        vm.moveCategoryUp("c-1")
+        vm.moveCategoryDown("c-6")
+        advanceUntilIdle()
+        assertTrue(repo.reorders.isEmpty())
+
+        vm.moveCategoryDown("c-1")
+        advanceUntilIdle()
+        vm.moveCategoryUp("c-6")
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                CategoryType.EXPENSE to listOf("c-2", "c-1", "c-6"),
+                CategoryType.EXPENSE to listOf("c-2", "c-6", "c-1"),
+            ),
+            repo.reorders,
+        )
+        assertEquals(listOf("c-2", "c-6", "c-1"), vm.content().active.map { it.id() })
+    }
+
+    @Test
+    fun mover_fueraDelModoOMientrasHayOtraOperacion_seIgnora() = runTest {
+        val repo = repoWith(threeActive).apply { reorderGate = CompletableDeferred() }
+        val vm = create(repo)
+
+        vm.moveCategory("c-6", 0)
+        advanceUntilIdle()
+        assertTrue(repo.reorders.isEmpty())
+
+        vm.startReorder()
+        vm.moveCategory("c-6", 0)
+        vm.moveCategory("c-2", 0)
+        vm.reactivate("c-3")
+        advanceUntilIdle()
+        repo.reorderGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.reorders.size)
+        assertTrue(repo.reactivations.isEmpty())
+    }
+
+    @Test
+    fun mover_rechazado_restauraElOrden_avisaYActualiza() = runTest {
+        val repo = repoWith(threeActive).apply { reorderResult = CategoryResult.Failure(CategoryFailure.Unknown) }
+        val vm = reordering(repo)
+        val refreshesBefore = repo.refreshed.size
+
+        vm.moveCategory("c-6", 0)
+        advanceUntilIdle()
+
+        assertEquals(listOf("c-1", "c-2", "c-6"), vm.content().active.map { it.id() })
+        assertEquals(CategoriesEvent.ReorderFailed, vm.content().event)
+        assertEquals(refreshesBefore + 1, repo.refreshed.size)
+        assertFalse(vm.content().isBusy)
+    }
+
+    @Test
+    fun mover_sinConexion_avisaYConservaElOrdenAnterior_sinRefrescar() = runTest {
+        val repo = repoWith(threeActive).apply { reorderResult = CategoryResult.Failure(CategoryFailure.Offline) }
+        val vm = reordering(repo)
+        val refreshesBefore = repo.refreshed.size
+
+        vm.moveCategory("c-6", 0)
+        advanceUntilIdle()
+
+        assertEquals(listOf("c-1", "c-2", "c-6"), vm.content().active.map { it.id() })
+        assertEquals(CategoriesEvent.Failed(CategoryFailure.Offline), vm.content().event)
+        assertEquals(refreshesBefore, repo.refreshed.size)
+    }
+
+    @Test
+    fun mover_unaQueYaNoExiste_avisaYActualiza_yPorRol_notificaAlHeader() = runTest {
+        val gone = repoWith(threeActive).apply { reorderResult = CategoryResult.Failure(CategoryFailure.NotFound) }
+        val vm = reordering(gone)
+        val refreshesBefore = gone.refreshed.size
+
+        vm.moveCategory("c-6", 0)
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.Failed(CategoryFailure.NotFound), vm.content().event)
+        assertEquals(refreshesBefore + 1, gone.refreshed.size)
+        assertEquals(listOf("c-1", "c-2", "c-6"), vm.content().active.map { it.id() })
+
+        val noRole = repoWith(threeActive).apply { reorderResult = CategoryResult.Failure(CategoryFailure.InsufficientRole) }
+        val vm2 = reordering(noRole)
+        vm2.moveCategory("c-6", 0)
+        advanceUntilIdle()
+
+        assertEquals(CategoriesEvent.Failed(CategoryFailure.InsufficientRole), vm2.content().event)
+        assertEquals(1, roleCalls)
     }
 }

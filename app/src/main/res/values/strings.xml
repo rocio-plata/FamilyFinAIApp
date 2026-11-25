@@ -413,6 +413,14 @@
     <string name="categories_status_archived_on">Archivada en %1$s</string>
     <string name="categories_tag_status_archived">Archivado</string>
 
+    <string name="categories_section_expense">Categorías de gasto</string>
+    <string name="categories_section_income">Categorías de ingreso</string>
+    <string name="categories_reorder">Reordenar</string>
+    <string name="categories_reorder_done">Listo</string>
+    <string name="categories_drag_handle_description">Arrastrar para reordenar %1$s</string>
+    <string name="categories_move_up_description">Subir %1$s</string>
+    <string name="categories_move_down_description">Bajar %1$s</string>
+
     <string name="categories_archived_section_title">Categorías archivadas</string>
     <plurals name="categories_archived_section_description">
         <item quantity="one">Categorías archivadas, %d</item>

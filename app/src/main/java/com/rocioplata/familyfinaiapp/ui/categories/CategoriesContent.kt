@@ -103,6 +103,7 @@ fun CategoriesContent(
     onEventConsumed: () -> Unit,
     modifier: Modifier = Modifier,
     onReactivateArchived: (String) -> Unit = {},
+    reorder: CategoryReorderActions = CategoryReorderActions(),
 ) {
     // Eliminar o reactivar una archivada se confirma antes de pedirlo (RF-13; RF-01 de la 010); se conserva al recrear.
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
@@ -114,6 +115,7 @@ fun CategoriesContent(
         is CategoriesEvent.Failed -> stringResource(event.failure.messageRes())
         CategoriesEvent.Reactivated -> stringResource(R.string.categories_reactivated)
         CategoriesEvent.ReactivatedNotMoved -> stringResource(R.string.categories_reactivated_not_moved)
+        CategoriesEvent.ReorderFailed -> stringResource(R.string.categories_error_reorder_failed)
         CategoriesEvent.CannotDelete, null -> null
     }
     LaunchedEffect(event) {
@@ -139,6 +141,10 @@ fun CategoriesContent(
     }
     // Atrás cierra primero el buscador y solo después sale de la pantalla.
     BackHandler(enabled = searchOpen, onBack = closeSearch)
+    // El modo de orden (RF-10 de la 010) solo existe para el Propietario; atrás lo cierra antes de salir.
+    val reorderMode = (state as? CategoriesUiState.Content)?.reorderMode == true && canManage
+    BackHandler(enabled = reorderMode, onBack = reorder.onFinish)
+    LaunchedEffect(reorderMode) { if (reorderMode) searchOpen = false }
 
     Scaffold(
         modifier = modifier.testTag("categories_screen"),
@@ -160,14 +166,16 @@ fun CategoriesContent(
                             }
                         },
                         actions = {
-                            IconButton(
-                                onClick = { searchOpen = true },
-                                modifier = Modifier.testTag("categories_search_button"),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = stringResource(R.string.categories_search_description),
-                                )
+                            if (!reorderMode) {
+                                IconButton(
+                                    onClick = { searchOpen = true },
+                                    modifier = Modifier.testTag("categories_search_button"),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = stringResource(R.string.categories_search_description),
+                                    )
+                                }
                             }
                         },
                     )
@@ -189,6 +197,7 @@ fun CategoriesContent(
                     onToggleArchived = onToggleArchived,
                     onDeleteArchived = { pendingDelete = it },
                     onReactivateArchived = { pendingReactivate = it },
+                    reorder = reorder,
                 )
             }
         }
@@ -342,7 +351,10 @@ private fun ContentState(
     onToggleArchived: () -> Unit,
     onDeleteArchived: (String) -> Unit,
     onReactivateArchived: (String) -> Unit,
+    reorder: CategoryReorderActions,
 ) {
+    // En el modo de orden solo se ven las activas: sin «Crear» ni archivadas, y tocar una fila no la abre (RF-10 de la 010).
+    val reorderMode = state.reorderMode && canManage
     Column(modifier = Modifier.fillMaxSize()) {
         TypeTabs(state, onSelectType)
         LazyColumn(
@@ -350,7 +362,7 @@ private fun ContentState(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (canManage) {
+            if (canManage && !reorderMode) {
                 item(key = "create") {
                     Button(
                         onClick = { onCreateClick(state.selectedType) },
@@ -363,10 +375,26 @@ private fun ContentState(
             }
             if (state.isEmpty) item(key = "empty") { EmptyState(state.selectedType, canManage) }
             if (state.noResults) item(key = "no_results") { NoResultsState() }
-            items(state.active, key = { it.category.id }) { item ->
-                CategoryRow(item, onClick = { onCategoryClick(item.category.id) })
+            if (state.active.isNotEmpty()) {
+                item(key = "section_header") {
+                    CategorySectionHeader(
+                        type = state.selectedType,
+                        count = state.selectedActiveCount,
+                        canManage = canManage,
+                        reorderMode = reorderMode,
+                        canReorder = state.canReorder,
+                        actions = reorder,
+                    )
+                }
             }
-            if (state.archived.isNotEmpty()) {
+            if (reorderMode) {
+                item(key = "reorder_list") { CategoryReorderList(state.active, enabled = !state.isBusy, actions = reorder) }
+            } else {
+                items(state.active, key = { it.category.id }) { item ->
+                    CategoryRow(item, onClick = { onCategoryClick(item.category.id) })
+                }
+            }
+            if (state.archived.isNotEmpty() && !reorderMode) {
                 item(key = "archived_header") {
                     ArchivedHeader(count = state.archived.size, expanded = state.archivedExpanded, onClick = onToggleArchived)
                 }

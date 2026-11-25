@@ -84,18 +84,18 @@ funcionalidad y se consulta antes de adaptar la app.
 
 ## Listado: orden
 
-- [ ] **T-10 · Modo de orden en el ViewModel**
+- [x] **T-10 · Modo de orden en el ViewModel**
   - **Cubre:** RF-06, RF-10, RF-12 (CA-14 a CA-16, CA-18) · **Depende de:** T-05
   - **Alcance:** `CategoriesViewModel`: `reorderMode`, `startReorder` (ignorado con búsqueda o menos de dos activas), `finishReorder`, `moveCategory(id, toIndex)`, `moveCategoryUp/Down`; `pendingOrder` optimista; si falla se restaura y, salvo sin conexión, `ReorderFailed` y refresco; escribir en el buscador sale del modo. `Content` gana `reorderMode` y `canReorder`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.ui.categories.CategoriesViewModelTest"`: mover, subir y bajar en los límites; orden mostrado al instante; fallo → restaurado con aviso y refresco; sin conexión → mensaje y orden anterior; búsqueda desactiva y cierra; una operación a la vez.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-11 · Modo de orden en el listado**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest :app:lintDebug` → BUILD SUCCESSFUL; `CategoriesViewModelTest` 54 (9 nuevos: abre y cierra el modo con al menos dos activas; no se abre con una sola activa ni con búsqueda; escribir en el buscador cierra el modo y borrarlo vuelve a permitirlo; mover muestra el orden al instante y lo guarda (envía solo las activas del tipo); subir y bajar mueven una posición y en los extremos no hacen nada; mover fuera del modo o con otra operación en curso se ignora (tampoco se puede reactivar entonces); rechazado → orden restaurado, `ReorderFailed` y refresco; sin conexión → `Failed(Offline)`, orden anterior y sin refresco; `404` avisa y refresca, rol notifica al header), 0 fallos. Suite JVM completa: 1592 tests, 0 fallos, 0 errores, 0 omitidos. El modo y el orden pendiente viven en `ReorderState` del ViewModel (sobreviven a recrear); cambiar de pestaña no cierra el modo, que pasa a ordenar el tipo visible.
+- [x] **T-11 · Modo de orden en el listado**
   - **Cubre:** RF-10 (CA-14, CA-15, CA-19) · **Depende de:** T-09, T-10
   - **Alcance:** `CategoriesContent`: fila de sección «Categorías de gasto/ingreso» con su cantidad y «Reordenar» (solo `canManage`, desactivada sin `canReorder`). En el modo: activas en un único ítem con el arrastre de `TagList` (`ui/common/DragReorder.kt`), subir/bajar como botones y `CustomAccessibilityAction`, tocar una fila no la abre, sin «Crear», archivadas ni buscador, «Listo» y atrás cierran el modo.
   - **Validación:** `CategoriesContentTest` (instrumentado): «Reordenar» visible solo al Propietario y desactivada con búsqueda; el modo oculta lo indicado; subir/bajar llaman a la acción; «Listo» y atrás salen. `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -P…class=…CategoriesContentTest,…CategoryEditContentTest` → BUILD SUCCESSFUL; `CategoriesContentTest` 52 (9 nuevos: el Propietario ve el título de la sección con su cantidad y «Reordenar» de al menos 48 dp; el Integrante no ve «Reordenar»; desactivada con búsqueda y con otra operación en curso; el modo muestra solo las activas con su asa y oculta «Crear», archivadas y buscador, y tocar una fila no la abre; subir y bajar piden el movimiento y están desactivados en los extremos; cada fila tiene acciones de accesibilidad y el asa mide 48 dp; «Listo» y atrás cierran el modo sin salir; un Integrante nunca ve el modo) y `CategoryEditContentTest` 70, 0 fallos (emulador «Medium_Phone_API_37.0»). Dos tests anteriores (`tabsShowTheirLabelsAndActiveCounts` y `aSingleActiveCategoryUsesTheSingularForm`) fallaron porque la cantidad del tipo visible ahora aparece también en el título de la sección; se acotaron a la pestaña, que es lo que comprueban. Lint: 0 errores y los mismos 25 avisos previos. La fila del modo y su asa están en `ui/categories/CategoryReorder.kt` (tercera copia privada del asa, como en tags y en el selector de familias, para no tocar código de otras funcionalidades). El arrastre real no lo cubre ningún test automático: queda para T-15. Se reinstaló la app en el emulador tras la ejecución.
 
 ## Tags
 

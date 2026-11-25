@@ -59,6 +59,13 @@ fun CategoriesScreen(
         onToggleArchived = viewModel::toggleArchived,
         onDeleteArchived = viewModel::deleteArchived,
         onReactivateArchived = viewModel::reactivate,
+        reorder = CategoryReorderActions(
+            onStart = viewModel::startReorder,
+            onFinish = viewModel::finishReorder,
+            onMove = viewModel::moveCategory,
+            onMoveUp = viewModel::moveCategoryUp,
+            onMoveDown = viewModel::moveCategoryDown,
+        ),
         onEventConsumed = viewModel::consumeEvent,
         modifier = modifier,
     )

@@ -29,6 +29,9 @@ sealed interface CategoriesEvent {
 
     /** Reactivada, pero no se pudo llevar al final de las activas (RF-11 de la 010). */
     data object ReactivatedNotMoved : CategoriesEvent
+
+    /** El backend rechazó el orden: se restauró el anterior (RF-12 de la 010). */
+    data object ReorderFailed : CategoriesEvent
 }
 
 sealed interface CategoriesUiState {
@@ -59,6 +62,10 @@ sealed interface CategoriesUiState {
         /** Hay una operación de cambio en curso: las acciones quedan deshabilitadas (CA-21). */
         val isBusy: Boolean = false,
         val event: CategoriesEvent? = null,
+        /** Modo de orden de las activas del tipo visible (RF-10 de la 010). */
+        val reorderMode: Boolean = false,
+        /** «Reordenar» disponible: sin texto en el buscador, al menos dos activas y sin otra operación en curso. */
+        val canReorder: Boolean = false,
     ) : CategoriesUiState {
         val selectedActiveCount: Int
             get() = if (selectedType == CategoryType.EXPENSE) expenseActiveCount else incomeActiveCount
