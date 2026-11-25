@@ -114,12 +114,12 @@ funcionalidad y se consulta antes de adaptar la app.
 
 ## Cierre
 
-- [ ] **T-14 · Comprobaciones automáticas completas**
+- [x] **T-14 · Comprobaciones automáticas completas**
   - **Cubre:** Regresión · **Depende de:** T-11, T-13
   - **Alcance:** Suite JVM e instrumentada completas y lint; corregir lo que falle. No dejar la app desinstalada del emulador de la persona.
   - **Validación:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` y `./gradlew :app:connectedDebugAndroidTest`.
   - **Hecho cuando:** todo pasa sin avisos nuevos de lint, o cada fallo previo está identificado.
-  - **Evidencia:** —
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --rerun-tasks` → BUILD SUCCESSFUL; JVM 1599 tests, 0 fallos, 0 errores, 0 omitidos (suma de `app/build/test-results/testDebugUnitTest`, de esta ejecución). Lint: 0 errores y 25 avisos (`lint-results-debug.xml`), los mismos que antes de la 010 (versiones de dependencias y AGP, `OldTargetApi`, `RedundantLabel`, `LockedOrientationActivity`, `DiscouragedApi`, `Typos` en «momento» y un recurso de auth sin usar); ninguno de esta funcionalidad. `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` (suite instrumentada completa, emulador «Medium_Phone_API_37.0», ~11 min) → exit 0; 557 tests, 0 fallos, 0 errores, 1 omitido: `AuthWiringTest.login_cabeceraConBearer_sesionPersisteYSeBorra`, que se omite por `assumeTrue` cuando no se pasan los argumentos `email` y `password` de la cuenta de prueba (preexistente, no tocada por la 010). La app se reinstaló en `emulator-5554` después (`installDebug`), porque el runner la desinstala. No se ejecutó en el segundo emulador (`emulator-5556`).
 - [ ] **T-15 · Pruebas manuales contra el backend local**
   - **Cubre:** CA-01 a CA-18 · **Depende de:** T-14
   - **Alcance:** Emulador y backend local con el PR #163: comprobar primero lo documentado (rutas, `deprecatedAt`, `GET` ordenado, regla del `PUT`) y anotar diferencias en `BACKEND_GAPS.md` de la 010. Reactivar categoría y tag (éxito, cancelar, modo avión), reordenar con arrastre y subir/bajar, refrescar sin que nada se mueva, ver el orden en el formulario de movimiento y el dashboard, «Archivada en …», reabrir sin conexión; con una segunda sesión o `curl`, CA-10, CA-11 y CA-18. Borrar los datos de prueba al terminar.
