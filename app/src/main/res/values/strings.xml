@@ -559,6 +559,10 @@
     <string name="categories_tag_move_down">Bajar</string>
     <string name="categories_tag_drag_handle_description">Arrastrar para reordenar %1$s</string>
     <string name="categories_tag_remove_description">Quitar %1$s</string>
+    <string name="categories_tag_reactivate">Reactivar</string>
+    <string name="categories_tag_reactivate_description">Reactivar %1$s</string>
+    <string name="categories_tag_reactivated">Tag reactivado</string>
+    <string name="categories_tag_reactivated_not_moved">Tag reactivado, pero no se pudo mover al final</string>
 
     <string name="categories_dialog_cancel">Cancelar</string>
     <string name="categories_dialog_understood">Entendido</string>

@@ -99,18 +99,18 @@ funcionalidad y se consulta antes de adaptar la app.
 
 ## Tags
 
-- [ ] **T-12 · Reactivar tag en el ViewModel de edición**
+- [x] **T-12 · Reactivar tag en el ViewModel de edición**
   - **Cubre:** RF-04, RF-06, RF-07, RF-11 (CA-05, CA-08 a CA-11, CA-17) · **Depende de:** T-06
   - **Alcance:** `CategoryEditViewModel.reactivateTag(tagId)` por `run()`, sin confirmación, ignorado en solo lectura; eventos `TagReactivated` y `TagReactivatedNotMoved` en `CategoryEditUiState`; 404 con `handleTagNotFound`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.ui.categories.CategoryEditViewModelTest"`: queda último de los activos; cada evento; solo lectura y categoría archivada no llaman; doble llamada → una; sin conexión; rol.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-13 · Botón «Reactivar» en los tags archivados**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest :app:lintDebug` → BUILD SUCCESSFUL; `CategoryEditViewModelTest` 113 (7 nuevos: reactivar sin confirmación deja el tag el último de los activos y avisa «Tag reactivado»; en solo lectura, en una categoría archivada o sobre un tag activo no hace nada; dos pulsaciones u otra operación → una sola llamada; parcial avisa y actualiza, y parcial por rol notifica al header; sin conexión avisa y no cambia nada; `404` avisa del tag y actualiza; rol insuficiente avisa y notifica), 0 fallos. Suite JVM completa: 1599 tests, 0 fallos, 0 errores, 0 omitidos. `reactivateTag` no usa `run()` porque el repositorio devuelve `ReactivationResult`; replica su control de una operación a la vez (`busy.compareAndSet`). Se corrigió el comentario de `archiveTag` que decía «irreversible».
+- [x] **T-13 · Botón «Reactivar» en los tags archivados**
   - **Cubre:** RF-04 (CA-05, CA-06, CA-19) · **Depende de:** T-12
   - **Alcance:** `TagList`/`TagRow`: botón «Reactivar» (48 dp, descripción con el nombre del tag) en los archivados cuando `!readOnly`, desactivado en curso; acción en `TagActions`; avisos en `CategoryEditContent`.
   - **Validación:** `CategoryEditContentTest` (instrumentado): visible y funcional para el Propietario en una categoría activa; ausente en solo lectura y en una archivada; sin diálogo. `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest -P…class=…CategoriesContentTest,…CategoryEditContentTest` → BUILD SUCCESSFUL; `CategoryEditContentTest` 76 (6 nuevos: el Propietario reactiva un tag archivado sin diálogo; el botón se anuncia «Reactivar Viejo», mide al menos 48 dp y solo está en los archivados; en solo lectura o categoría archivada no aparece; desactivado durante otra operación; avisos «Tag reactivado» y «…pero no se pudo mover al final») y `CategoriesContentTest` 52, 0 fallos (emulador «Medium_Phone_API_37.0»). Lint: 0 errores y los mismos 25 avisos previos. El botón es un `TextButton` «Reactivar» en `TagRow`, antes del de quitar; `TagActions` gana `onReactivate`. Se reinstaló la app en el emulador tras la ejecución.
 
 ## Cierre
 

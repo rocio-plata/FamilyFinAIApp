@@ -38,6 +38,12 @@ sealed interface CategoryEditEvent {
 
     /** No se pudo guardar el nuevo orden de los tags: se restauró el anterior (RF-17). */
     data object ReorderFailed : CategoryEditEvent
+
+    /** «Tag reactivado» (RF-04 de la 010). */
+    data object TagReactivated : CategoryEditEvent
+
+    /** Reactivado, pero no se pudo llevar al final de los activos (RF-11 de la 010). */
+    data object TagReactivatedNotMoved : CategoryEditEvent
 }
 
 /** Renombrando un tag (RF-16): el texto y el error del diálogo viven aquí para sobrevivir a la recreación. */

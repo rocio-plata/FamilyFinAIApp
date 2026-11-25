@@ -9,6 +9,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
+import com.rocioplata.familyfinaiapp.domain.categories.ReactivationResult
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import kotlinx.coroutines.CompletableDeferred
@@ -206,7 +207,28 @@ class CategoryEditViewModelTest {
         override suspend fun reorderCategories(familyId: String, type: CategoryType, activeCategoryIdsInOrder: List<String>) =
             unused()
 
-        override suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String) = unused()
+        val tagReactivations = mutableListOf<String>()
+        var reactivateTagResult: ReactivationResult = ReactivationResult.Success
+
+        override suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String): ReactivationResult {
+            tagReactivations += tagId
+            gate?.await()
+            if (reactivateTagResult !is ReactivationResult.Failure) {
+                // Como el repositorio real: activo y, si se pudo, el último de los activos.
+                changeTags(categoryId) { tags ->
+                    val last = tags.filter { it.status == TagStatus.ACTIVE }.maxOfOrNull { it.displayOrder } ?: -1
+                    tags.map {
+                        when {
+                            it.id != tagId -> it
+                            reactivateTagResult == ReactivationResult.Success ->
+                                it.copy(status = TagStatus.ACTIVE, displayOrder = last + 1)
+                            else -> it.copy(status = TagStatus.ACTIVE)
+                        }
+                    }
+                }
+            }
+            return reactivateTagResult
+        }
         private fun unused(): Nothing = error("Fuera del alcance de T-23")
     }
 
@@ -1825,5 +1847,113 @@ class CategoryEditViewModelTest {
         assertEquals(listOf("t-new-3", "t-2"), repo.reorders.last())
         assertEquals(listOf("t-new-3", "t-2", "t-1", "t-3").toSet(), vm.tagIds().toSet())
         assertEquals(TagStatus.DEPRECATED, vm.form().tags.last().status)
+    }
+
+    // --- Reactivar tags (T-12 de la 010; RF-04, RF-06, RF-07, RF-11; CA-05, CA-08 a CA-11, CA-17) ---
+
+    @Test
+    fun reactivarTag_sinConfirmacion_quedaUltimoDeLosActivosYAvisa() = runTest {
+        val repo = repoWith(comida)
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.reactivateTag("t-3")
+        advanceUntilIdle()
+
+        assertEquals(listOf("t-3"), repo.tagReactivations)
+        assertEquals(listOf("t-1", "t-2", "t-3"), vm.form().tags.map { it.id })
+        assertTrue(vm.form().tags.all { it.status == TagStatus.ACTIVE })
+        assertEquals(CategoryEditEvent.TagReactivated, vm.form().event)
+        assertFalse(vm.form().isBusy)
+    }
+
+    @Test
+    fun reactivarTag_enSoloLecturaOCategoriaArchivadaOTagActivo_noHaceNada() = runTest {
+        val member = repoWith(comida)
+        create(member, categoryId = "c-1", canManage = false).reactivateTag("t-3")
+        val archivedCategory = repoWith(gimnasio.copy(tags = listOf(Tag("t-9", "Pesas", TagStatus.DEPRECATED, 0))))
+        create(archivedCategory, categoryId = "c-2").reactivateTag("t-9")
+        val owner = repoWith(comida)
+        create(owner, categoryId = "c-1").reactivateTag("t-1")
+        advanceUntilIdle()
+
+        assertTrue(member.tagReactivations.isEmpty())
+        assertTrue(archivedCategory.tagReactivations.isEmpty())
+        assertTrue(owner.tagReactivations.isEmpty())
+    }
+
+    @Test
+    fun reactivarTag_dosPulsaciones_unaSolaLlamada_yMientrasTantoEstaOcupado() = runTest {
+        val repo = repoWith(comida).apply { gate = CompletableDeferred() }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.reactivateTag("t-3")
+        vm.reactivateTag("t-3")
+        vm.archiveTag("t-1")
+        advanceUntilIdle()
+        assertTrue(vm.form().isBusy)
+        repo.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repo.tagReactivations.size)
+        assertTrue(repo.tagArchives.isEmpty())
+        assertFalse(vm.form().isBusy)
+    }
+
+    @Test
+    fun reactivarTag_sinPoderMoverloAlFinal_avisaYActualiza_yPorRolNotifica() = runTest {
+        val repo = repoWith(comida).apply { reactivateTagResult = ReactivationResult.Partial(CategoryFailure.Unknown) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.reactivateTag("t-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.TagReactivatedNotMoved, vm.form().event)
+        assertEquals(1, repo.refreshes)
+        assertEquals(0, roleCalls)
+
+        val noRole = repoWith(comida).apply { reactivateTagResult = ReactivationResult.Partial(CategoryFailure.InsufficientRole) }
+        val vm2 = create(noRole, categoryId = "c-1")
+        vm2.reactivateTag("t-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.TagReactivatedNotMoved, vm2.form().event)
+        assertEquals(1, roleCalls)
+    }
+
+    @Test
+    fun reactivarTag_sinConexion_avisaYNoCambiaNada() = runTest {
+        val repo = repoWith(comida).apply { reactivateTagResult = ReactivationResult.Failure(CategoryFailure.Offline) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.reactivateTag("t-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.Offline), vm.form().event)
+        assertEquals(TagStatus.DEPRECATED, vm.form().tags.first { it.id == "t-3" }.status)
+        assertEquals(0, repo.refreshes)
+    }
+
+    @Test
+    fun reactivarTag_queYaNoExiste_avisaDelTagYActualiza() = runTest {
+        val repo = repoWith(comida).apply { reactivateTagResult = ReactivationResult.Failure(CategoryFailure.NotFound) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.reactivateTag("t-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.TagNotFound, vm.form().event)
+        assertEquals(1, repo.refreshes)
+    }
+
+    @Test
+    fun reactivarTag_rolInsuficiente_avisaYNotificaAlHeader() = runTest {
+        val repo = repoWith(comida).apply { reactivateTagResult = ReactivationResult.Failure(CategoryFailure.InsufficientRole) }
+        val vm = create(repo, categoryId = "c-1")
+
+        vm.reactivateTag("t-3")
+        advanceUntilIdle()
+
+        assertEquals(CategoryEditEvent.Failed(CategoryFailure.InsufficientRole), vm.form().event)
+        assertEquals(1, roleCalls)
     }
 }
