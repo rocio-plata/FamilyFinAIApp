@@ -40,6 +40,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.io.IOException
+import java.time.Instant
 
 class CategoriesRemoteDataSourceTest {
     private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
@@ -709,5 +710,47 @@ class CategoriesRemoteDataSourceTest {
         )
         val cancelled = source { throw CancellationException("cancelada") }
         assertThrows(CancellationException::class.java) { runBlocking { cancelled.deleteTag("f-1", "c-1", "t-1") } }
+    }
+
+    @Test
+    fun listado_leePosicionYFechaDeArchivado() = runTest {
+        val body = """[
+          {"id":"c-1","type":"EXPENSE","name":"Casa","status":"ACTIVE","displayOrder":2,"deprecatedAt":null,"tags":[]},
+          {"id":"c-2","type":"EXPENSE","name":"Gym","status":"DEPRECATED","displayOrder":5,
+           "deprecatedAt":"2026-09-14T15:30:00.000Z","tags":[]},
+          {"id":"c-3","type":"INCOME","name":"Bono","status":"DEPRECATED","displayOrder":0,
+           "deprecatedAt":"2026-01-02T10:00:00-03:00","tags":[]}
+        ]"""
+
+        val result = source(reply(HttpStatusCode.OK, body)).categories("f-1") as CategoryResult.Success
+
+        assertEquals(listOf(2, 5, 0), result.value.map { it.displayOrder })
+        assertEquals(
+            listOf(null, Instant.parse("2026-09-14T15:30:00Z"), Instant.parse("2026-01-02T13:00:00Z")),
+            result.value.map { it.deprecatedAt },
+        )
+    }
+
+    @Test
+    fun listado_sinPosicionNiFecha_quedanEnCeroYSinFecha() = runTest {
+        val body = """[{"id":"c-1","type":"EXPENSE","name":"Gym","status":"DEPRECATED","tags":[]}]"""
+
+        val result = source(reply(HttpStatusCode.OK, body)).categories("f-1") as CategoryResult.Success
+
+        assertEquals(0, result.value.single().displayOrder)
+        assertEquals(null, result.value.single().deprecatedAt)
+    }
+
+    @Test
+    fun listado_fechaDeArchivadoIlegible_seTrataComoAusenteYLaListaSeLee() = runTest {
+        val body = """[
+          {"id":"c-1","type":"EXPENSE","name":"Gym","status":"DEPRECATED","deprecatedAt":"ayer","tags":[]},
+          {"id":"c-2","type":"EXPENSE","name":"Casa","status":"ACTIVE","tags":[]}
+        ]"""
+
+        val result = source(reply(HttpStatusCode.OK, body)).categories("f-1") as CategoryResult.Success
+
+        assertEquals(listOf("c-1", "c-2"), result.value.map { it.id })
+        assertEquals(null, result.value.first().deprecatedAt)
     }
 }

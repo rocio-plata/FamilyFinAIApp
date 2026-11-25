@@ -13,6 +13,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
+import com.rocioplata.familyfinaiapp.domain.categories.inDisplayOrder
 import com.rocioplata.familyfinaiapp.session.Session
 import com.rocioplata.familyfinaiapp.session.SessionFailure
 import com.rocioplata.familyfinaiapp.session.SessionProvider
@@ -25,11 +26,13 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
 
 /**
  * Reglas de caché (RF-20): se muestra solo la caché del usuario actual y de menos de 7 días; otra
  * cosa se elimina. Con más de 24 h se marca como desactualizada hasta un refresco correcto.
- * El estado en memoria es por familia y el backend manda: la caché solo sirve para leer. Los cambios
+ * El estado en memoria es por familia y el backend manda: la caché solo sirve para leer. La lista se guarda y se emite
+ * siempre en `inDisplayOrder()` (RF-10 de la 010). Los cambios
  * requieren conexión (RF-21): sin ella no se llama al backend; con éxito se aplican a memoria y caché.
  */
 class CategoriesRepositoryImpl(
@@ -117,7 +120,7 @@ class CategoriesRepositoryImpl(
         }
         val remoteResult = remote.categories(familyId)
         if (remoteResult is CategoryResult.Failure) return remoteResult
-        val categories = (remoteResult as CategoryResult.Success).value
+        val categories = (remoteResult as CategoryResult.Success).value.inDisplayOrder()
         val now = clock()
         storageLock.withLock {
             // Si se borró la caché mientras se esperaba la red, no se guarda nada.
@@ -152,7 +155,7 @@ class CategoriesRepositoryImpl(
                 local.remove(familyId)
                 state.update { it - familyId }
             }
-            else -> state.update { it + (familyId to Entry(cached.value, cached.savedAtMillis)) }
+            else -> state.update { it + (familyId to Entry(cached.value.inDisplayOrder(), cached.savedAtMillis)) }
         }
     }
 
@@ -200,7 +203,10 @@ class CategoriesRepositoryImpl(
         familyId,
         request = { remote.deprecateCategory(familyId, categoryId) },
         apply = { categories, _ ->
-            categories.updateCategory(categoryId) { it.copy(status = CategoryStatus.DEPRECATED) }
+            // La fecha real la trae el siguiente refresco; mientras, la del dispositivo (RF-09 de la 010).
+            categories.updateCategory(categoryId) {
+                it.copy(status = CategoryStatus.DEPRECATED, deprecatedAt = Instant.ofEpochMilli(clock()))
+            }
         },
     )
 
@@ -298,7 +304,7 @@ class CategoriesRepositoryImpl(
             // Si se borró la caché mientras se esperaba la red, no se guarda nada.
             if (epoch != clearEpoch) return@withLock
             val entry = state.value[familyId] ?: return@withLock
-            val updated = Entry(apply(entry.categories, result.value), entry.savedAtMillis)
+            val updated = Entry(apply(entry.categories, result.value).inDisplayOrder(), entry.savedAtMillis)
             local.save(familyId, session.userId, updated.savedAtMillis, updated.categories)
             state.update { it + (familyId to updated) }
         }

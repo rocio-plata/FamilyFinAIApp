@@ -18,24 +18,24 @@ funcionalidad y se consulta antes de adaptar la app.
 
 ## Datos
 
-- [ ] **T-01 · Posición y fecha de archivado en el modelo y el remoto**
+- [x] **T-01 · Posición y fecha de archivado en el modelo y el remoto**
   - **Cubre:** RF-09, RF-10 (CA-13) · **Depende de:** —
   - **Alcance:** `domain/categories/Category.kt`: `displayOrder: Int = 0` y `deprecatedAt: Instant? = null`; corregir el comentario de `CategoryStatus` (archivar ya tiene inversa). `CategoriesRemoteDataSource`: `CategoryDto` lee `displayOrder` (por defecto 0) y `deprecatedAt`; una fecha ilegible se trata como ausente.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.categories.CategoriesRemoteDataSourceTest"`: campos presentes, ausentes, `deprecatedAt` nulo e ilegible (la lista se lee igual). `./gradlew :app:assembleDebug`.
   - **Hecho cuando:** los tests pasan y la app compila sin cambios visibles.
-  - **Evidencia:** —
-- [ ] **T-02 · Campos nuevos en la caché**
+  - **Evidencia:** `./gradlew :app:testDebugUnitTest --tests "…data.categories.*" …` → BUILD SUCCESSFUL; `CategoriesRemoteDataSourceTest` 52 (3 nuevos: lee posición y fecha, con `Z` y con desfase; sin los campos quedan en 0 y sin fecha; fecha ilegible se trata como ausente y la lista se lee igual), 0 fallos (leído de `app/build/test-results/testDebugUnitTest`, de esta ejecución). `Category` gana `displayOrder: Int = 0` y `deprecatedAt: Instant? = null` al final, así que las construcciones existentes no cambian; la fecha se lee con `OffsetDateTime.parse` (acepta `Z` y desfases). Comentario de `CategoryStatus` corregido. `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL. Sin cambios visibles.
+- [x] **T-02 · Campos nuevos en la caché**
   - **Cubre:** RF-08 (CA-12) · **Depende de:** T-01
   - **Alcance:** `CategoriesLocalDataSource`: `displayOrder` y `deprecatedAt` (epoch ms) opcionales en `CategoryJson`, sin subir `schemaVersion`.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.categories.CategoriesLocalDataSourceTest"`: ida y vuelta con los campos y copia anterior sin ellos (posición 0, sin fecha).
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-03 · Orden estable en el repositorio**
+  - **Evidencia:** Misma ejecución: `CategoriesLocalDataSourceTest` 20 (2 nuevos: ida y vuelta con posición y fecha con milisegundos; copia anterior sin los campos se lee con posición 0, sin fecha y en el orden guardado). La copia anterior sin color (test existente) también se sigue leyendo. `CategoryJson` gana `displayOrder` y `deprecatedAtMillis` opcionales; `schemaVersion` sigue en 1.
+- [x] **T-03 · Orden estable en el repositorio**
   - **Cubre:** RF-10, RF-11 · **Depende de:** T-02
   - **Alcance:** `List<Category>.inDisplayOrder()` en el dominio (orden estable por `displayOrder`, sin mover las archivadas al final). `CategoriesRepositoryImpl` lo aplica tras cada descarga, lectura de caché y cambio aplicado. `deprecateCategory` fija `deprecatedAt` con el reloj del repositorio.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.categories.*"`: lista desordenada sale ordenada; empates (todas en 0) conservan el orden del backend; archivar fija la fecha y no mueve la categoría. Regresión: `ui.categories.CategoryColorsTest` (archivar no cambia el color de las demás), `domain.dashboard.*`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** Misma ejecución: `CategoriesRepositoryImplTest` 58 (4 nuevos: la descarga se ordena por posición y los empates conservan el orden del backend, sin posiciones se conserva el orden del backend, una caché desordenada se muestra ordenada, archivar fija la fecha del dispositivo en memoria y caché y no mueve la categoría). Regresión: `CategoryColorsTest` 14, `DashboardCalculatorTest` 31, `CategoryBreakdownTest` 20, `MonthComparisonTest` 21 y `SessionEndDuringCategoriesRefreshTest` 1, 0 fallos. Después, `./gradlew :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL; suite JVM completa: 1557 tests, 0 fallos, 0 errores, 0 omitidos (suma de `app/build/test-results/testDebugUnitTest`). `inDisplayOrder()` está en `domain/categories/Category.kt` y el repositorio lo aplica al descargar, al leer la caché y tras cada cambio. No se ejecutó `lintDebug` ni la suite instrumentada en esta sección.
 
 ## Operaciones
 

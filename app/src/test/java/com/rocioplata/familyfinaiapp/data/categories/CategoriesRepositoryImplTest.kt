@@ -47,6 +47,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -527,6 +528,63 @@ class CategoriesRepositoryImplTest {
         assertEquals(CategoryStatus.DEPRECATED, env.current()?.first { it.id == "c-2" }?.status)
         assertEquals(CategoryStatus.ACTIVE, env.current()?.first { it.id == "c-1" }?.status)
         assertEquals(CategoryStatus.DEPRECATED, env.cached()?.value?.first { it.id == "c-2" }?.status)
+    }
+
+    @Test
+    fun archivarCategoria_fijaLaFechaDelDispositivo_yNoLaMueveDeSitio() = runTest {
+        val env = loaded()
+        val before = env.current()!!.map { it.id }
+        env.backend.responder = { noContent }
+
+        env.repository.deprecateCategory("f-1", "c-1")
+
+        assertEquals(Instant.ofEpochMilli(env.clock), env.current()?.first { it.id == "c-1" }?.deprecatedAt)
+        assertEquals(Instant.ofEpochMilli(env.clock), env.cached()?.value?.first { it.id == "c-1" }?.deprecatedAt)
+        assertEquals(before, env.current()!!.map { it.id })
+    }
+
+    @Test
+    fun descarga_seOrdenaPorPosicion_yLosEmpatesConservanElOrdenDelBackend() = runTest {
+        val env = env()
+        env.backend.body = """[
+          {"id":"a","type":"EXPENSE","name":"A","status":"ACTIVE","displayOrder":2,"tags":[]},
+          {"id":"b","type":"INCOME","name":"B","status":"ACTIVE","displayOrder":0,"tags":[]},
+          {"id":"c","type":"EXPENSE","name":"C","status":"DEPRECATED","displayOrder":0,"tags":[]},
+          {"id":"d","type":"EXPENSE","name":"D","status":"ACTIVE","displayOrder":1,"tags":[]}
+        ]"""
+
+        env.repository.refresh("f-1")
+
+        assertEquals(listOf("b", "c", "d", "a"), env.current()?.map { it.id })
+        assertEquals(listOf("b", "c", "d", "a"), env.cached()?.value?.map { it.id })
+    }
+
+    @Test
+    fun descargaSinPosiciones_conservaElOrdenDelBackend() = runTest {
+        val env = env()
+        env.backend.body = """[
+          {"id":"z","type":"EXPENSE","name":"Z","status":"ACTIVE","tags":[]},
+          {"id":"x","type":"EXPENSE","name":"X","status":"DEPRECATED","tags":[]},
+          {"id":"y","type":"EXPENSE","name":"Y","status":"ACTIVE","tags":[]}
+        ]"""
+
+        env.repository.refresh("f-1")
+
+        assertEquals(listOf("z", "x", "y"), env.current()?.map { it.id })
+    }
+
+    @Test
+    fun cacheDesordenada_seMuestraOrdenadaPorPosicion() = runTest {
+        val env = env()
+        env.local.save(
+            "f-1", "u-1", now,
+            listOf(
+                Category("b", CategoryType.EXPENSE, "B", null, CategoryStatus.ACTIVE, emptyList(), displayOrder = 1),
+                Category("a", CategoryType.EXPENSE, "A", null, CategoryStatus.ACTIVE, emptyList(), displayOrder = 0),
+            ),
+        )
+
+        assertEquals(listOf("a", "b"), env.current()?.map { it.id })
     }
 
     @Test
