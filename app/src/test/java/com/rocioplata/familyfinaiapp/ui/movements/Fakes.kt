@@ -125,6 +125,10 @@ internal class FakeCategories : CategoriesRepository {
         error("No se usa")
     override suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
     override suspend fun deleteTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
+    override suspend fun reactivateCategory(familyId: String, categoryId: String) = error("No se usa")
+    override suspend fun reorderCategories(familyId: String, type: CategoryType, activeCategoryIdsInOrder: List<String>) =
+        error("No se usa")
+    override suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String) = error("No se usa")
     override suspend fun clear() = Unit
     override suspend fun retainFamilies(familyIds: Set<String>) = Unit
 }

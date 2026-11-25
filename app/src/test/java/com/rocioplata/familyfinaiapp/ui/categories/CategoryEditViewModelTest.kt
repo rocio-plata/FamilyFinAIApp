@@ -202,6 +202,11 @@ class CategoryEditViewModelTest {
             }
             return reorderResult
         }
+        override suspend fun reactivateCategory(familyId: String, categoryId: String) = unused()
+        override suspend fun reorderCategories(familyId: String, type: CategoryType, activeCategoryIdsInOrder: List<String>) =
+            unused()
+
+        override suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String) = unused()
         private fun unused(): Nothing = error("Fuera del alcance de T-23")
     }
 

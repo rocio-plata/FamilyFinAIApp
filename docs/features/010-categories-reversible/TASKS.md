@@ -39,24 +39,24 @@ funcionalidad y se consulta antes de adaptar la app.
 
 ## Operaciones
 
-- [ ] **T-04 · Llamadas remotas de reactivar y reordenar**
+- [x] **T-04 · Llamadas remotas de reactivar y reordenar**
   - **Cubre:** RF-01, RF-04, RF-10 · **Depende de:** T-01
   - **Alcance:** `CategoriesRemoteDataSource`: `reactivateCategory`, `reactivateTag` (`POST …/reactivate`, `204`) y `reorderCategories` (`PUT …/categories/order` con `orderedCategoryIds`, `204`).
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.categories.CategoriesRemoteDataSourceTest"`: ruta, método y cuerpo; `204`; `404` → `NotFound`; `FAMILY.INSUFFICIENT_ROLE` → `InsufficientRole`; `400 INVALID_CATEGORY_ORDER` → `Unknown`; error de red → `Network`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-05 · Reordenar categorías en el repositorio**
+  - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL; `CategoriesRemoteDataSourceTest` 57 (5 nuevos: `POST …/categories/:id/reactivate` y `…/tags/:id/reactivate` con `204`; errores de reactivar (`404` de categoría y de tag → `NotFound`, `FAMILY.INSUFFICIENT_ROLE`, red, un `200` en vez de `204` → `Unknown`); `PUT /families/:id/categories/order` con `orderedCategoryIds`; errores de ordenar (`400 INVALID_CATEGORY_ORDER` → `Unknown`, `404`, rol, red, cancelación relanzada)), 0 fallos (leído de `app/build/test-results/testDebugUnitTest`, de esta ejecución).
+- [x] **T-05 · Reordenar categorías en el repositorio**
   - **Cubre:** RF-10, RF-12 (CA-14, CA-16, CA-18) · **Depende de:** T-03, T-04
   - **Alcance:** `CategoriesRepository.reorderCategories(familyId, type, activeIdsInOrder)` por `change()`: envía solo las activas del tipo y, al confirmarse, aplica la regla del backend (las enviadas en 0..n-1, el resto del tipo detrás en su orden previo, el otro tipo sin cambios). Los fakes de `CategoriesRepository` (`ui/movements/Fakes.kt`, `CategoriesViewModelTest`, `CategoryEditViewModelTest`) implementan el método.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.categories.CategoriesRepositoryImplTest"`: cuerpo enviado; memoria y caché con el nuevo orden y `savedAt` conservado; archivadas detrás; otro tipo intacto; sin conexión no hay petición; fallo sin cambios. `./gradlew :app:testDebugUnitTest` (compilan los fakes).
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
-- [ ] **T-06 · Reactivar en el repositorio**
+  - **Evidencia:** Misma ejecución: `CategoriesRepositoryImplTest` 70 (3 nuevos para ordenar: envía solo las dadas y aplica la regla del backend (enviadas primero, archivada después en su orden previo, el otro tipo intacto, memoria = caché, `savedAt` conservado); un refresco con lo que devolvería el backend no mueve nada; rechazado o sin conexión no cambia nada y sin conexión no hay petición). `CategoriesRepository.reorderCategories(familyId, type, activeCategoryIdsInOrder)`; la regla local es `withOrder` en `CategoriesRepositoryImpl`. Los fakes (`ui/movements/Fakes.kt`, `CategoriesViewModelTest`, `CategoryEditViewModelTest`) implementan los métodos nuevos sin uso (los de los ViewModels se completan en T-08 y T-12).
+- [x] **T-06 · Reactivar en el repositorio**
   - **Cubre:** RF-01, RF-04, RF-06 a RF-08, RF-11 (CA-08, CA-10, CA-12, CA-17) · **Depende de:** T-05
   - **Alcance:** `ReactivationResult` (`Success`, `Partial(orderFailure)`, `Failure`) en el dominio. `reactivateCategory`: reactivar por `change()` (estado activo, sin fecha), y si no queda ya como la última activa del tipo, `reorderCategories` con ella al final. `reactivateTag`: lo mismo con `reorderTags`. Fakes actualizados.
   - **Validación:** `./gradlew :app:testDebugUnitTest --tests "com.rocioplata.familyfinaiapp.data.categories.CategoriesRepositoryImplTest"`: 3 activas + 1 archivada → la cuarta (cuerpo del `PUT`); única activa o ya última → sin segunda llamada; orden falla → `Partial` con la reactivación ya en memoria y caché; reactivar falla (404, rol) → `Failure` sin cambios y sin segunda llamada; sin conexión → `Offline` sin peticiones; ídem para tags. Regresión: `SessionEndDuringCategoriesRefreshTest`.
   - **Hecho cuando:** los tests pasan.
-  - **Evidencia:** —
+  - **Evidencia:** Misma ejecución: 9 tests nuevos en `CategoriesRepositoryImplTest`: categoría con 3 activas + 1 archivada → `POST reactivate` y `PUT` con `["a","c","d","b"]`, queda la cuarta, sin fecha, en caché; ya última o única activa → sin segunda llamada; orden falla → `Partial(Unknown)` y activa en memoria y caché en la posición del backend; reactivar falla (`404`, rol) → `Failure`, una sola petición y nada cambia; sin conexión → `Offline` sin peticiones (categoría y tag); tag → `POST` y `PUT …/tags/order` con `["t-a","t-b","t-x"]`; tag ya último → sin segunda llamada; tag con orden rechazado → `Partial`, y con `404` → `Failure` sin cambios. Comprobación de que los tests detectan el fallo: sin llevarla al final y sin la regla local de orden fallaron 3 tests; ya restaurado. Suite JVM completa: 1574 tests, 0 fallos, 0 errores, 0 omitidos. `ReactivationResult` está en `domain/categories/CategoryFailure.kt`. Sin datos cargados de la familia la reactivación devuelve `Success` sin calcular orden (no hay lista que mostrar). Regresión `SessionEndDuringCategoriesRefreshTest` incluida en la suite. No se ejecutó `lintDebug` ni la suite instrumentada en esta sección.
 
 ## Textos de archivar
 

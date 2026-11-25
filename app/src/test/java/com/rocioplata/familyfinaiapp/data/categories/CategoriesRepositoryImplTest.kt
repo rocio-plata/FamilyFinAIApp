@@ -10,6 +10,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
+import com.rocioplata.familyfinaiapp.domain.categories.ReactivationResult
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import com.rocioplata.familyfinaiapp.session.Session
@@ -924,5 +925,250 @@ class CategoriesRepositoryImplTest {
         env.repository.refresh("f-1")
 
         assertNotNull(env.local.read("f-1"))
+    }
+
+    // --- Reordenar y reactivar (T-05 y T-06 de la 010) ---
+
+    private val orderedBody = """[
+      {"id":"a","type":"EXPENSE","name":"A","status":"ACTIVE","displayOrder":0,"tags":[]},
+      {"id":"i","type":"INCOME","name":"I","status":"ACTIVE","displayOrder":0,"tags":[]},
+      {"id":"b","type":"EXPENSE","name":"B","status":"DEPRECATED","displayOrder":1,"deprecatedAt":"2026-09-14T15:30:00Z","tags":[]},
+      {"id":"c","type":"EXPENSE","name":"C","status":"ACTIVE","displayOrder":2,"tags":[
+        {"id":"t-c","name":"TC","status":"ACTIVE","displayOrder":0},
+        {"id":"t-y","name":"TY","status":"DEPRECATED","displayOrder":1}]},
+      {"id":"d","type":"EXPENSE","name":"D","status":"ACTIVE","displayOrder":3,"tags":[
+        {"id":"t-a","name":"TA","status":"ACTIVE","displayOrder":0},
+        {"id":"t-x","name":"TX","status":"DEPRECATED","displayOrder":1},
+        {"id":"t-b","name":"TB","status":"ACTIVE","displayOrder":2}]}
+    ]"""
+
+    private suspend fun TestScope.ordered(body: String = orderedBody): Env {
+        val env = env()
+        env.backend.body = body
+        env.repository.refresh("f-1")
+        env.backend.body = null
+        env.backend.calls.set(0)
+        env.backend.requests.clear()
+        env.clock = now + 1.hours.inWholeMilliseconds
+        return env
+    }
+
+    private suspend fun Env.ids(type: CategoryType) = current()?.filter { it.type == type }?.map { it.id }
+    private suspend fun Env.category(id: String) = current()?.first { it.id == id }
+    private fun Env.sent() = backend.requests.map { (method, path, body) -> Triple(method, path, body?.replace(" ", "")) }
+
+    /** Responde 204 a todo salvo a la ruta [failingPath], que responde [failure]. */
+    private fun Env.failOn(failingPath: String, failure: Pair<HttpStatusCode, String>) {
+        backend.responder = { if (it.url.encodedPath == failingPath) failure else noContent }
+    }
+
+    @Test
+    fun reordenarCategorias_enviaLasDadas_yAplicaLaReglaDelBackend() = runTest {
+        val env = ordered()
+        env.backend.responder = { noContent }
+
+        val result = env.repository.reorderCategories("f-1", CategoryType.EXPENSE, listOf("d", "a", "c"))
+
+        assertEquals(CategoryResult.Success(Unit), result)
+        assertEquals(
+            listOf(Triple(HttpMethod.Put, "/families/f-1/categories/order", """{"orderedCategoryIds":["d","a","c"]}""")),
+            env.sent(),
+        )
+        // Las enviadas primero y la archivada después, en su orden previo; el otro tipo no cambia.
+        assertEquals(listOf("d", "a", "c", "b"), env.ids(CategoryType.EXPENSE))
+        assertEquals(listOf(0, 1, 2, 3), listOf("d", "a", "c", "b").map { env.category(it)?.displayOrder })
+        assertEquals(0, env.category("i")?.displayOrder)
+        assertEquals(env.current(), env.cached()?.value)
+        assertEquals(now, env.cached()?.savedAtMillis)
+    }
+
+    @Test
+    fun reordenarCategorias_unRefrescoConLoQueDevolveriaElBackend_noMueveNada() = runTest {
+        val env = ordered()
+        env.backend.responder = { noContent }
+        env.repository.reorderCategories("f-1", CategoryType.EXPENSE, listOf("d", "a", "c"))
+        val afterReorder = env.current()
+        env.backend.responder = null
+        // Lo que devuelve el backend tras ese `PUT`: ordenado por la nueva posición.
+        env.backend.body = """[
+          {"id":"d","type":"EXPENSE","name":"D","status":"ACTIVE","displayOrder":0,"tags":[
+            {"id":"t-a","name":"TA","status":"ACTIVE","displayOrder":0},
+            {"id":"t-x","name":"TX","status":"DEPRECATED","displayOrder":1},
+            {"id":"t-b","name":"TB","status":"ACTIVE","displayOrder":2}]},
+          {"id":"i","type":"INCOME","name":"I","status":"ACTIVE","displayOrder":0,"tags":[]},
+          {"id":"a","type":"EXPENSE","name":"A","status":"ACTIVE","displayOrder":1,"tags":[]},
+          {"id":"c","type":"EXPENSE","name":"C","status":"ACTIVE","displayOrder":2,"tags":[
+            {"id":"t-c","name":"TC","status":"ACTIVE","displayOrder":0},
+            {"id":"t-y","name":"TY","status":"DEPRECATED","displayOrder":1}]},
+          {"id":"b","type":"EXPENSE","name":"B","status":"DEPRECATED","displayOrder":3,"deprecatedAt":"2026-09-14T15:30:00Z","tags":[]}
+        ]"""
+
+        env.repository.refresh("f-1")
+
+        assertEquals(afterReorder?.filter { it.type == CategoryType.EXPENSE }, env.current()?.filter { it.type == CategoryType.EXPENSE })
+    }
+
+    @Test
+    fun reordenarCategorias_rechazadoOSinConexion_noCambiaNada() = runTest {
+        val env = ordered()
+        val before = env.current()
+        env.backend.responder = { HttpStatusCode.BadRequest to """{"error":"FINANCIAL_TRACKING.INVALID_CATEGORY_ORDER"}""" }
+
+        val rejected = env.repository.reorderCategories("f-1", CategoryType.EXPENSE, listOf("d", "a", "c"))
+
+        assertEquals(CategoryResult.Failure(CategoryFailure.Unknown), rejected)
+        assertEquals(before, env.current())
+        assertEquals(before, env.cached()?.value)
+
+        env.backend.requests.clear()
+        env.connectivity.online = false
+        val offline = env.repository.reorderCategories("f-1", CategoryType.EXPENSE, listOf("d", "a", "c"))
+
+        assertEquals(CategoryResult.Failure(CategoryFailure.Offline), offline)
+        assertTrue(env.backend.requests.isEmpty())
+        assertEquals(before, env.current())
+    }
+
+    @Test
+    fun reactivarCategoria_quedaComoLaUltimaActivaDeSuTipo_sinFecha_yEnCache() = runTest {
+        val env = ordered()
+        env.backend.responder = { noContent }
+
+        val result = env.repository.reactivateCategory("f-1", "b")
+
+        assertEquals(ReactivationResult.Success, result)
+        assertEquals(
+            listOf(
+                Triple(HttpMethod.Post, "/families/f-1/categories/b/reactivate", null),
+                Triple(HttpMethod.Put, "/families/f-1/categories/order", """{"orderedCategoryIds":["a","c","d","b"]}"""),
+            ),
+            env.sent(),
+        )
+        assertEquals(listOf("a", "c", "d", "b"), env.ids(CategoryType.EXPENSE))
+        assertEquals(CategoryStatus.ACTIVE, env.category("b")?.status)
+        assertNull(env.category("b")?.deprecatedAt)
+        assertEquals(env.current(), env.cached()?.value)
+        assertEquals(listOf("i"), env.ids(CategoryType.INCOME))
+    }
+
+    @Test
+    fun reactivarCategoria_queYaQuedaUltima_noEnviaOrden() = runTest {
+        val env = ordered(
+            """[
+              {"id":"a","type":"EXPENSE","name":"A","status":"ACTIVE","displayOrder":0,"tags":[]},
+              {"id":"b","type":"EXPENSE","name":"B","status":"DEPRECATED","displayOrder":1,"tags":[]}
+            ]""",
+        )
+        env.backend.responder = { noContent }
+
+        val result = env.repository.reactivateCategory("f-1", "b")
+
+        assertEquals(ReactivationResult.Success, result)
+        assertEquals(listOf(Triple(HttpMethod.Post, "/families/f-1/categories/b/reactivate", null)), env.sent())
+        assertEquals(CategoryStatus.ACTIVE, env.category("b")?.status)
+    }
+
+    @Test
+    fun reactivarCategoria_unicaActiva_noEnviaOrden() = runTest {
+        val env = ordered(
+            """[{"id":"b","type":"EXPENSE","name":"B","status":"DEPRECATED","displayOrder":4,"tags":[]},
+               {"id":"i","type":"INCOME","name":"I","status":"ACTIVE","displayOrder":5,"tags":[]}]""",
+        )
+        env.backend.responder = { noContent }
+
+        assertEquals(ReactivationResult.Success, env.repository.reactivateCategory("f-1", "b"))
+        assertEquals(1, env.backend.requests.size)
+    }
+
+    @Test
+    fun reactivarCategoria_siFallaElOrden_esParcial_yQuedaActivaEnMemoriaYCache() = runTest {
+        val env = ordered()
+        env.failOn("/families/f-1/categories/order", HttpStatusCode.InternalServerError to "{}")
+
+        val result = env.repository.reactivateCategory("f-1", "b")
+
+        assertEquals(ReactivationResult.Partial(CategoryFailure.Unknown), result)
+        assertEquals(CategoryStatus.ACTIVE, env.category("b")?.status)
+        assertEquals(CategoryStatus.ACTIVE, env.cached()?.value?.first { it.id == "b" }?.status)
+        // Queda en la posición que conserva el backend.
+        assertEquals(listOf("a", "b", "c", "d"), env.ids(CategoryType.EXPENSE))
+    }
+
+    @Test
+    fun reactivarCategoria_siFallaLaReactivacion_noCambiaNadaNiEnviaOrden() = runTest {
+        val env = ordered()
+        val before = env.current()
+        env.failOn("/families/f-1/categories/b/reactivate", HttpStatusCode.NotFound to """{"error":"FINANCIAL_TRACKING.CATEGORY_NOT_FOUND"}""")
+
+        val notFound = env.repository.reactivateCategory("f-1", "b")
+
+        assertEquals(ReactivationResult.Failure(CategoryFailure.NotFound), notFound)
+        assertEquals(1, env.backend.requests.size)
+        assertEquals(before, env.current())
+
+        env.failOn("/families/f-1/categories/b/reactivate", HttpStatusCode.Forbidden to """{"error":"FAMILY.INSUFFICIENT_ROLE"}""")
+        assertEquals(
+            ReactivationResult.Failure(CategoryFailure.InsufficientRole),
+            env.repository.reactivateCategory("f-1", "b"),
+        )
+        assertEquals(before, env.cached()?.value)
+    }
+
+    @Test
+    fun reactivarSinConexion_devuelveOfflineSinPeticiones() = runTest {
+        val env = ordered()
+        env.connectivity.online = false
+
+        assertEquals(ReactivationResult.Failure(CategoryFailure.Offline), env.repository.reactivateCategory("f-1", "b"))
+        assertEquals(ReactivationResult.Failure(CategoryFailure.Offline), env.repository.reactivateTag("f-1", "d", "t-x"))
+        assertEquals(0, env.backend.calls.get())
+    }
+
+    @Test
+    fun reactivarTag_quedaComoElUltimoActivo_yEnCache() = runTest {
+        val env = ordered()
+        env.backend.responder = { noContent }
+
+        val result = env.repository.reactivateTag("f-1", "d", "t-x")
+
+        assertEquals(ReactivationResult.Success, result)
+        assertEquals(
+            listOf(
+                Triple(HttpMethod.Post, "/families/f-1/categories/d/tags/t-x/reactivate", null),
+                Triple(HttpMethod.Put, "/families/f-1/categories/d/tags/order", """{"orderedTagIds":["t-a","t-b","t-x"]}"""),
+            ),
+            env.sent(),
+        )
+        val tags = env.category("d")?.tags?.sortedBy { it.displayOrder }
+        assertEquals(listOf("t-a", "t-b", "t-x"), tags?.map { it.id })
+        assertTrue(tags.orEmpty().all { it.status == TagStatus.ACTIVE })
+        assertEquals(env.current(), env.cached()?.value)
+    }
+
+    @Test
+    fun reactivarTag_queYaQuedaUltimo_noEnviaOrden() = runTest {
+        val env = ordered()
+        env.backend.responder = { noContent }
+
+        assertEquals(ReactivationResult.Success, env.repository.reactivateTag("f-1", "c", "t-y"))
+        assertEquals(1, env.backend.requests.size)
+        assertEquals(TagStatus.ACTIVE, env.category("c")?.tags?.first { it.id == "t-y" }?.status)
+    }
+
+    @Test
+    fun reactivarTag_siFallaElOrden_esParcial_ySiFallaLaReactivacion_noCambiaNada() = runTest {
+        val env = ordered()
+        env.failOn("/families/f-1/categories/d/tags/order", HttpStatusCode.BadRequest to """{"error":"FINANCIAL_TRACKING.INVALID_TAG_ORDER"}""")
+
+        assertEquals(ReactivationResult.Partial(CategoryFailure.Unknown), env.repository.reactivateTag("f-1", "d", "t-x"))
+        assertEquals(TagStatus.ACTIVE, env.category("d")?.tags?.first { it.id == "t-x" }?.status)
+
+        val before = env.current()
+        env.backend.requests.clear()
+        env.failOn("/families/f-1/categories/c/tags/t-y/reactivate", HttpStatusCode.NotFound to """{"error":"FINANCIAL_TRACKING.TAG_NOT_FOUND"}""")
+
+        assertEquals(ReactivationResult.Failure(CategoryFailure.NotFound), env.repository.reactivateTag("f-1", "c", "t-y"))
+        assertEquals(1, env.backend.requests.size)
+        assertEquals(before, env.current())
     }
 }

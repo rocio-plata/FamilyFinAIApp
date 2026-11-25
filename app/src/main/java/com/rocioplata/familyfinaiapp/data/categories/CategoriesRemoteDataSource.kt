@@ -117,6 +117,25 @@ class CategoriesRemoteDataSource(
             client.post { categoriesUrl(familyId, categoryId, "deprecate"); applyTimeouts() }
         }
 
+    /** Solo Propietario. Conserva la posición guardada: llevarla al final es cosa del repositorio (RF-11 de la 010). */
+    suspend fun reactivateCategory(familyId: String, categoryId: String): CategoryResult<Unit> =
+        sendDiscardingBody(HttpStatusCode.NoContent) {
+            client.post { categoriesUrl(familyId, categoryId, "reactivate"); applyTimeouts() }
+        }
+
+    /**
+     * Ordena las categorías de un tipo; las no enviadas de ese tipo quedan después en su orden previo (BG-04 de la 005).
+     * El rechazo del orden (`INVALID_CATEGORY_ORDER`) no se distingue, como el de los tags.
+     */
+    suspend fun reorderCategories(familyId: String, orderedCategoryIds: List<String>): CategoryResult<Unit> {
+        val body = buildJsonObject {
+            put("orderedCategoryIds", JsonArray(orderedCategoryIds.map(::JsonPrimitive)))
+        }
+        return sendDiscardingBody(HttpStatusCode.NoContent) {
+            client.put { categoriesUrl(familyId, "order"); jsonBody(body) }
+        }
+    }
+
     suspend fun deleteCategory(familyId: String, categoryId: String): CategoryResult<Unit> =
         sendDiscardingBody(HttpStatusCode.NoContent) {
             client.delete { categoriesUrl(familyId, categoryId); applyTimeouts() }
@@ -162,6 +181,12 @@ class CategoriesRemoteDataSource(
     suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> =
         sendDiscardingBody(HttpStatusCode.NoContent) {
             client.post { categoriesUrl(familyId, categoryId, "tags", tagId, "deprecate"); applyTimeouts() }
+        }
+
+    /** Solo Propietario. Conserva la posición guardada, como [reactivateCategory]. */
+    suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> =
+        sendDiscardingBody(HttpStatusCode.NoContent) {
+            client.post { categoriesUrl(familyId, categoryId, "tags", tagId, "reactivate"); applyTimeouts() }
         }
 
     suspend fun deleteTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> =

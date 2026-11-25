@@ -753,4 +753,98 @@ class CategoriesRemoteDataSourceTest {
         assertEquals(listOf("c-1", "c-2"), result.value.map { it.id })
         assertEquals(null, result.value.first().deprecatedAt)
     }
+
+    // --- Reactivar y ordenar categorías (T-04 de la 010) ---
+
+    @Test
+    fun reactivarCategoria_hacePostAReactivateYAceptaNoContent() = runTest {
+        val captured = Captured()
+        val source = capturing(HttpStatusCode.NoContent, captured = captured)
+
+        val result = source.reactivateCategory("f-1", "c-1")
+
+        assertEquals(HttpMethod.Post, captured.method)
+        assertEquals("/families/f-1/categories/c-1/reactivate", captured.path)
+        assertEquals(CategoryResult.Success(Unit), result)
+    }
+
+    @Test
+    fun reactivarTag_hacePostAReactivateYAceptaNoContent() = runTest {
+        val captured = Captured()
+        val source = capturing(HttpStatusCode.NoContent, captured = captured)
+
+        val result = source.reactivateTag("f-1", "c-1", "t-1")
+
+        assertEquals(HttpMethod.Post, captured.method)
+        assertEquals("/families/f-1/categories/c-1/tags/t-1/reactivate", captured.path)
+        assertEquals(CategoryResult.Success(Unit), result)
+    }
+
+    @Test
+    fun reactivar_errores() = runTest {
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.NotFound),
+            source(reply(HttpStatusCode.NotFound, errorBody("FINANCIAL_TRACKING.CATEGORY_NOT_FOUND")))
+                .reactivateCategory("f-1", "c-1"),
+        )
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.NotFound),
+            source(reply(HttpStatusCode.NotFound, errorBody("FINANCIAL_TRACKING.TAG_NOT_FOUND")))
+                .reactivateTag("f-1", "c-1", "t-1"),
+        )
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.InsufficientRole),
+            source(reply(HttpStatusCode.Forbidden, errorBody("FAMILY.INSUFFICIENT_ROLE"))).reactivateCategory("f-1", "c-1"),
+        )
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.Network),
+            source { throw IOException("sin red") }.reactivateTag("f-1", "c-1", "t-1"),
+        )
+        // Un 200 en lugar de 204 no se da por bueno, como en el resto de operaciones.
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.Unknown),
+            source(reply(HttpStatusCode.OK, "{}")).reactivateCategory("f-1", "c-1"),
+        )
+    }
+
+    @Test
+    fun reordenarCategorias_hacePutConLosIdsEnOrden() = runTest {
+        val captured = Captured()
+        val source = capturing(HttpStatusCode.NoContent, captured = captured)
+
+        val result = source.reorderCategories("f-1", listOf("c-3", "c-1", "c-2"))
+
+        assertEquals(HttpMethod.Put, captured.method)
+        assertEquals("/families/f-1/categories/order", captured.path)
+        assertEquals("application/json", captured.contentType)
+        assertEquals(
+            buildJsonObject { put("orderedCategoryIds", JsonArray(listOf("c-3", "c-1", "c-2").map(::JsonPrimitive))) },
+            captured.body,
+        )
+        assertEquals(CategoryResult.Success(Unit), result)
+    }
+
+    @Test
+    fun reordenarCategorias_errores() = runTest {
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.Unknown),
+            source(reply(HttpStatusCode.BadRequest, errorBody("FINANCIAL_TRACKING.INVALID_CATEGORY_ORDER")))
+                .reorderCategories("f-1", listOf("c-1")),
+        )
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.NotFound),
+            source(reply(HttpStatusCode.NotFound, errorBody("FINANCIAL_TRACKING.CATEGORY_NOT_FOUND")))
+                .reorderCategories("f-1", listOf("c-1")),
+        )
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.InsufficientRole),
+            source(reply(HttpStatusCode.Forbidden, errorBody("FAMILY.INSUFFICIENT_ROLE"))).reorderCategories("f-1", listOf("c-1")),
+        )
+        assertEquals(
+            CategoryResult.Failure(CategoryFailure.Network),
+            source { throw IOException("sin red") }.reorderCategories("f-1", listOf("c-1")),
+        )
+        val cancelled = source { throw CancellationException("cancelada") }
+        assertThrows(CancellationException::class.java) { runBlocking { cancelled.reorderCategories("f-1", listOf("c-1")) } }
+    }
 }

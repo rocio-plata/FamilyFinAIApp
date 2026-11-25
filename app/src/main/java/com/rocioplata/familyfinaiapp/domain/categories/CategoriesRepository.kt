@@ -44,6 +44,22 @@ interface CategoriesRepository {
 
     suspend fun deleteCategory(familyId: String, categoryId: String): CategoryResult<Unit>
 
+    /**
+     * Reactiva una categoría archivada y la deja como la última activa de su tipo (RF-01, RF-11 de la 010). Si no se
+     * puede guardar ese orden, la reactivación se mantiene y se devuelve `Partial`.
+     */
+    suspend fun reactivateCategory(familyId: String, categoryId: String): ReactivationResult
+
+    /**
+     * Guarda el orden de las categorías activas de [type] (RF-10 de la 010). Las demás de ese tipo (las archivadas)
+     * quedan después en su orden previo, como hace el backend.
+     */
+    suspend fun reorderCategories(
+        familyId: String,
+        type: CategoryType,
+        activeCategoryIdsInOrder: List<String>,
+    ): CategoryResult<Unit>
+
     suspend fun addTag(familyId: String, categoryId: String, name: String): CategoryResult<Unit>
 
     suspend fun renameTag(
@@ -66,6 +82,9 @@ interface CategoriesRepository {
     suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit>
 
     suspend fun deleteTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit>
+
+    /** Reactiva un tag archivado y lo deja como el último activo de su categoría (RF-04, RF-11 de la 010). */
+    suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String): ReactivationResult
 
     /** Borra los datos guardados y en memoria al terminar la sesión; no espera a la red. */
     suspend fun clear()
