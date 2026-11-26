@@ -18,6 +18,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.time.Instant
 
 class CategoriesLocalDataSourceTest {
     @get:Rule
@@ -157,6 +158,37 @@ class CategoriesLocalDataSourceTest {
             Cached("u-1", 1L, listOf(Category("c", CategoryType.EXPENSE, "N", "home", CategoryStatus.ACTIVE, emptyList()))),
             CategoriesLocalDataSource(store).read("f-1"),
         )
+    }
+
+    @Test
+    fun posicionYFechaDeArchivado_seGuardanYSeLeen() = runTest {
+        val source = CategoriesLocalDataSource(newStore())
+        val ordered = listOf(
+            Category("c-1", CategoryType.EXPENSE, "Casa", null, CategoryStatus.ACTIVE, emptyList(), displayOrder = 3),
+            Category(
+                "c-2", CategoryType.EXPENSE, "Gym", null, CategoryStatus.DEPRECATED, emptyList(),
+                displayOrder = 7, deprecatedAt = Instant.parse("2026-09-14T15:30:00.123Z"),
+            ),
+        )
+
+        source.save("f-1", "u-1", 1L, ordered)
+
+        assertEquals(Cached("u-1", 1L, ordered), source.read("f-1"))
+    }
+
+    @Test
+    fun copiaAnteriorSinPosicionNiFecha_seLeeEnCeroSinFechaYEnSuOrden() = runTest {
+        val store = newStore()
+        store.edit {
+            it[keyF1] =
+                """{"schemaVersion":1,"userId":"u-1","savedAtMillis":1,"value":[{"id":"b","type":"EXPENSE","name":"B","status":"DEPRECATED","tags":[]},{"id":"a","type":"EXPENSE","name":"A","status":"ACTIVE","tags":[]}]}"""
+        }
+
+        val read = CategoriesLocalDataSource(store).read("f-1")?.value.orEmpty()
+
+        assertEquals(listOf("b", "a"), read.map { it.id })
+        assertEquals(listOf(0, 0), read.map { it.displayOrder })
+        assertEquals(listOf(null, null), read.map { it.deprecatedAt })
     }
 
     @Test

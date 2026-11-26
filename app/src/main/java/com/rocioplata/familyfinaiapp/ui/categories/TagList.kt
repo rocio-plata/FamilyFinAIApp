@@ -50,6 +50,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -82,6 +83,8 @@ data class TagActions(
     /** Alternativa sin arrastre, para lector de pantalla (RF-17). */
     val onMoveUp: (String) -> Unit = {},
     val onMoveDown: (String) -> Unit = {},
+    /** Reactivar un tag archivado, sin confirmación (RF-04 de la 010). */
+    val onReactivate: (String) -> Unit = {},
 )
 
 /**
@@ -154,6 +157,7 @@ fun TagList(
                     onRemove = { pendingRemove = tag.id },
                     onMoveUp = { actions.onMoveUp(tag.id) },
                     onMoveDown = { actions.onMoveDown(tag.id) },
+                    onReactivate = { actions.onReactivate(tag.id) },
                     onDragStart = {
                         draggingId = tag.id
                         dragOffset = 0f
@@ -294,6 +298,7 @@ private fun TagRow(
     onRemove: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
+    onReactivate: () -> Unit,
     onDragStart: () -> Unit,
     onDragTo: (Float) -> Unit,
     onDragEnd: () -> Unit,
@@ -356,6 +361,17 @@ private fun TagRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            if (canEdit && archived) {
+                val reactivateDescription = stringResource(R.string.categories_tag_reactivate_description, tag.name)
+                TextButton(
+                    onClick = onReactivate,
+                    enabled = enabled,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .semantics { contentDescription = reactivateDescription }
+                        .testTag("tag_reactivate_${tag.id}"),
+                ) { Text(stringResource(R.string.categories_tag_reactivate)) }
             }
             if (canEdit) {
                 IconButton(onClick = onRemove, enabled = enabled, modifier = Modifier.testTag("tag_remove_${tag.id}")) {

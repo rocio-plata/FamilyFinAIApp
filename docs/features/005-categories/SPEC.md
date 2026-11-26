@@ -202,7 +202,7 @@ y comportamiento, sin diseñar tablas, DTO, DAO ni almacenamiento. -->
   conserva lo escrito.
 - Orden: las categorías se muestran en el orden que devuelve el backend (desde el 2026-11-24 es su `displayOrder`, BG-04); los
   tags, según su posición.
-- Archivar es irreversible para la app (el backend ya permite reactivar desde el 2026-11-24, BG-01; pendiente de especificar). Una categoría archivada no admite tags nuevos.
+- Archivar era irreversible para la app. **Cambiado por la 010** (`docs/features/010-categories-reversible/SPEC.md`): ahora se puede reactivar categorías y tags, se muestra «Archivada en …» y el Propietario reordena categorías; esto sustituye a RF-04 («Archivada» sin fecha), RF-12 y RF-18 (avisos de irreversibilidad) y a CA-04, CA-11 y CA-17 en lo que dicen de ello. Una categoría archivada no admite tags nuevos.
 - Eliminar solo es posible si no hay movimientos asociados; el backend es
   quien lo determina.
 - El backend es la autoridad del rol. La app oculta las acciones al

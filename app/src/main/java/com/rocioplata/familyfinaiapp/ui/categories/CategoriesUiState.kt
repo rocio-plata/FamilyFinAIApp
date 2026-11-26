@@ -4,6 +4,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.Category
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryFailure
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
+import java.time.YearMonth
 
 /** Una fila del listado: la categoría y los tags activos que se muestran, ya en su orden (RF-03). */
 data class CategoryItem(
@@ -11,6 +12,8 @@ data class CategoryItem(
     val activeTags: List<Tag>,
     /** Color a dibujar: el de la categoría o, si no tiene o no se conoce, el de su posición (RF-14 de la 008). */
     val color: CategoryColorOption = CategoryColors.fallback(0),
+    /** Mes en que se archivó, solo en las archivadas que lo informan (RF-09 de la 010). */
+    val archivedAt: YearMonth? = null,
 )
 
 /** Algo que el listado debe mostrar una sola vez y luego confirmar con `consumeEvent()`. */
@@ -20,6 +23,15 @@ sealed interface CategoriesEvent {
 
     /** Eliminar una categoría archivada con movimientos asociados: solo se informa (RF-13). */
     data object CannotDelete : CategoriesEvent
+
+    /** «Categoría reactivada» (RF-01 de la 010). */
+    data object Reactivated : CategoriesEvent
+
+    /** Reactivada, pero no se pudo llevar al final de las activas (RF-11 de la 010). */
+    data object ReactivatedNotMoved : CategoriesEvent
+
+    /** El backend rechazó el orden: se restauró el anterior (RF-12 de la 010). */
+    data object ReorderFailed : CategoriesEvent
 }
 
 sealed interface CategoriesUiState {
@@ -50,6 +62,10 @@ sealed interface CategoriesUiState {
         /** Hay una operación de cambio en curso: las acciones quedan deshabilitadas (CA-21). */
         val isBusy: Boolean = false,
         val event: CategoriesEvent? = null,
+        /** Modo de orden de las activas del tipo visible (RF-10 de la 010). */
+        val reorderMode: Boolean = false,
+        /** «Reordenar» disponible: sin texto en el buscador, al menos dos activas y sin otra operación en curso. */
+        val canReorder: Boolean = false,
     ) : CategoriesUiState {
         val selectedActiveCount: Int
             get() = if (selectedType == CategoryType.EXPENSE) expenseActiveCount else incomeActiveCount

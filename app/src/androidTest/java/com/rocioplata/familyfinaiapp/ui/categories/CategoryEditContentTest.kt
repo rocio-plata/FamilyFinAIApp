@@ -10,6 +10,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -82,6 +83,7 @@ class CategoryEditContentTest {
         val moves = mutableListOf<Pair<String, Int>>()
         val moveUps = mutableListOf<String>()
         val moveDowns = mutableListOf<String>()
+        val tagReactivations = mutableListOf<String>()
     }
 
     // --- Datos de prueba ---
@@ -189,6 +191,7 @@ class CategoryEditContentTest {
         onMove = { id, index -> events.moves += id to index },
         onMoveUp = { events.moveUps += it },
         onMoveDown = { events.moveDowns += it },
+        onReactivate = { events.tagReactivations += it },
     )
 
     private fun absent(tag: String) = rule.onAllNodesWithTag(tag, useUnmergedTree = true).assertCountEquals(0)
@@ -523,12 +526,12 @@ class CategoryEditContentTest {
     // --- Archivar y eliminar (CA-11, CA-12) ---
 
     @Test
-    fun archivingAsksForConfirmationWarningItIsIrreversibleAndCancelChangesNothing() {
+    fun archivingAsksForConfirmationSayingItCanBeReactivatedAndCancelChangesNothing() {
         val events = show(form())
 
         rule.onNodeWithTag("category_edit_archive").performScrollTo().performClick()
         rule.onNodeWithText("¿Archivar la categoría?").assertIsDisplayed()
-        rule.onNodeWithText("Dejará de estar disponible para nuevos movimientos y no podrás reactivarla.")
+        rule.onNodeWithText("Dejará de estar disponible para nuevos movimientos. Podrás reactivarla desde «Categorías archivadas».")
             .assertIsDisplayed()
         rule.onNodeWithTag("archive_cancel").performClick()
 
@@ -574,7 +577,7 @@ class CategoryEditContentTest {
         val events = show(form(event = CategoryEditEvent.OfferArchive))
 
         rule.onNodeWithText("No se puede eliminar").assertIsDisplayed()
-        rule.onNodeWithText("Esta categoría tiene movimientos asociados. Puedes archivarla en su lugar; no podrás reactivarla.")
+        rule.onNodeWithText("Esta categoría tiene movimientos asociados. Puedes archivarla en su lugar y reactivarla más tarde desde «Categorías archivadas».")
             .assertIsDisplayed()
         rule.onNodeWithTag("offer_archive_confirm").performClick()
 
@@ -787,7 +790,7 @@ class CategoryEditContentTest {
         val events = show(form(event = CategoryEditEvent.OfferArchiveTag("t1")))
 
         rule.onNodeWithText("No se puede quitar").assertIsDisplayed()
-        rule.onNodeWithText("Esta etiqueta tiene movimientos asociados. Puedes archivarla en su lugar; no podrás reactivarla.")
+        rule.onNodeWithText("Esta etiqueta tiene movimientos asociados. Puedes archivarla en su lugar y reactivarla más tarde desde esta categoría.")
             .assertIsDisplayed()
         rule.onNodeWithTag("tag_offer_archive_confirm").performClick()
 
@@ -1019,6 +1022,60 @@ class CategoryEditContentTest {
         restoration.emulateSavedInstanceStateRestore()
 
         rule.onNodeWithText("¿Quitar la etiqueta?").assertIsDisplayed()
+    }
+
+    // --- Reactivar tags (T-13 de la 010; RF-04; CA-05, CA-06, CA-19) ---
+
+    @Test
+    fun theOwnerReactivatesAnArchivedTagWithoutConfirmation() {
+        val events = show(form())
+
+        rule.onNodeWithTag("tag_reactivate_t4").performScrollTo().assertIsDisplayed().performClick()
+
+        assertEquals(listOf("t4"), events.tagReactivations)
+        rule.onAllNodesWithText("¿Reactivar la categoría?").assertCountEquals(0)
+    }
+
+    @Test
+    fun theReactivateButtonIsNamedAndHasATouchTargetOfAtLeast48dp() {
+        show(form())
+
+        rule.onNodeWithTag("tag_reactivate_t4").performScrollTo()
+            .assertHeightIsAtLeast(48.dp)
+            .assert(hasContentDescription("Reactivar Viejo"))
+        // Solo en los archivados.
+        absent("tag_reactivate_t1")
+    }
+
+    @Test
+    fun aMemberOrAnArchivedCategoryShowsNoReactivate() {
+        show(form(readOnly = true, archived = true))
+
+        rule.onNodeWithTag("tag_row_t4").performScrollTo().assertIsDisplayed()
+        absent("tag_reactivate_t4")
+    }
+
+    @Test
+    fun theReactivateButtonIsDisabledWhileAnOperationIsInProgress() {
+        show(form(busy = true))
+
+        rule.onNodeWithTag("tag_reactivate_t4").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun aTagReactivationShowsItsNotice() {
+        val events = show(form(event = CategoryEditEvent.TagReactivated))
+
+        rule.onNodeWithText("Tag reactivado").assertIsDisplayed()
+        assertEquals(1, events.consumed)
+    }
+
+    @Test
+    fun aTagReactivationThatCouldNotMoveToTheEndSaysSo() {
+        val events = show(form(event = CategoryEditEvent.TagReactivatedNotMoved))
+
+        rule.onNodeWithText("Tag reactivado, pero no se pudo mover al final").assertIsDisplayed()
+        assertEquals(1, events.consumed)
     }
 }
 

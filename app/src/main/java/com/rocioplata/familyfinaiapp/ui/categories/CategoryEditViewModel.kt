@@ -13,6 +13,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.NameError
 import com.rocioplata.familyfinaiapp.domain.categories.NameValidation
+import com.rocioplata.familyfinaiapp.domain.categories.ReactivationResult
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -283,7 +284,7 @@ class CategoryEditViewModel(
         )
     }
 
-    /** Archivar un tag activo, ya confirmado (irreversible, BG-01), p. ej. al aceptar la oferta de [removeTag]. */
+    /** Archivar un tag activo, ya confirmado, p. ej. al aceptar la oferta de [removeTag]. Se deshace con [reactivateTag]. */
     fun archiveTag(tagId: String) {
         val id = categoryId ?: return
         if (isReadOnly()) return
@@ -293,6 +294,32 @@ class CategoryEditViewModel(
             onSuccess = {},
             onFailure = { handleTagNotFound(it) },
         )
+    }
+
+    /**
+     * Reactivar un tag archivado de una categoría activa, sin confirmación (RF-04 de la 010): queda como el último de los
+     * activos; si eso no se pudo guardar, se avisa y se actualiza la lista (RF-11). Una operación a la vez (RF-06).
+     */
+    fun reactivateTag(tagId: String) {
+        val id = categoryId ?: return
+        if (isReadOnly()) return
+        if (currentCategory()?.tags?.firstOrNull { it.id == tagId }?.status != TagStatus.DEPRECATED) return
+        if (!busy.compareAndSet(expect = false, update = true)) return
+        viewModelScope.launch {
+            try {
+                when (val result = repository.reactivateTag(familyId, id, tagId)) {
+                    ReactivationResult.Success -> event.value = CategoryEditEvent.TagReactivated
+                    is ReactivationResult.Partial -> {
+                        event.value = CategoryEditEvent.TagReactivatedNotMoved
+                        if (result.orderFailure == CategoryFailure.InsufficientRole) onInsufficientRole()
+                        refreshList()
+                    }
+                    is ReactivationResult.Failure -> if (!handleTagNotFound(result.failure)) handle(result.failure)
+                }
+            } finally {
+                busy.value = false
+            }
+        }
     }
 
     // --- Reordenar tags (RF-17) ---

@@ -11,8 +11,10 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.ColorUpdate
 import com.rocioplata.familyfinaiapp.domain.categories.IconUpdate
+import com.rocioplata.familyfinaiapp.domain.categories.ReactivationResult
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
+import com.rocioplata.familyfinaiapp.domain.categories.inDisplayOrder
 import com.rocioplata.familyfinaiapp.session.Session
 import com.rocioplata.familyfinaiapp.session.SessionFailure
 import com.rocioplata.familyfinaiapp.session.SessionProvider
@@ -25,11 +27,13 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
 
 /**
  * Reglas de caché (RF-20): se muestra solo la caché del usuario actual y de menos de 7 días; otra
  * cosa se elimina. Con más de 24 h se marca como desactualizada hasta un refresco correcto.
- * El estado en memoria es por familia y el backend manda: la caché solo sirve para leer. Los cambios
+ * El estado en memoria es por familia y el backend manda: la caché solo sirve para leer. La lista se guarda y se emite
+ * siempre en `inDisplayOrder()` (RF-10 de la 010). Los cambios
  * requieren conexión (RF-21): sin ella no se llama al backend; con éxito se aplican a memoria y caché.
  */
 class CategoriesRepositoryImpl(
@@ -117,7 +121,7 @@ class CategoriesRepositoryImpl(
         }
         val remoteResult = remote.categories(familyId)
         if (remoteResult is CategoryResult.Failure) return remoteResult
-        val categories = (remoteResult as CategoryResult.Success).value
+        val categories = (remoteResult as CategoryResult.Success).value.inDisplayOrder()
         val now = clock()
         storageLock.withLock {
             // Si se borró la caché mientras se esperaba la red, no se guarda nada.
@@ -152,7 +156,7 @@ class CategoriesRepositoryImpl(
                 local.remove(familyId)
                 state.update { it - familyId }
             }
-            else -> state.update { it + (familyId to Entry(cached.value, cached.savedAtMillis)) }
+            else -> state.update { it + (familyId to Entry(cached.value.inDisplayOrder(), cached.savedAtMillis)) }
         }
     }
 
@@ -200,7 +204,10 @@ class CategoriesRepositoryImpl(
         familyId,
         request = { remote.deprecateCategory(familyId, categoryId) },
         apply = { categories, _ ->
-            categories.updateCategory(categoryId) { it.copy(status = CategoryStatus.DEPRECATED) }
+            // La fecha real la trae el siguiente refresco; mientras, la del dispositivo (RF-09 de la 010).
+            categories.updateCategory(categoryId) {
+                it.copy(status = CategoryStatus.DEPRECATED, deprecatedAt = Instant.ofEpochMilli(clock()))
+            }
         },
     )
 
@@ -208,6 +215,37 @@ class CategoriesRepositoryImpl(
         familyId,
         request = { remote.deleteCategory(familyId, categoryId) },
         apply = { categories, _ -> categories.filterNot { it.id == categoryId } },
+    )
+
+    override suspend fun reactivateCategory(familyId: String, categoryId: String): ReactivationResult {
+        val reactivated = change(
+            familyId,
+            request = { remote.reactivateCategory(familyId, categoryId) },
+            apply = { categories, _ ->
+                categories.updateCategory(categoryId) { it.copy(status = CategoryStatus.ACTIVE, deprecatedAt = null) }
+            },
+        )
+        if (reactivated is CategoryResult.Failure) return ReactivationResult.Failure(reactivated.failure)
+        // El backend conserva su posición anterior; se lleva al final de las activas de su tipo (RF-11). Sin datos de la
+        // familia no hay orden que calcular ni nada que mostrar.
+        val categories = state.value[familyId]?.categories ?: return ReactivationResult.Success
+        val type = categories.firstOrNull { it.id == categoryId }?.type ?: return ReactivationResult.Success
+        val active = categories.filter { it.type == type && it.status == CategoryStatus.ACTIVE }.map { it.id }
+        if (active.lastOrNull() == categoryId) return ReactivationResult.Success
+        return when (val ordered = reorderCategories(familyId, type, active - categoryId + categoryId)) {
+            is CategoryResult.Success -> ReactivationResult.Success
+            is CategoryResult.Failure -> ReactivationResult.Partial(ordered.failure)
+        }
+    }
+
+    override suspend fun reorderCategories(
+        familyId: String,
+        type: CategoryType,
+        activeCategoryIdsInOrder: List<String>,
+    ): CategoryResult<Unit> = change(
+        familyId,
+        request = { remote.reorderCategories(familyId, activeCategoryIdsInOrder) },
+        apply = { categories, _ -> categories.withOrder(type, activeCategoryIdsInOrder) },
     )
 
     override suspend fun addTag(familyId: String, categoryId: String, name: String): CategoryResult<Unit> =
@@ -265,6 +303,23 @@ class CategoriesRepositoryImpl(
             },
         )
 
+    override suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String): ReactivationResult {
+        val reactivated = change(
+            familyId,
+            request = { remote.reactivateTag(familyId, categoryId, tagId) },
+            apply = { categories, _ -> categories.updateTag(categoryId, tagId) { it.copy(status = TagStatus.ACTIVE) } },
+        )
+        if (reactivated is CategoryResult.Failure) return ReactivationResult.Failure(reactivated.failure)
+        val category = state.value[familyId]?.categories?.firstOrNull { it.id == categoryId }
+            ?: return ReactivationResult.Success
+        val active = category.tags.filter { it.status == TagStatus.ACTIVE }.sortedBy { it.displayOrder }.map { it.id }
+        if (active.lastOrNull() == tagId) return ReactivationResult.Success
+        return when (val ordered = reorderTags(familyId, categoryId, active - tagId + tagId)) {
+            is CategoryResult.Success -> ReactivationResult.Success
+            is CategoryResult.Failure -> ReactivationResult.Partial(ordered.failure)
+        }
+    }
+
     override suspend fun deleteTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> =
         change(
             familyId,
@@ -298,7 +353,7 @@ class CategoriesRepositoryImpl(
             // Si se borró la caché mientras se esperaba la red, no se guarda nada.
             if (epoch != clearEpoch) return@withLock
             val entry = state.value[familyId] ?: return@withLock
-            val updated = Entry(apply(entry.categories, result.value), entry.savedAtMillis)
+            val updated = Entry(apply(entry.categories, result.value).inDisplayOrder(), entry.savedAtMillis)
             local.save(familyId, session.userId, updated.savedAtMillis, updated.categories)
             state.update { it + (familyId to updated) }
         }
@@ -307,6 +362,19 @@ class CategoriesRepositoryImpl(
 
     private fun List<Category>.updateCategory(id: String, change: (Category) -> Category) =
         map { if (it.id == id) change(it) else it }
+
+    /**
+     * Lo que hace el backend al ordenar (BG-04 de la 005): las enviadas de [type] toman las primeras posiciones y el resto
+     * de ese tipo les sigue en su orden previo; el otro tipo no cambia. Así el siguiente refresco no mueve nada.
+     */
+    private fun List<Category>.withOrder(type: CategoryType, orderedIds: List<String>): List<Category> {
+        val ofType = filter { it.type == type }
+        val byId = ofType.associateBy { it.id }
+        val sent = orderedIds.distinct().mapNotNull { byId[it] }
+        val newOrder = sent + ofType.filterNot { it in sent }
+        val positions = newOrder.withIndex().associate { (index, category) -> category.id to index }
+        return map { category -> positions[category.id]?.let { category.copy(displayOrder = it) } ?: category }
+    }
 
     private fun List<Category>.updateTag(categoryId: String, tagId: String, change: (Tag) -> Tag) =
         updateCategory(categoryId) { category ->

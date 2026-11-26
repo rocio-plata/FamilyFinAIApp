@@ -36,6 +36,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.IOException
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.format.DateTimeParseException
 
 /**
  * Llamadas de categorías y tags (contrato §3.4.2). [client] es el cliente autenticado: añade el Bearer
@@ -114,6 +117,25 @@ class CategoriesRemoteDataSource(
             client.post { categoriesUrl(familyId, categoryId, "deprecate"); applyTimeouts() }
         }
 
+    /** Solo Propietario. Conserva la posición guardada: llevarla al final es cosa del repositorio (RF-11 de la 010). */
+    suspend fun reactivateCategory(familyId: String, categoryId: String): CategoryResult<Unit> =
+        sendDiscardingBody(HttpStatusCode.NoContent) {
+            client.post { categoriesUrl(familyId, categoryId, "reactivate"); applyTimeouts() }
+        }
+
+    /**
+     * Ordena las categorías de un tipo; las no enviadas de ese tipo quedan después en su orden previo (BG-04 de la 005).
+     * El rechazo del orden (`INVALID_CATEGORY_ORDER`) no se distingue, como el de los tags.
+     */
+    suspend fun reorderCategories(familyId: String, orderedCategoryIds: List<String>): CategoryResult<Unit> {
+        val body = buildJsonObject {
+            put("orderedCategoryIds", JsonArray(orderedCategoryIds.map(::JsonPrimitive)))
+        }
+        return sendDiscardingBody(HttpStatusCode.NoContent) {
+            client.put { categoriesUrl(familyId, "order"); jsonBody(body) }
+        }
+    }
+
     suspend fun deleteCategory(familyId: String, categoryId: String): CategoryResult<Unit> =
         sendDiscardingBody(HttpStatusCode.NoContent) {
             client.delete { categoriesUrl(familyId, categoryId); applyTimeouts() }
@@ -159,6 +181,12 @@ class CategoriesRemoteDataSource(
     suspend fun deprecateTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> =
         sendDiscardingBody(HttpStatusCode.NoContent) {
             client.post { categoriesUrl(familyId, categoryId, "tags", tagId, "deprecate"); applyTimeouts() }
+        }
+
+    /** Solo Propietario. Conserva la posición guardada, como [reactivateCategory]. */
+    suspend fun reactivateTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> =
+        sendDiscardingBody(HttpStatusCode.NoContent) {
+            client.post { categoriesUrl(familyId, categoryId, "tags", tagId, "reactivate"); applyTimeouts() }
         }
 
     suspend fun deleteTag(familyId: String, categoryId: String, tagId: String): CategoryResult<Unit> =
@@ -257,7 +285,17 @@ class CategoriesRemoteDataSource(
         val categoryType = CategoryType.entries.firstOrNull { it.name == type } ?: return null
         val categoryStatus = CategoryStatus.entries.firstOrNull { it.name == status } ?: return null
         val domainTags = tags.map { it.toDomain() ?: return null }
-        return Category(id, categoryType, name, icon, categoryStatus, domainTags, color)
+        return Category(
+            id, categoryType, name, icon, categoryStatus, domainTags, color, displayOrder, parseInstantOrNull(deprecatedAt),
+        )
+    }
+
+    // La fecha de archivado solo se muestra (RF-09 de la 010): una ilegible se trata como ausente en vez de rechazar
+    // toda la lista, que dejaría a la app sin categorías por un dato informativo.
+    private fun parseInstantOrNull(text: String?): Instant? = try {
+        text?.let { OffsetDateTime.parse(it).toInstant() }
+    } catch (_: DateTimeParseException) {
+        null
     }
 
     private fun TagDto.toDomain(): Tag? {
@@ -274,6 +312,8 @@ class CategoriesRemoteDataSource(
         val color: String? = null,
         val status: String,
         val tags: List<TagDto> = emptyList(),
+        val displayOrder: Int = 0,
+        val deprecatedAt: String? = null,
     )
 
     @Serializable

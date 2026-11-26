@@ -15,6 +15,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import java.time.Instant
 
 /**
  * Caché de solo lectura offline (RF-20): un JSON por familia con `schemaVersion`, `userId` y `savedAt`.
@@ -82,18 +83,25 @@ class CategoriesLocalDataSource(
         val color: String? = null,
         val status: String,
         val tags: List<TagJson>,
+        // Opcionales y añadidos sin subir `schemaVersion` (010): una copia anterior se lee con posición 0, que conserva
+        // el orden en que se guardó, y sin fecha de archivado.
+        val displayOrder: Int = 0,
+        val deprecatedAtMillis: Long? = null,
     ) {
         fun toDomainOrNull(): Category? {
             val categoryType = CategoryType.entries.firstOrNull { it.name == type } ?: return null
             val categoryStatus = CategoryStatus.entries.firstOrNull { it.name == status } ?: return null
             val domainTags = tags.map { it.toDomainOrNull() ?: return null }
-            return Category(id, categoryType, name, icon, categoryStatus, domainTags, color)
+            return Category(
+                id, categoryType, name, icon, categoryStatus, domainTags, color, displayOrder,
+                deprecatedAtMillis?.let(Instant::ofEpochMilli),
+            )
         }
 
         companion object {
             fun from(category: Category) = CategoryJson(
                 category.id, category.type.name, category.name, category.icon, category.color, category.status.name,
-                category.tags.map(TagJson::from),
+                category.tags.map(TagJson::from), category.displayOrder, category.deprecatedAt?.toEpochMilli(),
             )
         }
     }

@@ -4,13 +4,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -32,6 +38,7 @@ import com.rocioplata.familyfinaiapp.domain.categories.CategoryStatus
 import com.rocioplata.familyfinaiapp.domain.categories.CategoryType
 import com.rocioplata.familyfinaiapp.domain.categories.Tag
 import com.rocioplata.familyfinaiapp.domain.categories.TagStatus
+import com.rocioplata.familyfinaiapp.ui.movements.formatShortMonth
 import com.rocioplata.familyfinaiapp.ui.theme.FamilyFinAIAppTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +46,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.YearMonth
 
 @RunWith(AndroidJUnit4::class)
 class CategoriesContentTest {
@@ -55,6 +63,10 @@ class CategoriesContentTest {
         val opened = mutableListOf<String>()
         val created = mutableListOf<CategoryType>()
         val deleted = mutableListOf<String>()
+        val reactivated = mutableListOf<String>()
+        var reorderStarts = 0
+        var reorderFinishes = 0
+        val moves = mutableListOf<String>()
         var consumed = 0
     }
 
@@ -84,10 +96,13 @@ class CategoriesContentTest {
         isStale: Boolean = false,
         isBusy: Boolean = false,
         event: CategoriesEvent? = null,
+        reorderMode: Boolean = false,
+        canReorder: Boolean = active.size > 1 && query.isEmpty() && !isBusy,
     ) = CategoriesUiState.Content(
         selectedType = type, expenseActiveCount = expenseCount, incomeActiveCount = incomeCount, query = query,
         active = active, archived = archived, archivedExpanded = expanded, isEmpty = isEmpty,
         noResults = noResults, isStale = isStale, isRefreshing = false, isBusy = isBusy, event = event,
+        reorderMode = reorderMode, canReorder = canReorder,
     )
 
     private val alimentacion = item("c1", "Alimentación", "shopping_cart", tags = arrayOf("Súper", "Feria", "Despensa"))
@@ -142,6 +157,20 @@ class CategoriesContentTest {
             },
             onDeleteArchived = { events.deleted += it },
             onEventConsumed = { events.consumed++ },
+            onReactivateArchived = { events.reactivated += it },
+            reorder = CategoryReorderActions(
+                onStart = {
+                    events.reorderStarts++
+                    update { it.copy(reorderMode = true) }
+                },
+                onFinish = {
+                    events.reorderFinishes++
+                    update { it.copy(reorderMode = false) }
+                },
+                onMove = { id, index -> events.moves += "$id->$index" },
+                onMoveUp = { events.moves += "$it-up" },
+                onMoveDown = { events.moves += "$it-down" },
+            ),
         )
     }
 
@@ -162,23 +191,26 @@ class CategoriesContentTest {
         assertFalse("c2 no debe usar el color de c1", second.containsColorNear(coral))
     }
 
+    private fun inTab(type: String, text: String) = hasText(text) and hasAnyAncestor(hasTestTag("categories_tab_$type"))
+
     @Test
     fun tabsShowTheirLabelsAndActiveCounts() {
         show(content(active = listOf(alimentacion, sinIcono), expenseCount = 5, incomeCount = 3))
 
         rule.onNodeWithTag("categories_tab_expense").assertIsSelected()
         rule.onNodeWithText("Gastos").assertIsDisplayed()
-        rule.onNodeWithText("5 activas").assertIsDisplayed()
+        // La cantidad del tipo visible también está en el título de su sección (RF-10 de la 010): se busca en la pestaña.
+        rule.onNode(inTab("expense", "5 activas"), useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithText("Ingresos").assertIsDisplayed()
-        rule.onNodeWithText("3 activas").assertIsDisplayed()
+        rule.onNode(inTab("income", "3 activas"), useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
     fun aSingleActiveCategoryUsesTheSingularForm() {
         show(content(active = listOf(alimentacion), expenseCount = 1, incomeCount = 0))
 
-        rule.onNodeWithText("1 activa").assertIsDisplayed()
-        rule.onNodeWithText("0 activas").assertIsDisplayed()
+        rule.onNode(inTab("expense", "1 activa"), useUnmergedTree = true).assertIsDisplayed()
+        rule.onNode(inTab("income", "0 activas"), useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
@@ -510,5 +542,195 @@ class CategoriesContentTest {
         restoration.emulateSavedInstanceStateRestore()
 
         rule.onNodeWithTag("categories_search_field").assertIsDisplayed()
+    }
+
+    // --- Reactivar y fecha de archivado (T-09 de la 010; RF-01, RF-03, RF-09; CA-01 a CA-03, CA-13, CA-19) ---
+
+    @Test
+    fun theOwnerReactivatesAnArchivedCategoryAfterConfirming() {
+        val events = show(content(archived = listOf(gimnasio), expanded = true), canManage = true)
+
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+        rule.onNodeWithContentDescription("Reactivar Gimnasio").assertIsDisplayed().performClick()
+        rule.onNodeWithText("¿Reactivar la categoría?").assertIsDisplayed()
+        rule.onNodeWithText("Volverá a estar disponible para nuevos movimientos y quedará como la última de las activas.")
+            .assertIsDisplayed()
+        assertEquals(emptyList<String>(), events.reactivated)
+        rule.onNodeWithTag("reactivate_confirm").performClick()
+
+        assertEquals(listOf("c4"), events.reactivated)
+        rule.onAllNodesWithText("¿Reactivar la categoría?").assertCountEquals(0)
+    }
+
+    @Test
+    fun cancellingTheReactivationChangesNothing() {
+        val events = show(content(archived = listOf(gimnasio), expanded = true), canManage = true)
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+        rule.onNodeWithTag("archived_reactivate_c4").performClick()
+
+        rule.onNodeWithTag("reactivate_cancel").performClick()
+
+        rule.onAllNodesWithText("¿Reactivar la categoría?").assertCountEquals(0)
+        assertEquals(emptyList<String>(), events.reactivated)
+    }
+
+    @Test
+    fun theReactivateOptionIsNamedAndHasATouchTargetOfAtLeast48dp() {
+        show(content(archived = listOf(gimnasio), expanded = true), canManage = true)
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+
+        rule.onNodeWithTag("archived_reactivate_c4").assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithTag("archived_reactivate_c4").assert(hasContentDescription("Reactivar Gimnasio"))
+    }
+
+    @Test
+    fun aMemberCannotReactivateAndOpensTheArchivedCategoryInReadOnly() {
+        val events = show(content(archived = listOf(gimnasio), expanded = true), canManage = false)
+
+        rule.onAllNodesWithContentDescription("Reactivar Gimnasio").assertCountEquals(0)
+        rule.onAllNodesWithTag("archived_reactivate_c4").assertCountEquals(0)
+        rule.onNodeWithTag("category_row_c4").performClick()
+
+        assertEquals(listOf("c4"), events.opened)
+    }
+
+    @Test
+    fun theReactivationConfirmationSurvivesRecreatingTheScreen() {
+        val restoration = StateRestorationTester(rule)
+        val events = Events()
+        restoration.setContent {
+            FamilyFinAIAppTheme {
+                Host(content(archived = listOf(gimnasio), expanded = true), canManage = true, events = events)
+            }
+        }
+        rule.onNodeWithContentDescription("Más acciones de Gimnasio").performClick()
+        rule.onNodeWithTag("archived_reactivate_c4").performClick()
+
+        restoration.emulateSavedInstanceStateRestore()
+
+        rule.onNodeWithText("¿Reactivar la categoría?").assertIsDisplayed()
+        rule.onNodeWithTag("reactivate_confirm").performClick()
+        assertEquals(listOf("c4"), events.reactivated)
+    }
+
+    @Test
+    fun anArchivedCategoryShowsItsArchiveMonthOrOnlyArchivedWithoutIt() {
+        val september = YearMonth.of(2026, 9)
+        show(content(archived = listOf(gimnasio.copy(archivedAt = september), vacaciones), expanded = true))
+
+        rule.onNodeWithText("Archivada en ${formatShortMonth(september)}").assertIsDisplayed()
+        rule.onAllNodesWithText("Archivada").assertCountEquals(1)
+    }
+
+    @Test
+    fun aReactivationShowsItsNoticeOnce() {
+        val events = show(content(active = listOf(alimentacion), event = CategoriesEvent.Reactivated))
+
+        rule.onNodeWithText("Categoría reactivada").assertIsDisplayed()
+        assertEquals(1, events.consumed)
+    }
+
+    @Test
+    fun aReactivationThatCouldNotMoveToTheEndSaysSo() {
+        val events = show(content(active = listOf(alimentacion), event = CategoriesEvent.ReactivatedNotMoved))
+
+        rule.onNodeWithText("Categoría reactivada, pero no se pudo mover al final").assertIsDisplayed()
+        assertEquals(1, events.consumed)
+    }
+
+    // --- Modo de orden (T-11 de la 010; RF-10; CA-14, CA-15, CA-19) ---
+
+    private val ocio = item("c6", "Ocio", "sports_esports")
+    private fun ownerList(query: String = "", isBusy: Boolean = false) =
+        content(active = listOf(alimentacion, sinIcono, ocio), archived = listOf(gimnasio), query = query, isBusy = isBusy)
+
+    @Test
+    fun theOwnerSeesTheSectionTitleWithItsCountAndReorder() {
+        show(ownerList(), canManage = true)
+
+        rule.onNodeWithText("Categorías de gasto").assertIsDisplayed()
+        rule.onNodeWithTag("categories_section_header").assert(hasAnyDescendant(hasText("3 activas")))
+        rule.onNodeWithTag("categories_reorder").assertIsEnabled().assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun aMemberSeesTheSectionTitleButNoReorder() {
+        show(ownerList(), canManage = false)
+
+        rule.onNodeWithText("Categorías de gasto").assertIsDisplayed()
+        rule.onAllNodesWithTag("categories_reorder").assertCountEquals(0)
+    }
+
+    @Test
+    fun reorderIsDisabledWhileThereIsASearchOrAnOperation() {
+        show(ownerList(query = "a"), canManage = true)
+        rule.onNodeWithTag("categories_reorder").assertIsNotEnabled()
+    }
+
+    @Test
+    fun reorderIsDisabledWhileAnOperationIsInProgress() {
+        show(ownerList(isBusy = true), canManage = true)
+        rule.onNodeWithTag("categories_reorder").assertIsNotEnabled()
+    }
+
+    @Test
+    fun reorderModeShowsOnlyTheActiveWithHandlesAndHidesCreateArchivedAndSearch() {
+        val events = show(ownerList().copy(archivedExpanded = true), canManage = true)
+
+        rule.onNodeWithTag("categories_reorder").performClick()
+
+        assertEquals(1, events.reorderStarts)
+        rule.onNodeWithTag("categories_reorder_done").assertIsDisplayed()
+        rule.onAllNodesWithText("Crear nueva categoría").assertCountEquals(0)
+        rule.onAllNodesWithText("Categorías archivadas").assertCountEquals(0)
+        rule.onAllNodesWithText("Gimnasio").assertCountEquals(0)
+        rule.onAllNodesWithContentDescription("Buscar").assertCountEquals(0)
+        rule.onNodeWithContentDescription("Arrastrar para reordenar Ocio").assertIsDisplayed()
+        rule.onNodeWithTag("category_reorder_row_c6").performClick()
+        assertTrue(events.opened.isEmpty())
+    }
+
+    @Test
+    fun upAndDownMoveARowAndAreDisabledAtTheEnds() {
+        val events = show(ownerList().copy(reorderMode = true), canManage = true)
+
+        rule.onNodeWithTag("category_move_up_c1").assertIsNotEnabled()
+        rule.onNodeWithTag("category_move_down_c6").assertIsNotEnabled()
+        rule.onNodeWithContentDescription("Bajar Alimentación").performClick()
+        rule.onNodeWithContentDescription("Subir Ocio").performClick()
+
+        assertEquals(listOf("c1-down", "c6-up"), events.moves)
+    }
+
+    @Test
+    fun eachReorderRowOffersUpAndDownAsAccessibilityActions() {
+        show(ownerList().copy(reorderMode = true), canManage = true)
+
+        rule.onNodeWithTag("category_reorder_row_c2")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions))
+        rule.onNodeWithTag("category_handle_c2").assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun doneAndSystemBackCloseTheReorderMode() {
+        val events = show(ownerList().copy(reorderMode = true), canManage = true)
+
+        rule.onNodeWithTag("categories_reorder_done").performClick()
+        assertEquals(1, events.reorderFinishes)
+        rule.onNodeWithTag("categories_reorder").performClick()
+        pressBack()
+
+        assertEquals(2, events.reorderFinishes)
+        assertEquals(0, events.backs)
+        rule.onNodeWithText("Crear nueva categoría").assertIsDisplayed()
+    }
+
+    @Test
+    fun aMemberNeverSeesTheReorderModeEvenIfTheStateSaysSo() {
+        val events = show(ownerList().copy(reorderMode = true), canManage = false)
+
+        rule.onAllNodesWithTag("categories_reorder_list").assertCountEquals(0)
+        rule.onNodeWithTag("category_row_c6").performClick()
+        assertEquals(listOf("c6"), events.opened)
     }
 }

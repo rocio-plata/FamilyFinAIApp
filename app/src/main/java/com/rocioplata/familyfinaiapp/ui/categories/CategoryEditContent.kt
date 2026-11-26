@@ -121,6 +121,8 @@ fun CategoryEditContent(
     val failedText = (event as? CategoryEditEvent.Failed)?.failure?.let { stringResource(it.messageRes()) }
     val tagNotFoundText = stringResource(R.string.categories_error_tag_not_found)
     val reorderFailedText = stringResource(R.string.categories_error_reorder_failed)
+    val tagReactivatedText = stringResource(R.string.categories_tag_reactivated)
+    val tagReactivatedNotMovedText = stringResource(R.string.categories_tag_reactivated_not_moved)
     LaunchedEffect(event) {
         when (event) {
             is CategoryEditEvent.Created -> {
@@ -138,6 +140,14 @@ fun CategoryEditContent(
             CategoryEditEvent.ReorderFailed -> {
                 onEventConsumed()
                 message = reorderFailedText
+            }
+            CategoryEditEvent.TagReactivated -> {
+                onEventConsumed()
+                message = tagReactivatedText
+            }
+            CategoryEditEvent.TagReactivatedNotMoved -> {
+                onEventConsumed()
+                message = tagReactivatedNotMovedText
             }
             // Estos eventos se resuelven con su diálogo.
             is CategoryEditEvent.Leave,

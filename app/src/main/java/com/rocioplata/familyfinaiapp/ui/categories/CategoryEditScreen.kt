@@ -105,6 +105,7 @@ fun CategoryEditScreen(
                 onMove = viewModel::moveTag,
                 onMoveUp = viewModel::moveTagUp,
                 onMoveDown = viewModel::moveTagDown,
+                onReactivate = viewModel::reactivateTag,
             ),
         )
     }
