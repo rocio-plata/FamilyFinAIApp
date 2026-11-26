@@ -120,12 +120,12 @@ funcionalidad y se consulta antes de adaptar la app.
   - **Validación:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug` y `./gradlew :app:connectedDebugAndroidTest`.
   - **Hecho cuando:** todo pasa sin avisos nuevos de lint, o cada fallo previo está identificado.
   - **Evidencia:** `./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --rerun-tasks` → BUILD SUCCESSFUL; JVM 1599 tests, 0 fallos, 0 errores, 0 omitidos (suma de `app/build/test-results/testDebugUnitTest`, de esta ejecución). Lint: 0 errores y 25 avisos (`lint-results-debug.xml`), los mismos que antes de la 010 (versiones de dependencias y AGP, `OldTargetApi`, `RedundantLabel`, `LockedOrientationActivity`, `DiscouragedApi`, `Typos` en «momento» y un recurso de auth sin usar); ninguno de esta funcionalidad. `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` (suite instrumentada completa, emulador «Medium_Phone_API_37.0», ~11 min) → exit 0; 557 tests, 0 fallos, 0 errores, 1 omitido: `AuthWiringTest.login_cabeceraConBearer_sesionPersisteYSeBorra`, que se omite por `assumeTrue` cuando no se pasan los argumentos `email` y `password` de la cuenta de prueba (preexistente, no tocada por la 010). La app se reinstaló en `emulator-5554` después (`installDebug`), porque el runner la desinstala. No se ejecutó en el segundo emulador (`emulator-5556`).
-- [ ] **T-15 · Pruebas manuales contra el backend local**
+- [x] **T-15 · Pruebas manuales contra el backend local**
   - **Cubre:** CA-01 a CA-18 · **Depende de:** T-14
   - **Alcance:** Emulador y backend local con el PR #163: comprobar primero lo documentado (rutas, `deprecatedAt`, `GET` ordenado, regla del `PUT`) y anotar diferencias en `BACKEND_GAPS.md` de la 010. Reactivar categoría y tag (éxito, cancelar, modo avión), reordenar con arrastre y subir/bajar, refrescar sin que nada se mueva, ver el orden en el formulario de movimiento y el dashboard, «Archivada en …», reabrir sin conexión; con una segunda sesión o `curl`, CA-10, CA-11 y CA-18. Borrar los datos de prueba al terminar.
   - **Validación:** tabla por criterio con resultado y captura.
   - **Hecho cuando:** cada criterio está verificado o marcado como no verificado con su motivo.
-  - **Evidencia:** —
+  - **Evidencia:** 2026-11-26, emulador `emulator-5554` (app debug) contra el backend local en `:3000` (rama con el PR #163), con usuarios de prueba propios creados para esto (credenciales solo en `local.properties`, no versionado: `DEV_TEST_*` y `DEV_TEST2_*`). **Backend (curl):** `POST …/categories/:id/reactivate` y `…/tags/:id/reactivate` responden 204 y conservan la posición (una categoría archivada y reactivada sigue en su lugar: de ahí el segundo paso de la app); `GET …?includeDeprecated=true` trae `deprecatedAt` (nulo si está activa) y `displayOrder` por tipo; `PUT …/categories/order` con `orderedCategoryIds` responde 204 y deja los ids enviados primero y el resto del tipo después en su orden previo (BG-04 como está documentado); lista vacía o con repetidos → 400 `FINANCIAL_TRACKING.INVALID_CATEGORY_ORDER`; un UUID inexistente → 404 `FINANCIAL_TRACKING.CATEGORY_NOT_FOUND` (también en reactivar); un id que no es UUID → 400 `FINANCIAL_TRACKING.INVALID_CATEGORY_ID`. Diferencias menores sin efecto en la app, por eso no hay `BACKEND_GAPS.md` de la 010: reactivar algo ya activo responde 204 (idempotente) y el `PUT` ignora un campo `type` (la app solo envía los ids). **App:** CA-01 (la categoría vuelve entre las activas y salen de «archivadas»; contadores 11→12 y archivadas 1→0; en el backend queda la última de su tipo, CA-17), CA-02 (cancelar la confirmación no cambia nada, confirmado en el backend), CA-04 (el aviso de archivar dice «Podrás reactivarla desde «Categorías archivadas»»), CA-05/CA-17 en tags (un tag archivado se reactiva sin confirmación, aviso «Tag reactivado» y queda el último; backend `t2, t3, t1`), CA-08 y CA-16 (modo avión: «Necesitas conexión para hacer cambios…» al reactivar y al subir/bajar, sin cambios), CA-10 (categoría borrada por otra persona: «Esta categoría ya no existe. Actualizamos la lista.» y desaparece de archivadas), CA-11 (segundo usuario Propietario degradado a Integrante desde la API: al reactivar muestra «No tienes permisos para modificar las categorías de esta familia.», la pantalla pasa a solo lectura sin ⋮, «Reordenar» ni «Crear», y los tags archivados sin «Reactivar»), CA-03/CA-06/CA-15 (con ese mismo Integrante: sin «Reactivar», sin «Reordenar»), CA-13 con fecha («Archivada en Nov 2026», el mes con la configuración regional del dispositivo; sin fecha y desaparición al reactivar solo por tests automáticos), CA-12 (reabrir la app sin conexión muestra las 11 activas y la archivada con su fecha desde la caché), CA-14 (subir/bajar y arrastre real con `adb input swipe` desde el asa: el backend queda `C, B, A`; el mismo orden se ve en el dashboard y en el formulario de movimiento), CA-18 (categoría borrada con el modo «Reordenar» abierto: el movimiento se rechaza con el aviso de «ya no existe», la lista se actualiza y el backend no cambia). **No verificados a mano:** CA-07 (quitar un tag con movimientos: requiere crear un movimiento; cubierto por `CategoryEditContentTest`/`CategoryEditViewModelTest`), CA-09 (doble pulsación con respuesta lenta: no hay forma de ralentizar el backend; cubierto por los tests de `getAndUpdate` en los ViewModels) y la parte «sin fecha» de CA-13. Observaciones sin cambio de código: el aviso sin conexión dice «Lo que escribiste se conserva» también al reactivar o reordenar, donde no hay nada escrito (texto común a todas las acciones de categorías, anterior a esta funcionalidad); una vez la gestión de categorías se cerró sola al volver de segundo plano (`HOME` + `am start`, el proceso sigue vivo), sin repetirse en otras pruebas: queda como observación, no se investigó. Datos de prueba borrados (categorías A, B, C, D, E, Z, el segundo miembro); quedan los dos usuarios de prueba. Capturas de pantalla solo en el directorio temporal de la sesión, no versionadas.
 - [ ] **T-16 · Accesibilidad manual**
   - **Cubre:** CA-19 · **Depende de:** T-14
   - **Alcance:** TalkBack, fuente al 200 % y modo oscuro en «Reactivar» (categoría y tag), «Archivada en …» y el modo de orden.
@@ -143,22 +143,22 @@ funcionalidad y se consulta antes de adaptar la app.
 
 | Criterio | Tareas | Estado |
 | --- | --- | --- |
-| CA-01 | T-06, T-08, T-09, T-15 | Pendiente |
-| CA-02 | T-09, T-15 | Pendiente |
-| CA-03 | T-09, T-15 | Pendiente |
-| CA-04 | T-07, T-15 | Pendiente |
-| CA-05 | T-06, T-12, T-13, T-15 | Pendiente |
-| CA-06 | T-13, T-15 | Pendiente |
-| CA-07 | T-07, T-15 | Pendiente |
-| CA-08 | T-06, T-08, T-12, T-15 | Pendiente |
-| CA-09 | T-08, T-12 | Pendiente |
-| CA-10 | T-06, T-08, T-12, T-15 | Pendiente |
-| CA-11 | T-08, T-12, T-15 | Pendiente |
-| CA-12 | T-02, T-06, T-15 | Pendiente |
-| CA-13 | T-01, T-08, T-09, T-15 | Pendiente |
-| CA-14 | T-05, T-10, T-11, T-15 | Pendiente |
-| CA-15 | T-10, T-11 | Pendiente |
-| CA-16 | T-05, T-10, T-15 | Pendiente |
-| CA-17 | T-06, T-12, T-15 | Pendiente |
-| CA-18 | T-05, T-10, T-15 | Pendiente |
+| CA-01 | T-06, T-08, T-09, T-15 | Verificado (T-06, T-08, T-09 y a mano en T-15) |
+| CA-02 | T-09, T-15 | Verificado (T-09 y a mano) |
+| CA-03 | T-09, T-15 | Verificado (T-09 y a mano con Integrante) |
+| CA-04 | T-07, T-15 | Verificado (T-07 y a mano) |
+| CA-05 | T-06, T-12, T-13, T-15 | Verificado (T-06, T-12, T-13 y a mano) |
+| CA-06 | T-13, T-15 | Verificado (T-13 y a mano con Integrante) |
+| CA-07 | T-07, T-15 | Verificado por tests (T-07); no a mano |
+| CA-08 | T-06, T-08, T-12, T-15 | Verificado (tests y a mano) |
+| CA-09 | T-08, T-12 | Verificado por tests (T-08, T-12); no a mano |
+| CA-10 | T-06, T-08, T-12, T-15 | Verificado (tests y a mano) |
+| CA-11 | T-08, T-12, T-15 | Verificado (tests y a mano) |
+| CA-12 | T-02, T-06, T-15 | Verificado (tests y a mano) |
+| CA-13 | T-01, T-08, T-09, T-15 | Verificado con fecha a mano; sin fecha por tests |
+| CA-14 | T-05, T-10, T-11, T-15 | Verificado (tests y a mano, arrastre real incluido) |
+| CA-15 | T-10, T-11 | Verificado (T-10, T-11 y a mano con Integrante) |
+| CA-16 | T-05, T-10, T-15 | Verificado (tests y a mano) |
+| CA-17 | T-06, T-12, T-15 | Verificado (tests y a mano, categoría y tag) |
+| CA-18 | T-05, T-10, T-15 | Verificado (tests y a mano) |
 | CA-19 | T-09, T-11, T-13, T-16 | Pendiente |
