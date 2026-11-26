@@ -618,7 +618,6 @@ private fun ArchivedRow(
                         ?: stringResource(R.string.categories_status_archived),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
                 )
             }
             if (canManage) {
