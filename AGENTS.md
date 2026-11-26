@@ -128,6 +128,18 @@ luego por funcionalidad (`domain/header`, `data/header`, `ui/main`), no según l
   como `FINANCIAL_TRACKING.*` aunque el contrato documente `FINANCIAL.*`: se aceptan ambos
   prefijos (`BACKEND_GAPS.md` de la 005, BG-06). Los cambios requieren conexión y no hay cola
   offline; lo escrito se conserva ante un fallo.
+  **Reversible y con orden (010)**: `Category` lleva `displayOrder` y `deprecatedAt` (opcionales en la caché sin cambiar
+  `schemaVersion`; una copia antigua se lee sin ellos) y `inDisplayOrder()` ordena de forma estable por `displayOrder`; el
+  repositorio no manda las archivadas al final (la UI las separa), así que archivar no cambia los colores de respaldo, que siguen
+  a la posición. Archivar fija `deprecatedAt` al reloj local; la UI muestra «Archivada en <mes año>» (`formatShortMonth`) o solo
+  «Archivada» si no hay fecha. Reactivar una categoría o un tag es en **dos pasos** porque el backend conserva la posición:
+  `reactivate` y después un `PUT` de orden para llevarla al final de las activas; `ReactivationResult.Partial(orderFailure)` es
+  «reactivada, pero no se pudo mover al final». `reorderCategories(familia, tipo, idsActivosEnOrden)` envía solo los ids y
+  aplica en local la misma regla que el backend (`withOrder`: enviados primero, resto del tipo después, otro tipo intacto).
+  `CategoriesViewModel` ordena con un `pendingOrder` optimista y una sola operación a la vez (`getAndUpdate`/`compareAndSet`); el
+  modo «Reordenar» (asa de arrastre con `ui/common/DragReorder.kt` y subir/bajar para accesibilidad, «Listo» para salir) solo
+  existe para el Propietario, sin búsqueda ni otra operación en curso. Un rechazo por categoría borrada o por rol actualiza la
+  lista y el rol (`onInsufficientRole`) y no deja un orden a medias.
 - **Medios de pago** (`domain/paymentmethods`, `data/paymentmethods`, `ui/paymentmethods`): misma
   separación por capas que categorías, sin código compartido con ella (los fallos son tipos
   distintos por funcionalidad). `PaymentMethodsRepositoryImpl` expone un `Flow` por familia

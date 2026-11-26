@@ -580,6 +580,8 @@ Obtiene las categorías de la familia junto con sus tags anidados.
       "icon": "shopping_cart",
       "color": "teal_500",
       "status": "ACTIVE",
+      "deprecatedAt": null,
+      "displayOrder": 0,
       "tags": [
         {
           "id": "t1t2t3t4-0000-4111-8222-123456789abc",
@@ -597,6 +599,9 @@ Obtiene las categorías de la familia junto con sus tags anidados.
     }
   ]
   ```
+- **Orden y archivado**: las categorías llegan ordenadas por `displayOrder` (posición dentro de su tipo; las anteriores a la
+  migración están empatadas en `0`). `deprecatedAt` (ISO-8601) es la fecha de archivado y es `null` si la categoría está activa
+  o si se archivó antes de la migración; se limpia al reactivar.
 
 ---
 
@@ -631,6 +636,25 @@ Actualiza el nombre, ícono y/o color de una categoría.
 Marca una categoría como deprecada. Deja de aparecer en nuevas opciones de registro.
 - **Autenticación**: Bearer Token + Rol `OWNER`.
 - **Respuesta `204 No Content`**
+
+---
+
+#### `POST /families/:familyId/categories/:categoryId/reactivate`
+Reactiva una categoría deprecada. Conserva la posición (`displayOrder`) que tenía; la app la lleva al final de las activas con
+una segunda llamada a `PUT …/categories/order`. Reactivar una categoría ya activa responde `204` (idempotente).
+- **Autenticación**: Bearer Token + Rol `OWNER`.
+- **Respuesta `204 No Content`**
+- **Errores posibles**: `403` `FAMILY.INSUFFICIENT_ROLE`; `404` `FINANCIAL_TRACKING.CATEGORY_NOT_FOUND`.
+
+---
+
+#### `PUT /families/:familyId/categories/order`
+Ordena las categorías de un tipo. Los ids enviados quedan primero, en ese orden; las categorías del mismo tipo no enviadas
+quedan después en su orden previo y las del otro tipo no cambian. El backend deduce el tipo de los ids (no lee un campo `type`).
+- **Autenticación**: Bearer Token + Rol `OWNER`.
+- **Request Body**: `{ "orderedCategoryIds": ["…", "…"] }` (no vacía, sin repetidos y del mismo tipo).
+- **Respuesta `204 No Content`**
+- **Errores posibles**: `400` `FINANCIAL_TRACKING.INVALID_CATEGORY_ORDER` (vacía o con repetidos) o `FINANCIAL_TRACKING.INVALID_CATEGORY_ID` (un id que no es UUID); `403` `FAMILY.INSUFFICIENT_ROLE`; `404` `FINANCIAL_TRACKING.CATEGORY_NOT_FOUND`.
 
 ---
 
@@ -693,6 +717,14 @@ Reordena los tags de una categoría según la preferencia visual deseada.
 Depreca un tag de la categoría.
 - **Autenticación**: Bearer Token + Rol `OWNER`.
 - **Respuesta `204 No Content`**
+
+---
+
+#### `POST /families/:familyId/categories/:categoryId/tags/:tagId/reactivate`
+Reactiva un tag deprecado; conserva su posición y la app lo lleva al final con `PUT …/tags/order`.
+- **Autenticación**: Bearer Token + Rol `OWNER`.
+- **Respuesta `204 No Content`**
+- **Errores posibles**: `403` `FAMILY.INSUFFICIENT_ROLE`; `404` `FINANCIAL_TRACKING.CATEGORY_NOT_FOUND` o `FINANCIAL_TRACKING.TAG_NOT_FOUND`.
 
 ---
 
